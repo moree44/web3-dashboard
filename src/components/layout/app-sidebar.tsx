@@ -48,9 +48,9 @@ export function AppSidebar({ active }: { active: AppSection }) {
   const [projectOpen, setProjectOpen] = useState(true);
 
   return (
-    <aside className="hidden h-full flex-col border-r border-border bg-secondary px-4 py-5 lg:flex">
+    <aside className="hidden h-full flex-col border-r soft-divider bg-secondary px-4 py-5 lg:flex">
       <Link href="/" className="flex items-center gap-3 rounded-xl px-1 py-1.5 focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="soft-control grid size-9 place-items-center rounded-xl border border-border bg-card text-foreground">
+        <span className="soft-control grid size-9 place-items-center rounded-xl border border-white/[0.06] bg-card text-foreground">
           <Radar aria-hidden="true" className="size-4" strokeWidth={1.8} />
         </span>
         <span className="min-w-0">
@@ -126,7 +126,7 @@ export function AppSidebar({ active }: { active: AppSection }) {
           Settings
         </Link>
         <LogoutButton />
-        <div className="mt-4 rounded-xl border border-border bg-card p-3 soft-panel">
+        <div className="mt-4 rounded-xl border border-white/[0.06] bg-card p-3 soft-panel">
           <div className="flex items-center gap-3">
             <span className="grid size-8 shrink-0 place-items-center rounded-full bg-elevated text-[10px] font-semibold">M</span>
             <span className="min-w-0">
@@ -156,7 +156,7 @@ function NavItem({ label, href, icon: Icon, active, count, placeholder = false }
     >
       <Icon aria-hidden="true" className="size-4" strokeWidth={1.8} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {count ? <span className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">{count}</span> : null}
+      {count ? <span className="rounded-md border border-white/[0.06] bg-card px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">{count}</span> : null}
     </Link>
   );
 }

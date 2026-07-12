@@ -82,32 +82,32 @@ export function DashboardPreview() {
       </header>
 
 
-      <section className="soft-panel mt-3 grid gap-2 rounded-xl border border-border bg-card p-2 xl:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="soft-inset flex min-w-0 items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
+      <section className="soft-panel mt-3 grid gap-2 rounded-xl border border-white/[0.06] bg-card p-2 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="soft-inset flex min-w-0 items-center gap-3 rounded-lg border border-white/[0.055] bg-input px-3 py-2.5">
           <Plus className="size-4 text-muted-foreground" />
           <span className="truncate text-[13px] text-muted-foreground">Capture project link, Twitter watchlist, note, or inbox item...</span>
         </div>
         <div className="grid grid-cols-4 gap-2 xl:flex">
-          <Button variant="secondary" size="sm">Project</Button>
-          <Button variant="secondary" size="sm">Watchlist</Button>
-          <Button variant="secondary" size="sm">Note</Button>
-          <Button variant="secondary" size="sm">Inbox</Button>
+          <Button className="soft-control" variant="secondary" size="sm">Project</Button>
+          <Button className="soft-control" variant="secondary" size="sm">Watchlist</Button>
+          <Button className="soft-control" variant="secondary" size="sm">Note</Button>
+          <Button className="soft-control" variant="secondary" size="sm">Inbox</Button>
         </div>
       </section>
       <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_350px] 2xl:grid-cols-[minmax(420px,1fr)_minmax(340px,0.82fr)_350px]">
         <DashboardPanel icon={StickyNote} title="Notes desk" subtitle="Pinned and recent knowledge" href="/docs">
           <SectionLabel label="Pinned notes" />
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-white/[0.045]">
             {pinnedNotes.map((note) => <PinnedNoteRow key={note.title} note={note} />)}
           </div>
           <SectionLabel label="Recent notes" className="mt-2.5" />
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-white/[0.045]">
             {recentNotes.map((note) => <SimpleRow key={note.title} title={note.title} meta={note.meta} />)}
           </div>
         </DashboardPanel>
 
         <DashboardPanel icon={CalendarClock} title="Upcoming deadlines" subtitle="Nearest date-sensitive items" href="/daily">
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-white/[0.045]">
             {deadlines.map((item) => <DeadlineRow key={item.title} item={item} />)}
           </div>
         </DashboardPanel>
@@ -124,19 +124,19 @@ export function DashboardPreview() {
           </div>
 
           <SectionLabel label="Running / recheck" className="mt-2.5" />
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-white/[0.045]">
             {runningItems.map((item) => <SignalRow key={item.title} item={item} />)}
           </div>
         </DashboardPanel>
 
         <DashboardPanel icon={Inbox} title="Inbox to process" subtitle="Raw input waiting for a decision" href="/inbox">
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-white/[0.045]">
             {inboxItems.map((item) => <InboxRow key={item.title} item={item} />)}
           </div>
         </DashboardPanel>
 
         <DashboardPanel icon={AlertCircle} title="Recent activity" subtitle="Small latest changes" href="/projects">
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-white/[0.045]">
             {recentActivity.map((activity) => <Activity key={activity.text} {...activity} />)}
           </div>
         </DashboardPanel>
@@ -147,10 +147,10 @@ export function DashboardPreview() {
 
 function DashboardPanel({ icon: Icon, title, subtitle, href, className = "", children }: { icon: typeof Inbox; title: string; subtitle: string; href: string; className?: string; children: ReactNode }) {
   return (
-    <section className={"soft-panel overflow-hidden rounded-xl border border-border bg-card " + className}>
-      <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5">
+    <section className={"soft-panel overflow-hidden rounded-xl bg-card " + className}>
+      <div className="flex items-center justify-between gap-3 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-border bg-muted text-muted-foreground"><Icon className="size-4" /></span>
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/[0.04] text-muted-foreground"><Icon className="size-4" /></span>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold">{title}</h2>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{subtitle}</p>
@@ -203,7 +203,7 @@ function SimpleRow({ title, meta }: { title: string; meta: string }) {
 
 function MetricTile({ item }: { item: (typeof overviewMetrics)[number] }) {
   return (
-    <Link href="/projects" className="rounded-lg border border-border bg-muted/35 px-3 py-2 hover:bg-accent/45">
+    <Link href="/projects" className="rounded-lg bg-white/[0.035] px-3 py-2 hover:bg-white/[0.055]">
       <span className="block text-[11px] text-muted-foreground">{item.label}</span>
       <span className="mt-0.5 block text-[18px] font-semibold leading-none tabular-nums tracking-[-0.025em]">{item.value}</span>
     </Link>

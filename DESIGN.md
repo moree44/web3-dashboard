@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
 **Version:** 2.9
-**Status:** Final visual direction for current Phase 1 preview and Dashboard V3 clean desk
+**Status:** Final visual direction for current Phase 1 preview, Dashboard V3 clean desk, and softer workbench tone
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -188,6 +188,64 @@ Panels should have:
 Avoid heavy card stacks.
 
 Avoid equal-weight panels everywhere.
+
+---
+
+
+## 6C. Quick Create Modal Rule
+
+Create flows should stay compact. The first modal captures only what is needed to create a useful record. Heavy setup belongs in detail panels after the object exists.
+
+For Add Project, the active direction is a compact quick-create modal with:
+
+* compact logo slot
+* project name
+* date field for when the project was recorded, watched, or started
+* hunt type
+* stage/result
+* status
+* priority
+* assigned accounts
+* optional URL, work type, project type, and short note
+
+Move these to project detail instead of the quick-create modal:
+
+* full logo upload workflow
+* detailed wallet assignment
+* starter task generation
+* full docs/resources
+* long Watchlist explanation
+* activity/history
+
+The modal should feel quick to open, quick to scan, and safe to skip optional fields. The project name remains the clearest first input.
+
+Native browser select menus should be avoided in dark modals because their option popup can render with browser-default styling. Use compact custom dark dropdowns for enum-like controls such as Hunt Type, Stage/Result, Status, and Priority. Priority should use small ranking glyphs instead of bright color blocks.
+
+When a create modal has several enum-like properties, prefer compact property controls over full stacked form controls. Only one dropdown should be open at a time. Date should be aligned as a field, not a floating or clipped chip.
+ Internal modal dividers should be avoided unless they materially improve grouping. Add Project uses a subtle enter animation so opening the modal feels responsive without becoming decorative.
+
+## 6B. Visual Tone Adjustment
+
+The interface should avoid a terminal or code-editor feel.
+
+Use:
+
+* near-black base surfaces
+* sidebar and app canvas separation
+* softer borders
+* visible but subtle shadows
+* inset inputs that differ from card backgrounds
+* raised controls for buttons and active pills
+
+Avoid:
+
+* strong border outlines everywhere
+* flat black panels
+* equal-depth cards, inputs, and rows
+* excessive terminal-like separators
+* strong internal dividers inside every card
+
+Quick Capture and form inputs should use an inset well. Cards and modal sections should use soft shadow depth rather than relying only on borders.
 
 ---
 
@@ -839,9 +897,9 @@ Projects should support:
 * wallets
 * progress
 * dates
-* last activity
-
 Dashboard must not duplicate this full table.
+
+Avoid vague preview columns such as Activity unless they are backed by a clear activity log or last-updated field. If needed later, use a clearer label such as Last updated.
 
 Mobile should use compact project cards instead of squeezing table columns.
 
@@ -860,11 +918,33 @@ The detail panel keeps the project table visible in the background and gives fas
 * links
 * project docs
 * project tasks
-* about/notes area
 
-Project docs in the side panel are linked to the Docs system, but the user should not need to leave the project detail just to read project-specific notes.
+Project-specific notes should live in linked Project docs, not in a separate free-floating About textarea inside the panel. The side panel may show a main project doc, setup notes, result notes, and task links as compact rows.
+
+Future connected behavior: creating a project should create or prepare a project doc record using the project name. Active grind/testnet projects and Watchlist projects may later be organized differently in Docs, but the preview should avoid exposing folder complexity before the Docs system is real.
 
 The panel should feel like a compact project page, not a full-screen document editor.
+
+### Add Project Quick Create Preview
+
+Add Project should not feel like a heavy setup form. The current direction is quick create first, detail completion later.
+
+The modal layout should prioritize:
+
+```txt
+Logo | Project name | Date
+Hunt type | Stage | Status | Priority
+Assigned accounts
+Optional context
+```
+
+Date means the date the project was recorded, added to Watchlist, or started. It is not an end date.
+
+Accounts are selected in quick create. Wallet choices are completed later from the project detail because wallets belong to personas in the Accounts area.
+
+Starter tasks are not shown as a heavy first-step section. They can be suggested later after project creation, and should never be auto-created without user confirmation.
+
+Watchlist behavior remains a product rule, but long explanatory Watchlist copy should not clutter the quick-create modal.
 
 ---
 
@@ -891,6 +971,8 @@ Trading should feel like a calm ledger, not a crypto exchange terminal. Keep it 
 
 Tasks is for cross-project task management.
 
+Use `/projects` → `All Project` as the locked visual baseline for spacing, density, dark surfaces, subtle dividers, button treatment, chip treatment, dropdowns, and modal polish. Other workbench pages should follow that direction before inventing a new visual language.
+
 Use compact list-first layout, with Board as a clean secondary work surface.
 
 Primary views:
@@ -906,12 +988,15 @@ List view is for dense scanning and editing across many projects.
 
 Board view should feel like a precise task board:
 
-* calm fixed columns
+* support By Project and By Status grouping
+* default preview grouping can be By Project because the user often thinks by active project
+* calm fixed-width lanes
 * compact cards
-* add-card slot at the top of each column
+* single Add Task action in the page header, no per-lane plus controls unless real UX requires it later
 * two-line max task titles
-* two-line max descriptions
-* status, mode, frequency, project, account, due, and last log visible without opening detail
+* when grouped by project, do not repeat the project name inside every card
+* status, mode, frequency, account, and due visible without opening detail
+* descriptions, notes count, proof count, and long logs should move to detail panels later
 * scalable filters instead of horizontal chips for every project
 * compact Running monitor rows that respect the active project filter
 * subtle hover only
@@ -927,6 +1012,8 @@ Done
 ```
 
 Running is not treated as a generic board column by default.
+
+Add Task can use a compact quick-create modal in preview and later should connect to project tasks, Daily generation, and task logs. Search and filters should be functional wherever possible, even before persistence, so the workflow can be tested with preview data.
 
 Running is a special monitoring state for process-based work only, such as:
 

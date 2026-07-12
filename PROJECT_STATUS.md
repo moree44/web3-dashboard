@@ -1,6 +1,6 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-07-08
+Last updated: 2026-07-09
 
 ## Current Situation
 
@@ -141,9 +141,82 @@ Implemented:
 
 - Project names in the Projects table can now be clicked
 - Clicking a project opens a right-side detail panel preview
-- Detail panel shows project identity, status, priority, stage/result, completion, dates, work type, project type, accounts, links, project docs, tasks, and about notes
-- Project docs are represented inside the panel as linked docs preview
-- Detail panel is visual only and not connected to persistence yet
+- Detail panel shows project identity, properties, stage/result, completion, dates, work type, project type, accounts, links, project docs, and tasks
+- Removed the preview label, duplicate hero status/priority badges, and separate About textarea from the side panel preview
+- Project docs are now the intended home for project-specific notes in the panel preview
+- Detail panel is visual only and not connected to persistence, Docs records, or auto-created project docs yet
+
+### Batch 2F.1 - Add Project Flow Preview
+
+Completed on 2026-07-09.
+
+Implemented:
+
+- Explored a sectioned Add Project popup workflow: Identity, Classification, Accounts & Wallets, Starter Tasks
+- Assigned accounts drove wallet suggestions visually
+- Wallets were grouped under selected accounts in the preview
+- Added project wallet creation placeholder
+- Added starter task suggestion preview with explicit confirmation behavior
+- Added Watchlist rule copy for registered, waiting result, joined whitelist, and similar waiting stages
+- This sectioned approach was later superseded by the compact quick-create direction in Batch 2K
+- Still visual only and not connected to persistence yet
+
+### Batch 2K - Add Project Compact Quick Create Preview
+
+Completed on 2026-07-10 and refined on 2026-07-11.
+
+Implemented:
+
+- Simplified Add Project popup into a compact quick-create flow
+- Current top area uses compact logo slot, project name, and date aligned in one row
+- Date records when the project was captured, watched, or started. It is not an end date
+- Kept only useful initial fields: hunt type, stage/result, status, priority, assigned accounts, optional URL, work type, project type, and short note
+- Removed heavy first-step sections from the popup preview, including detailed wallet selection, starter task generation, and long Watchlist explanation
+- Reframed full logo upload, wallets, starter tasks, docs, and full links as detail-panel work after project creation
+- Added project-name autofocus for a faster create feel
+- Replaced native select controls with compact custom dark dropdown previews for Hunt Type, Stage/Result, Status, and Priority
+- Added compact priority glyphs so the dropdown does not rely on bright color blocks
+- Made Add Project dropdowns mutually exclusive so opening one closes the previous one
+- Removed the short summary field so project name is the clear first input
+- Clarified account wallet helper copy to explain that wallets come from selected accounts
+- Reduced internal Add Project modal divider lines for a cleaner surface
+- Added a subtle Add Project modal enter animation
+- Replaced the priority glyph with a cleaner signal-style SVG icon
+- Removed Projects header caption under the page title
+- Added fixed table column widths for better Projects table header/body alignment
+- Updated Projects table priority display to use the same signal-style icon as Add Project
+- Made the whole project identity area clickable to open the side detail panel preview
+- Removed the vague Activity column from the Projects preview until real activity log data exists
+- Adjusted Completion progress alignment in both table rows and the side detail panel
+- Made overflow Work Type and Project Type chips clickable so hidden tags can be inspected in a small popover
+- Kept this as visual-only and did not add persistence, real logo upload, account-wallet data, or Supabase wiring
+
+### Batch 2J - Divider and Color Correction Pass
+
+Completed on 2026-07-09.
+
+Implemented:
+
+- Kept the softer divider treatment from the visual pass
+- Reverted the unapproved Projects table direction from the previous visual pass
+- Removed the extra Projects Health column from the preview
+- Restored the previous Projects table information structure
+- Reduced excessive preview color by neutralizing fallback project marks, Add Project button tone, and progress bars
+- Kept this as visual-only and did not change PRD behavior, database schema, or persistence
+
+### Batch 2I - Visual Tone Pass 1
+
+Completed on 2026-07-09.
+
+Implemented:
+
+- Adjusted theme tokens toward warmer charcoal and softer depth
+- Reduced terminal-like flatness by improving panel, card, control, and inset shadows
+- Made Quick Capture input area feel more inset and intentional
+- Softened key Projects modal and Tasks board surfaces without changing workflow logic
+- Kept this as visual-only and did not change PRD behavior or data model
+- Follow-up adjusted palette toward a cleaner near-black dark base with subtle borders and muted text
+- Follow-up reduced terminal-like internal dividers and kept stronger lines only for major structure
 
 ### Batch 2G - Tasks Preview Page
 
@@ -177,9 +250,13 @@ Implemented:
 - Moved Running out of normal board columns and into a special Running monitor strip/view
 - Clarified Running as process-based work only, such as node, CLI, prover, bot, validator, extension process, or long-running services
 - Reworked Recheck view into a review queue for eligibility, waitlist, claim, mint, proof, and result checks
-- Improved task card precision with compact priority/mode chips, project identity, accounts, due date, last log, notes, and proof count
+- Improved task card precision with compact priority/mode chips, project identity, accounts, and due date
 - Follow-up refined Board filters from project chips into scalable filter controls
 - Follow-up made Board Running monitor compact and project-filter aware
+- Follow-up aligned Tasks visual direction with Projects by removing the long page caption, reducing colored chips, neutralizing project marks, removing Last activity/Last log preview noise, and making board cards more compact
+- Follow-up removed per-column board add buttons and the list inline quick-add row so Add Task uses one primary entry point in the page header
+- Follow-up removed duplicate Running and frequency labels from the board preview
+- Follow-up added functional preview UX for Tasks search, project filter, account filter, mode filter, Add Task modal, local preview task creation, and task detail side panel
 
 ## Current Product Direction
 
