@@ -80,7 +80,6 @@ export function InboxPreview() {
         <div>
           <p className="text-xs text-muted-foreground">Inbox · Preview queue</p>
           <h1 className="font-display mt-1 text-2xl font-semibold tracking-[-0.025em]">Raw input before it becomes work</h1>
-          <p className="mt-1 text-xs text-muted-foreground">Manual captures, copied links, reminders, and notes waiting for a decision.</p>
         </div>
         <Button size="sm"><Plus />New inbox item</Button>
       </header>

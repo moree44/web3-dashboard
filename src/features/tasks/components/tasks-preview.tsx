@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type TaskStatus = "Todo" | "In progress" | "Running" | "Recheck" | "Done";
+type TaskStatus = "Not started" | "Todo" | "In progress" | "Running" | "Recheck" | "Done";
 type TaskView = "list" | "board" | "running" | "recheck";
 type BoardGroup = "project" | "status";
 
@@ -51,9 +51,13 @@ const viewTabs: { label: string; value: TaskView }[] = [
 const projectFilterOptions = ["All", "Soundness", "NexusHQ", "Linera", "Huddle01", "Drosera"];
 const accountFilterOptions = ["All", "Moree", "Wdym", "Wayss"];
 const modeFilterOptions = ["All", "Site interaction", "Discord activity", "Proof submit", "Node / CLI", "Waitlist check", "Claim", "Form registration"];
-const statusOptions: TaskStatus[] = ["Todo", "In progress", "Running", "Recheck", "Done"];
+const statusOptions: TaskStatus[] = ["Not started", "Todo", "In progress", "Running", "Recheck", "Done"];
 const frequencyOptions: Task["frequency"][] = ["once", "daily", "weekly", "monthly", "custom"];
 const priorityOptions: Task["priority"][] = ["High", "Medium", "Low"];
+
+function formatFrequency(value: Task["frequency"]) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 const boardGroupOptions: { label: string; value: BoardGroup }[] = [
   { label: "By Project", value: "project" },
   { label: "By Status", value: "status" },
@@ -200,7 +204,7 @@ const tasks: Task[] = [
   },
 ];
 
-const boardColumns: TaskStatus[] = ["Todo", "In progress", "Recheck", "Done"];
+const boardColumns: TaskStatus[] = ["Not started", "Todo", "In progress", "Recheck", "Done"];
 
 function statusVariant(status: TaskStatus) {
   switch (status) {
@@ -212,6 +216,8 @@ function statusVariant(status: TaskStatus) {
       return "outline" as const;
     case "In progress":
       return "info" as const;
+    case "Not started":
+      return "secondary" as const;
     default:
       return "secondary" as const;
   }
@@ -291,12 +297,12 @@ function TaskListRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
           <TaskIdentity task={task} />
         </button>
       </td>
-      <td className="px-3"><ModeChip task={task} /></td>
-      <td className="px-3"><Badge variant={statusVariant(task.status)} className="text-[10px]">{task.status}</Badge></td>
-      <td className="px-3"><Badge variant="outline" className="text-[10px]">{task.frequency}</Badge></td>
-      <td className="px-3"><AccountChips accounts={task.accounts} /></td>
-      <td className="whitespace-nowrap px-3 text-xs text-muted-foreground">{task.due}</td>
-      <td className="px-3"><Priority value={task.priority} /></td>
+      <td className="px-3 align-middle"><div className="flex items-center"><ModeChip task={task} /></div></td>
+      <td className="px-3 align-middle"><div className="flex items-center"><Badge variant={statusVariant(task.status)} className="text-[10px]">{task.status}</Badge></div></td>
+      <td className="px-3 align-middle"><div className="flex items-center"><Badge variant="outline" className="text-[10px]">{formatFrequency(task.frequency)}</Badge></div></td>
+      <td className="px-3 align-middle"><AccountChips accounts={task.accounts} /></td>
+      <td className="whitespace-nowrap px-3 align-middle text-xs text-muted-foreground">{task.due}</td>
+      <td className="px-3 align-middle"><Priority value={task.priority} /></td>
       <td className="w-12 px-3">
         <button className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" aria-label={"More options for " + task.title}>
           <MoreHorizontal className="size-4" />
@@ -330,7 +336,7 @@ function TaskBoardCard({ task, onOpen, hideProject = false }: { task: Task; onOp
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Badge variant={statusVariant(task.status)} className="text-[10px]">{task.status}</Badge>
-        <Badge variant="outline" className="text-[10px]">{task.frequency}</Badge>
+        <Badge variant="outline" className="text-[10px]">{formatFrequency(task.frequency)}</Badge>
         {!hideProject ? <ModeChip task={task} /> : null}
       </div>
 
@@ -482,7 +488,7 @@ function ReviewQueueCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
     <article className="grid gap-3 border-b soft-divider px-4 py-3 hover:bg-accent/25 lg:grid-cols-[minmax(280px,1fr)_140px_120px_110px_80px] lg:items-center lg:px-6">
       <button type="button" onClick={onOpen} className="text-left"><TaskIdentity task={task} /></button>
       <div className="flex items-center gap-2 lg:block">
-        <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground lg:block">Due</span>
+        <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground lg:block">Date start</span>
         <span className="text-xs font-medium text-warning lg:mt-1 lg:block">{task.due}</span>
       </div>
       <AccountChips accounts={task.accounts} />
@@ -514,19 +520,23 @@ function TaskMobileCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
 function AddTaskDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (task: Task) => void }) {
   const [title, setTitle] = useState("");
   const [project, setProject] = useState("Soundness");
-  const [status, setStatus] = useState<TaskStatus>("Todo");
+  const [status, setStatus] = useState<TaskStatus>("Not started");
   const [frequency, setFrequency] = useState<Task["frequency"]>("once");
   const [priority, setPriority] = useState<Task["priority"]>("Medium");
-  const [account, setAccount] = useState("Moree");
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(["Moree"]);
   const [mode, setMode] = useState("Site interaction");
-  const [due, setDue] = useState("Today");
+  const [due, setDue] = useState("");
   const [note, setNote] = useState("");
   const [openSelect, setOpenSelect] = useState<string | null>(null);
 
   if (!open) return null;
 
   const projectMark = project[0] ?? "T";
-  const canCreate = title.trim().length > 0;
+  const accountOptions = accountFilterOptions.filter((item) => item !== "All");
+  const toggleAccount = (account: string) => {
+    setSelectedAccounts((accounts) => accounts.includes(account) ? accounts.filter((item) => item !== account) : [...accounts, account]);
+  };
+  const canCreate = title.trim().length > 0 && selectedAccounts.length > 0;
 
   return (
     <div className="modal-backdrop-in fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="add-task-title">
@@ -547,18 +557,39 @@ function AddTaskDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
 
           <div className="mt-3 grid gap-3 px-2 md:grid-cols-2">
             <SelectField id="task-project" label="Project" value={project} options={projectFilterOptions.filter((item) => item !== "All")} onChange={setProject} openSelect={openSelect} setOpenSelect={setOpenSelect} />
-            <SelectField id="task-account" label="Account" value={account} options={accountFilterOptions.filter((item) => item !== "All")} onChange={setAccount} openSelect={openSelect} setOpenSelect={setOpenSelect} />
             <SelectField id="task-status" label="Status" value={status} options={statusOptions} onChange={(value) => setStatus(value as TaskStatus)} openSelect={openSelect} setOpenSelect={setOpenSelect} />
-            <SelectField id="task-frequency" label="Frequency" value={frequency} options={frequencyOptions} onChange={(value) => setFrequency(value as Task["frequency"])} openSelect={openSelect} setOpenSelect={setOpenSelect} />
+            <SelectField id="task-frequency" label="Frequency" value={frequency} options={frequencyOptions} onChange={(value) => setFrequency(value as Task["frequency"])} openSelect={openSelect} setOpenSelect={setOpenSelect} formatOption={(value) => formatFrequency(value as Task["frequency"])} />
             <SelectField id="task-priority" label="Priority" value={priority} options={priorityOptions} onChange={(value) => setPriority(value as Task["priority"])} openSelect={openSelect} setOpenSelect={setOpenSelect} />
             <SelectField id="task-mode" label="Mode" value={mode} options={modeFilterOptions.filter((item) => item !== "All")} onChange={setMode} openSelect={openSelect} setOpenSelect={setOpenSelect} />
           </div>
 
+          <div className="mt-3 px-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Assigned accounts</span>
+              <span className="text-[11px] text-muted-foreground">multi-select</span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {accountOptions.map((account) => {
+                const selected = selectedAccounts.includes(account);
+                return (
+                  <button
+                    key={account}
+                    type="button"
+                    onClick={() => toggleAccount(account)}
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                      selected ? "bg-white/[0.11] text-foreground" : "bg-white/[0.035] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
+                    )}
+                  >
+                    {account}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="mt-3 grid gap-3 px-2 md:grid-cols-[180px_1fr]">
-            <label>
-              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Due</span>
-              <input value={due} onChange={(event) => setDue(event.target.value)} className="mt-1.5 h-9 w-full soft-inset rounded-lg border border-white/[0.055] bg-input px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-ring" placeholder="Today" />
-            </label>
+            <DatePickerField label="Date start" value={due} onChange={setDue} />
             <label>
               <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Short note</span>
               <input value={note} onChange={(event) => setNote(event.target.value)} className="mt-1.5 h-9 w-full soft-inset rounded-lg border border-white/[0.055] bg-input px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-ring" placeholder="Optional context" />
@@ -566,8 +597,7 @@ function AddTaskDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t soft-divider bg-muted/20 px-4 py-2.5">
-          <p className="text-[11px] text-muted-foreground">Preview only. This will connect to project tasks, Daily, and task logs later.</p>
+        <div className="flex items-center justify-end gap-3 border-t soft-divider bg-muted/20 px-4 py-2.5">
           <div className="flex shrink-0 gap-2">
             <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
             <Button size="sm" className="bg-accent text-foreground hover:bg-white/[0.09]" disabled={!canCreate} onClick={() => onCreate({
@@ -581,8 +611,8 @@ function AddTaskDialog({ open, onClose, onCreate }: { open: boolean; onClose: ()
               status,
               frequency,
               priority,
-              accounts: [account],
-              due,
+              accounts: selectedAccounts,
+              due: due || "No date",
               lastLog: "No log",
               comments: 0,
               proofs: 0,
@@ -604,6 +634,7 @@ function SelectField({
   onChange,
   openSelect,
   setOpenSelect,
+  formatOption = (option) => option,
 }: {
   id: string;
   label: string;
@@ -612,6 +643,7 @@ function SelectField({
   onChange: (value: string) => void;
   openSelect: string | null;
   setOpenSelect: (value: string | null) => void;
+  formatOption?: (value: string) => string;
 }) {
   const isOpen = openSelect === id;
 
@@ -623,7 +655,7 @@ function SelectField({
         onClick={() => setOpenSelect(isOpen ? null : id)}
         className="mt-1.5 flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-white/[0.065] bg-white/[0.025] px-3 text-left text-sm font-medium text-foreground outline-none transition-colors hover:bg-white/[0.045] focus:border-ring"
       >
-        <span className="truncate">{value}</span>
+        <span className="truncate">{formatOption(value)}</span>
         <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", isOpen ? "rotate-180" : "")} />
       </button>
       {isOpen ? (
@@ -643,7 +675,7 @@ function SelectField({
                   selected ? "bg-white/[0.075] text-foreground" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground",
                 )}
               >
-                <span className="truncate font-medium">{option}</span>
+                <span className="truncate font-medium">{formatOption(option)}</span>
                 {selected ? <Check className="size-3.5 text-muted-foreground" /> : null}
               </button>
             );
@@ -652,6 +684,105 @@ function SelectField({
       ) : null}
     </div>
   );
+}
+
+function DatePickerField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const days = getCalendarDays(visibleMonth);
+  const todayLabel = formatDateLabel(new Date());
+
+  return (
+    <div className="relative">
+      <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</span>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "mt-1.5 flex h-9 w-full items-center gap-2 rounded-lg border border-white/[0.065] bg-white/[0.025] px-3 text-left text-sm outline-none transition-colors hover:bg-white/[0.045]",
+          open ? "border-white/[0.12] bg-white/[0.045]" : "",
+        )}
+      >
+        <CalendarClock className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className={cn("min-w-0 flex-1 truncate font-medium", value ? "text-foreground" : "text-muted-foreground")}>{value || "Select date"}</span>
+        <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open ? "rotate-180" : "")} />
+      </button>
+
+      {open ? (
+        <div className="absolute left-0 top-full z-[80] mt-1.5 w-[252px] overflow-hidden rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-2 shadow-2xl shadow-black/45 backdrop-blur">
+          <div className="flex items-center justify-between gap-2 px-1 pb-2">
+            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, -1))} className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" aria-label="Previous month">‹</button>
+            <div className="text-xs font-semibold text-foreground">{formatMonthLabel(visibleMonth)}</div>
+            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))} className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" aria-label="Next month">›</button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 px-1 pb-1 text-center text-[10px] font-medium text-muted-foreground">
+            {weekDays.map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {days.map((day) => {
+              const labelValue = formatDateLabel(day.date);
+              const selected = value === labelValue;
+              const isToday = todayLabel === labelValue;
+              return (
+                <button
+                  key={day.key}
+                  type="button"
+                  onClick={() => {
+                    onChange(labelValue);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "grid size-7 place-items-center rounded-lg text-[11px] font-medium transition-colors",
+                    day.inMonth ? "text-foreground hover:bg-white/[0.065]" : "text-muted-foreground/45 hover:bg-white/[0.04]",
+                    selected ? "bg-white/[0.12] text-foreground shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08)]" : "",
+                    !selected && isToday ? "text-info" : "",
+                  )}
+                >
+                  {day.date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-2 flex items-center justify-between border-t border-white/[0.055] px-1 pt-2">
+            <button type="button" onClick={() => onChange("")} className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:bg-white/[0.055] hover:text-foreground">Clear</button>
+            <button type="button" onClick={() => { onChange(todayLabel); setVisibleMonth(new Date()); setOpen(false); }} className="rounded-lg px-2 py-1 text-[11px] font-medium text-foreground hover:bg-white/[0.055]">Today</button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function formatMonthLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(date);
+}
+
+function formatDateLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+}
+
+function getCalendarDays(monthDate: Date) {
+  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const start = new Date(firstDay);
+  start.setDate(firstDay.getDate() - firstDay.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return {
+      date,
+      key: date.toISOString(),
+      inMonth: date.getMonth() === monthDate.getMonth(),
+    };
+  });
 }
 
 function TaskDetailPanel({ task, onClose }: { task: Task | null; onClose: () => void }) {
@@ -675,9 +806,9 @@ function TaskDetailPanel({ task, onClose }: { task: Task | null; onClose: () => 
 
           <section className="mt-6 grid gap-x-6 gap-y-4 border-t border-white/[0.045] pt-4 sm:grid-cols-2">
             <TaskProperty label="Status"><Badge variant={statusVariant(task.status)}>{task.status}</Badge></TaskProperty>
-            <TaskProperty label="Frequency"><Badge variant="outline">{task.frequency}</Badge></TaskProperty>
+            <TaskProperty label="Frequency"><Badge variant="outline">{formatFrequency(task.frequency)}</Badge></TaskProperty>
             <TaskProperty label="Priority"><Priority value={task.priority} /></TaskProperty>
-            <TaskProperty label="Due"><span>{task.due}</span></TaskProperty>
+            <TaskProperty label="Date start"><span>{task.due}</span></TaskProperty>
             <TaskProperty label="Mode"><ModeChip task={task} /></TaskProperty>
             <TaskProperty label="Accounts"><AccountChips accounts={task.accounts} /></TaskProperty>
           </section>
@@ -737,7 +868,6 @@ export function TasksPreview() {
 
   const runningTasks = taskItems.filter((task) => task.status === "Running");
   const recheckTasks = taskItems.filter((task) => task.status === "Recheck");
-  const actionableTasks = taskItems.filter((task) => task.status === "Todo" || task.status === "In progress");
 
   const filterTasks = (items: Task[]) => {
     const query = searchQuery.trim().toLowerCase();
@@ -770,9 +900,6 @@ export function TasksPreview() {
     <div className="min-w-0 py-5 lg:py-7">
       <header className="flex flex-col gap-4 border-b soft-divider px-4 pb-5 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
         <div>
-          <p className="text-xs text-muted-foreground">
-            {tasks.length} tasks · {actionableTasks.length} actionable · {runningTasks.length} running · {recheckTasks.length} recheck
-          </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Tasks</h1>
         </div>
         <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add task</Button>
@@ -873,17 +1000,27 @@ export function TasksPreview() {
       ) : (
         <>
           <div className="hidden overflow-x-auto lg:block">
-            <table className="w-full min-w-[980px] border-collapse text-left">
+            <table className="w-full min-w-[1040px] table-fixed border-collapse text-left">
+              <colgroup>
+                <col className="w-[35%]" />
+                <col className="w-[13%]" />
+                <col className="w-[11%]" />
+                <col className="w-[11%]" />
+                <col className="w-[9%]" />
+                <col className="w-[9%]" />
+                <col className="w-[9%]" />
+                <col className="w-12" />
+              </colgroup>
               <thead className="sticky top-0 z-10 bg-secondary text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 <tr>
-                  <th className="min-w-[300px] border-b soft-divider px-4 py-3 lg:px-6">Task</th>
-                  <th className="border-b soft-divider px-3 py-3">Mode</th>
-                  <th className="border-b soft-divider px-3 py-3">Status</th>
-                  <th className="border-b soft-divider px-3 py-3">Frequency</th>
-                  <th className="border-b soft-divider px-3 py-3">Account</th>
-                  <th className="border-b soft-divider px-3 py-3">Due</th>
-                  <th className="border-b soft-divider px-3 py-3">Priority</th>
-                  <th className="w-12 border-b soft-divider px-3 py-3"><span className="sr-only">Actions</span></th>
+                  <th className="border-b soft-divider px-4 py-3 align-middle lg:px-6">Task</th>
+                  <th className="border-b soft-divider px-3 py-3 align-middle">Mode</th>
+                  <th className="border-b soft-divider px-3 py-3 align-middle">Status</th>
+                  <th className="border-b soft-divider px-3 py-3 align-middle">Frequency</th>
+                  <th className="border-b soft-divider px-3 py-3 align-middle">Account</th>
+                  <th className="border-b soft-divider px-3 py-3 align-middle">Date start</th>
+                  <th className="border-b soft-divider px-3 py-3 align-middle">Priority</th>
+                  <th className="w-12 border-b soft-divider px-3 py-3 align-middle"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

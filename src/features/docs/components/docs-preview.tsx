@@ -45,7 +45,6 @@ export function DocsPreview() {
         <div>
           <p className="text-xs text-muted-foreground">Docs · Knowledge library</p>
           <h1 className="font-display mt-1 text-2xl font-semibold tracking-[-0.025em]">Notes, research, links, and safe access metadata</h1>
-          <p className="mt-1 text-xs text-muted-foreground">Docs replaces standalone Notes and keeps references separate from the Daily checklist.</p>
         </div>
         <Button size="sm"><Plus />New doc</Button>
       </header>

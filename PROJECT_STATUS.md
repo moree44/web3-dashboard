@@ -1,6 +1,6 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-07-09
+Last updated: 2026-07-14
 
 ## Current Situation
 
@@ -190,6 +190,13 @@ Implemented:
 - Adjusted Completion progress alignment in both table rows and the side detail panel
 - Made overflow Work Type and Project Type chips clickable so hidden tags can be inspected in a small popover
 - Kept this as visual-only and did not add persistence, real logo upload, account-wallet data, or Supabase wiring
+- Follow-up added persistent uppercase labels above Add Project property controls: Hunt Type, Stage, Status, and Priority
+- Follow-up converted Hunt Type and Stage into custom-capable combobox controls for preview flexibility
+- Follow-up converted Work Type and Project Type optional fields into custom-capable combobox controls
+- Follow-up kept Status, Priority, and Date as controlled fixed fields because they map to stricter workflow meaning
+- Follow-up made Add Project combobox dropdowns internally scrollable so long Work Type and Project Type option lists do not clip against the modal
+- Follow-up adjusted spacing between Assigned accounts and Optional context so modal sections keep a consistent rhythm
+- Follow-up removed the persistent Add Project footer preview caption so the footer only contains Cancel and Create project actions
 
 ### Batch 2J - Divider and Color Correction Pass
 
@@ -244,19 +251,24 @@ Implemented:
 - Reworked `/tasks` preview into a cleaner cross-project work queue
 - Added visual execution mode to preview tasks, such as Site interaction, Discord activity, Proof submit, Waitlist check, Claim, and Node / CLI
 - Kept execution mode as visual-only for now, not a PRD/database field yet
-- Refined List view with Mode, Status, Frequency, Account, Due, Last log, and Priority columns
+- Refined List view with Mode, Status, Frequency, Account, Date start, and Priority columns
 - Added inline quick-add preview row in List view
 - Reworked Board view into calm fixed columns: Todo, In progress, Recheck, Done
 - Moved Running out of normal board columns and into a special Running monitor strip/view
 - Clarified Running as process-based work only, such as node, CLI, prover, bot, validator, extension process, or long-running services
 - Reworked Recheck view into a review queue for eligibility, waitlist, claim, mint, proof, and result checks
-- Improved task card precision with compact priority/mode chips, project identity, accounts, and due date
+- Improved task card precision with compact priority/mode chips, project identity, accounts, and Date start
 - Follow-up refined Board filters from project chips into scalable filter controls
 - Follow-up made Board Running monitor compact and project-filter aware
 - Follow-up aligned Tasks visual direction with Projects by removing the long page caption, reducing colored chips, neutralizing project marks, removing Last activity/Last log preview noise, and making board cards more compact
 - Follow-up removed per-column board add buttons and the list inline quick-add row so Add Task uses one primary entry point in the page header
 - Follow-up removed duplicate Running and frequency labels from the board preview
 - Follow-up added functional preview UX for Tasks search, project filter, account filter, mode filter, Add Task modal, local preview task creation, and task detail side panel
+- Follow-up added By Project and By Status board grouping, with By Project as the default preview grouping
+- Follow-up added multi-account selection in Add Task, capitalized frequency labels, Not started status, and Date start wording in place of Due
+- Follow-up confirmed Add Task dropdowns keep persistent labels for Project, Status, Frequency, Priority, and Mode
+- Follow-up kept Add Task Status, Priority, and Frequency as fixed-option controls because they map to database enum behavior later
+- Follow-up removed the persistent Add Task footer preview caption so the footer only contains Cancel and Create task actions
 
 ## Current Product Direction
 
@@ -336,6 +348,12 @@ Supabase foundation, real auth verification, schema, migrations, and RLS still n
 
 Current accepted visual direction:
 
+Current visual baseline:
+
+- `/projects` is the locked spacing and visual reference for future page cleanup.
+- Prefer subtle structure, compact rows, muted chips, soft dropdowns, and minimal permanent helper captions.
+- Page titles should not have permanent meta summary lines above them. Use tab counters and badges instead when counts are needed.
+
 - Premium dark gradient ambience
 - Royal charcoal base
 - Soft-depth surfaces
@@ -414,7 +432,7 @@ Resolved direction:
 - `Docs` is the final UI label because the area will include notes, guides, links, templates, SOP/checklist, safe access metadata, and lightweight references.
 - `Trading` stays as a top-level inactive sidebar menu.
 - Trading is not a Projects category. It is for portfolio wallets, trade journal, and profit/minus notes.
-- Projects sidebar is a dropdown with All Project, Watchlist, Daily, and Tasks.
+- Projects sidebar is a dropdown where the Projects parent directly links to `/projects`, with Watchlist, Daily, and Tasks nested below it.
 - Dashboard Quick Capture `Watchlist` should be treated as an Inbox item or Docs entry until a dedicated model is approved.
 
 Still pending:
@@ -531,7 +549,7 @@ Auth-related files:
 
 ## Validation Results
 
-Latest commands passing after Tasks Board UI Realignment:
+Latest commands passing after Add Project and Add Task modal polish:
 
 ```txt
 pnpm lint
@@ -568,7 +586,7 @@ Build routes generated:
 Recommended next step:
 
 ```txt
-Batch 2H - Remaining Sidebar Preview Pages
+Batch 2L - Remaining Sidebar Preview Pages
 ```
 
 Suggested scope:
@@ -578,6 +596,6 @@ Suggested scope:
 - Add `/settings` preview page with minimal workspace and profile summary.
 - Keep Docs as the final UI label.
 - Keep Trading as an inactive top-level menu for now.
-- Projects sidebar uses a dropdown: All Project, Watchlist, Daily, Tasks.
+- Keep Projects as the direct `/projects` link with Watchlist, Daily, and Tasks nested below it.
 
 After sidebar preview pages are visually aligned, continue to Supabase foundation, schema, migrations, RLS, and real Server Actions.

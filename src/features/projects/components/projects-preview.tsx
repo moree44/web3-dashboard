@@ -110,7 +110,6 @@ export function ProjectsPreview() {
     <div className="min-w-0 py-5 lg:py-7">
       <header className="flex flex-col gap-4 border-b soft-divider px-4 pb-5 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
         <div>
-          <p className="text-xs text-muted-foreground">6 active · 1 running · 1 recheck</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Projects</h1>
         </div>
         <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add project</Button>
@@ -434,14 +433,14 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
           <div className="px-2 py-2">
             <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
-              <SelectPreview id="hunt" label="Hunt type" value="Free Hunts" options={["Free Hunts", "Retro", "NFT", "Waitlist"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact />
-              <SelectPreview id="stage" label="Stage" value="Registered" options={["Not started", "Registered", "Waiting result", "Joined whitelist", "Whitelisted", "Eligible", "Claimable", "Mint open", "Done"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact />
+              <SelectPreview id="hunt" label="Hunt type" value="Free Hunts" options={["Free Hunts", "Retro", "NFT", "Waitlist"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact allowCustom />
+              <SelectPreview id="stage" label="Stage" value="Registered" options={["Not started", "Registered", "Waiting result", "Joined whitelist", "Whitelisted", "Eligible", "Claimable", "Mint open", "Done"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact allowCustom />
               <SelectPreview id="status" label="Status" value="Watching" options={["Watching", "In progress", "Running", "Recheck", "Paused", "Done"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact />
               <SelectPreview id="priority" label="Priority" value="Medium" options={["No priority", "High", "Medium", "Low"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact />
             </div>
           </div>
 
-          <div className="mt-2 px-2">
+          <div className="mt-2 px-2 pb-2">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold">Assigned accounts</p>
               <span className="text-[11px] text-muted-foreground">wallets come from selected accounts</span>
@@ -452,14 +451,14 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           </div>
 
-          <div className="mt-3 px-2">
+          <div className="mt-2 px-2">
             <div className="mb-2">
               <p className="text-xs font-semibold">Optional context</p>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="Project URL" placeholder="https://..." />
-              <Field label="Work type" placeholder="Testnet, Node" />
-              <Field label="Project type" placeholder="ZK, AI, DePIN" />
+              <ComboboxPreview label="Work type" initialValue="Testnet" options={["Testnet", "Node", "CLI running", "Farm role", "Galxe", "Whitelist", "Proof submit"]} placeholder="Add work type..." />
+              <ComboboxPreview label="Project type" initialValue="ZK" options={["ZK", "AI", "DePIN", "L1", "L2", "Security", "Data"]} placeholder="Add project type..." />
             </div>
             <label className="mt-3 block">
               <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Short note</span>
@@ -468,8 +467,7 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t soft-divider bg-muted/20 px-4 py-2.5">
-          <p className="text-[11px] text-muted-foreground">Preview only. Save will connect to Projects, Accounts, Wallets, Tasks, Daily, and Watchlist later.</p>
+        <div className="flex items-center justify-end gap-3 border-t soft-divider bg-muted/20 px-4 py-2.5">
           <div className="flex shrink-0 gap-2">
             <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
             <Button size="sm" className="bg-accent text-foreground hover:bg-white/[0.09]" onClick={onClose}>Create project</Button>
@@ -493,19 +491,48 @@ function Field({ label, placeholder, className = "" }: { label: string; placehol
   );
 }
 
-function SelectPreview({ id, label, value, options, openSelect, setOpenSelect, compact = false }: { id: string; label: string; value: string; options: string[]; openSelect: string | null; setOpenSelect: (value: string | null) => void; compact?: boolean }) {
+function SelectPreview({
+  id,
+  label,
+  value,
+  options,
+  openSelect,
+  setOpenSelect,
+  compact = false,
+  allowCustom = false,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: string[];
+  openSelect: string | null;
+  setOpenSelect: (value: string | null) => void;
+  compact?: boolean;
+  allowCustom?: boolean;
+}) {
   const [selected, setSelected] = useState(value);
+  const [items, setItems] = useState(options);
+  const [customValue, setCustomValue] = useState("");
   const open = openSelect === id;
+  const normalizedCustomValue = customValue.trim();
+  const canAddCustom = allowCustom && normalizedCustomValue.length > 0 && !items.some((item) => item.toLowerCase() === normalizedCustomValue.toLowerCase());
+  const addCustomValue = () => {
+    if (!canAddCustom) return;
+    setItems((current) => [...current, normalizedCustomValue]);
+    setSelected(normalizedCustomValue);
+    setCustomValue("");
+    setOpenSelect(null);
+  };
 
   return (
     <div className="relative">
-      {!compact ? <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</span> : null}
+      <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</span>
       <button
         type="button"
         onClick={() => setOpenSelect(open ? null : id)}
         className={cn(
-          "flex items-center justify-between gap-2 rounded-full border border-white/[0.055] bg-white/[0.035] text-sm outline-none transition-colors hover:bg-white/[0.055]",
-          compact ? "h-8 w-full px-2.5 text-xs" : "mt-1.5 h-9 w-full px-3",
+          "mt-1.5 flex items-center justify-between gap-2 rounded-full border border-white/[0.055] bg-white/[0.035] text-sm outline-none transition-colors hover:bg-white/[0.055]",
+          compact ? "h-8 w-full px-2.5 text-xs" : "h-9 w-full px-3",
           open ? "border-white/[0.12] bg-white/[0.055]" : "",
         )}
         aria-expanded={open}
@@ -518,9 +545,34 @@ function SelectPreview({ id, label, value, options, openSelect, setOpenSelect, c
       </button>
 
       {open ? (
-        <div className={cn("absolute left-0 top-full z-[80] mt-1.5 overflow-hidden rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45 backdrop-blur", compact ? "w-56" : "w-full")}>
+        <div className={cn("absolute left-0 top-full z-[80] mt-1.5 max-h-48 overflow-y-auto rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45 backdrop-blur", compact ? "w-56" : "w-full")}>
           <div className="px-2 py-1 text-[10px] text-muted-foreground">Change {label.toLowerCase()}...</div>
-          {options.map((option, index) => (
+          {allowCustom ? (
+            <div className="mb-1 flex items-center gap-1 rounded-lg bg-white/[0.025] p-1">
+              <input
+                value={customValue}
+                onChange={(event) => setCustomValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addCustomValue();
+                  }
+                }}
+                className="min-w-0 flex-1 bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground"
+                placeholder={`Add custom ${label.toLowerCase()}...`}
+              />
+              <button
+                type="button"
+                onClick={addCustomValue}
+                disabled={!canAddCustom}
+                className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.055] hover:text-foreground disabled:opacity-35"
+                aria-label={`Add custom ${label.toLowerCase()}`}
+              >
+                <Plus className="size-3.5" />
+              </button>
+            </div>
+          ) : null}
+          {items.map((option, index) => (
             <button
               key={option}
               type="button"
@@ -539,7 +591,83 @@ function SelectPreview({ id, label, value, options, openSelect, setOpenSelect, c
               {selected === option ? <Check className="size-4 text-muted-foreground" /> : null}
             </button>
           ))}
-          {label === "Work type" || label === "Project type" ? <button className="mt-1 flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-sm text-muted-foreground hover:bg-white/[0.055] hover:text-foreground"><Plus className="size-3.5" /> Add custom</button> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ComboboxPreview({ label, initialValue, options, placeholder }: { label: string; initialValue: string; options: string[]; placeholder: string }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState(options);
+  const [selected, setSelected] = useState(initialValue);
+  const [customValue, setCustomValue] = useState("");
+  const normalizedCustomValue = customValue.trim();
+  const canAddCustom = normalizedCustomValue.length > 0 && !items.some((item) => item.toLowerCase() === normalizedCustomValue.toLowerCase());
+  const addCustomValue = () => {
+    if (!canAddCustom) return;
+    setItems((current) => [...current, normalizedCustomValue]);
+    setSelected(normalizedCustomValue);
+    setCustomValue("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</span>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "mt-1.5 flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-white/[0.055] bg-input px-3 text-left text-sm outline-none transition-colors hover:bg-white/[0.045]",
+          open ? "border-white/[0.12] bg-white/[0.045]" : "",
+        )}
+      >
+        <span className="min-w-0 truncate text-muted-foreground">{selected || placeholder}</span>
+        <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open ? "rotate-180" : "")} />
+      </button>
+      {open ? (
+        <div className="absolute left-0 top-full z-[80] mt-1.5 max-h-48 w-full overflow-y-auto rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45 backdrop-blur">
+          <div className="mb-1 flex items-center gap-1 rounded-lg bg-white/[0.025] p-1">
+            <input
+              value={customValue}
+              onChange={(event) => setCustomValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addCustomValue();
+                }
+              }}
+              className="min-w-0 flex-1 bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground"
+              placeholder={placeholder}
+            />
+            <button
+              type="button"
+              onClick={addCustomValue}
+              disabled={!canAddCustom}
+              className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.055] hover:text-foreground disabled:opacity-35"
+              aria-label={`Add custom ${label.toLowerCase()}`}
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </div>
+          {items.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => {
+                setSelected(option);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex h-7 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-xs transition-colors hover:bg-white/[0.055]",
+                selected === option ? "text-foreground" : "text-[#c3c7ce]",
+              )}
+            >
+              <span className="min-w-0 truncate font-medium">{option}</span>
+              {selected === option ? <Check className="size-4 text-muted-foreground" /> : null}
+            </button>
+          ))}
         </div>
       ) : null}
     </div>
@@ -547,13 +675,102 @@ function SelectPreview({ id, label, value, options, openSelect, setOpenSelect, c
 }
 
 function DatePreview() {
-  const today = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => formatDateLabel(new Date()));
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
+  const [open, setOpen] = useState(false);
+  const days = getCalendarDays(visibleMonth);
+  const todayLabel = formatDateLabel(new Date());
+
   return (
-    <button type="button" className="mt-1.5 flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-white/[0.055] bg-white/[0.035] px-2 text-xs text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" title="Date added">
-      <CalendarClock className="size-3" />
-      <span className="font-medium tabular-nums">{today}</span>
-    </button>
+    <div className="relative mt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-white/[0.055] bg-white/[0.035] px-2 text-xs text-muted-foreground hover:bg-white/[0.055] hover:text-foreground",
+          open ? "border-white/[0.12] bg-white/[0.055]" : "",
+        )}
+        title="Date added"
+      >
+        <CalendarClock className="size-3" />
+        <span className="font-medium tabular-nums">{selectedDate}</span>
+      </button>
+
+      {open ? (
+        <div className="absolute right-0 top-full z-[90] mt-1.5 w-[252px] overflow-hidden rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-2 text-left shadow-2xl shadow-black/45 backdrop-blur">
+          <div className="flex items-center justify-between gap-2 px-1 pb-2">
+            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, -1))} className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" aria-label="Previous month">‹</button>
+            <div className="text-xs font-semibold text-foreground">{formatMonthLabel(visibleMonth)}</div>
+            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))} className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" aria-label="Next month">›</button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 px-1 pb-1 text-center text-[10px] font-medium text-muted-foreground">
+            {weekDays.map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {days.map((day) => {
+              const labelValue = formatDateLabel(day.date);
+              const selected = selectedDate === labelValue;
+              const isToday = todayLabel === labelValue;
+              return (
+                <button
+                  key={day.key}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(labelValue);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    "grid size-7 place-items-center rounded-lg text-[11px] font-medium transition-colors",
+                    day.inMonth ? "text-foreground hover:bg-white/[0.065]" : "text-muted-foreground/45 hover:bg-white/[0.04]",
+                    selected ? "bg-white/[0.12] text-foreground shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08)]" : "",
+                    !selected && isToday ? "text-info" : "",
+                  )}
+                >
+                  {day.date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-2 flex items-center justify-between border-t border-white/[0.055] px-1 pt-2">
+            <button type="button" onClick={() => setSelectedDate("")} className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:bg-white/[0.055] hover:text-foreground">Clear</button>
+            <button type="button" onClick={() => { setSelectedDate(todayLabel); setVisibleMonth(new Date()); setOpen(false); }} className="rounded-lg px-2 py-1 text-[11px] font-medium text-foreground hover:bg-white/[0.055]">Today</button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
+}
+
+const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function formatMonthLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(date);
+}
+
+function formatDateLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+}
+
+function getCalendarDays(monthDate: Date) {
+  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const start = new Date(firstDay);
+  start.setDate(firstDay.getDate() - firstDay.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return {
+      date,
+      key: date.toISOString(),
+      inMonth: date.getMonth() === monthDate.getMonth(),
+    };
+  });
 }
 
 function SelectGlyph({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {

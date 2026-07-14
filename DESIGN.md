@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.9
-**Status:** Final visual direction for current Phase 1 preview, Dashboard V3 clean desk, and softer workbench tone
+**Version:** 2.10
+**Status:** Final visual direction for current Phase 1 preview, compact create modals, Dashboard V3 clean desk, and softer workbench tone
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -221,7 +221,17 @@ The modal should feel quick to open, quick to scan, and safe to skip optional fi
 
 Native browser select menus should be avoided in dark modals because their option popup can render with browser-default styling. Use compact custom dark dropdowns for enum-like controls such as Hunt Type, Stage/Result, Status, and Priority. Priority should use small ranking glyphs instead of bright color blocks.
 
+Property controls in create modals must keep persistent uppercase labels above the control, matching the small muted label style used for Project Name and Date. Do not rely on the selected value alone to explain the field.
+
+Custom-capable combobox controls are allowed only where the option list is naturally flexible. In the current preview, this applies to Hunt Type, Stage, Work Type, and Project Type. Status, Priority, and Frequency remain fixed-option controls because they map to stricter workflow or database enum behavior later.
+
+Combobox dropdown lists inside create modals should use an internal max-height with scroll instead of overflowing the modal. This keeps long option lists predictable without adding collision logic.
+
 When a create modal has several enum-like properties, prefer compact property controls over full stacked form controls. Only one dropdown should be open at a time. Date should be aligned as a field, not a floating or clipped chip.
+
+Create modal footer areas should not keep persistent explanatory preview captions. Keep the footer focused on Cancel and Create actions.
+
+Spacing between create modal sections should follow a consistent rhythm. If a section has chips or short rows, add enough bottom breathing room before the next section label so the label does not feel cramped.
  Internal modal dividers should be avoided unless they materially improve grouping. Add Project uses a subtle enter animation so opening the modal feels responsive without becoming decorative.
 
 ## 6B. Visual Tone Adjustment
@@ -320,7 +330,6 @@ Dashboard
 Inbox
 Docs
 Projects
-  All Project
   Watchlist
   Daily
   Tasks
@@ -337,7 +346,8 @@ Navigation roles:
 | Dashboard | Compact opening overview                             |
 | Inbox     | Raw input waiting to be processed                    |
 | Docs      | Notes, research, links, guides, SOP, access metadata |
-| Projects  | Full project database and workflow group             |
+| Projects  | Main project database, workflow group, and direct link to full table |
+| Watchlist | Project watchlist, nested under Projects              |
 | Daily     | Full checklist execution, nested under Projects      |
 | Tasks     | Cross-project task management, nested under Projects |
 | Trading   | Portfolio wallets, trade journal, and PnL notes      |
@@ -345,7 +355,7 @@ Navigation roles:
 | Archive   | Archived projects and results                        |
 | Settings  | App and workspace settings                           |
 
-Do not add hunt categories to sidebar. Projects may contain workflow children only: All Project, Watchlist, Daily, and Tasks.
+Do not add hunt categories to sidebar. Projects may contain workflow children only: Watchlist, Daily, and Tasks. The Projects parent is a direct link to the full project table.
 
 Hunt categories stay inside Projects as tabs or filters on the Projects page.
 
@@ -946,6 +956,8 @@ Starter tasks are not shown as a heavy first-step section. They can be suggested
 
 Watchlist behavior remains a product rule, but long explanatory Watchlist copy should not clutter the quick-create modal.
 
+The current Add Project preview keeps the footer action-only, uses scrollable dropdown menus for custom-capable fields, and preserves clear spacing between Assigned accounts and Optional context.
+
 ---
 
 ## 19A. Trading Page Direction
@@ -995,7 +1007,7 @@ Board view should feel like a precise task board:
 * single Add Task action in the page header, no per-lane plus controls unless real UX requires it later
 * two-line max task titles
 * when grouped by project, do not repeat the project name inside every card
-* status, mode, frequency, account, and due visible without opening detail
+* status, mode, frequency, assigned account chips, and Date start visible without opening detail
 * descriptions, notes count, proof count, and long logs should move to detail panels later
 * scalable filters instead of horizontal chips for every project
 * compact Running monitor rows that respect the active project filter
@@ -1005,6 +1017,7 @@ Board view should feel like a precise task board:
 Board columns for normal work:
 
 ```txt
+Not started
 Todo
 In progress
 Recheck
@@ -1013,7 +1026,9 @@ Done
 
 Running is not treated as a generic board column by default.
 
-Add Task can use a compact quick-create modal in preview and later should connect to project tasks, Daily generation, and task logs. Search and filters should be functional wherever possible, even before persistence, so the workflow can be tested with preview data.
+Add Task can use a compact quick-create modal in preview and later should connect to project tasks, Daily generation, and task logs. It should support multi-account assignment because crypto tasks often apply to multiple personas. Search and filters should be functional wherever possible, even before persistence, so the workflow can be tested with preview data.
+
+Add Task quick-create modal should follow the same field-label discipline as Add Project. Project, Status, Frequency, Priority, Mode, Assigned accounts, Date start, and Short note should have visible persistent labels. Status, Frequency, and Priority remain fixed-option controls. Date start uses the custom dark date picker, not a native browser date popup.
 
 Running is a special monitoring state for process-based work only, such as:
 
@@ -1025,7 +1040,7 @@ Running is a special monitoring state for process-based work only, such as:
 * extension process
 * long-running service
 
-Normal website/testnet/Discord/form/proof tasks should use Todo, In progress, Recheck, Done, or Skipped later when implemented.
+Normal website/testnet/Discord/form/proof tasks should use Not started, Todo, In progress, Recheck, Done, or Skipped later when implemented.
 
 Every task row or card should show:
 
@@ -1036,7 +1051,7 @@ Every task row or card should show:
 * assigned account chips
 * status badge
 * frequency badge
-* due or monitoring window
+* Date start or monitoring window
 * last log or last check
 * priority only when meaningful, especially high priority
 

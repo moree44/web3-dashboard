@@ -95,7 +95,7 @@ export function DashboardPreview() {
         </div>
       </section>
       <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_350px] 2xl:grid-cols-[minmax(420px,1fr)_minmax(340px,0.82fr)_350px]">
-        <DashboardPanel icon={StickyNote} title="Notes desk" subtitle="Pinned and recent knowledge" href="/docs">
+        <DashboardPanel icon={StickyNote} title="Notes desk" href="/docs">
           <SectionLabel label="Pinned notes" />
           <div className="divide-y divide-white/[0.045]">
             {pinnedNotes.map((note) => <PinnedNoteRow key={note.title} note={note} />)}
@@ -106,13 +106,13 @@ export function DashboardPreview() {
           </div>
         </DashboardPanel>
 
-        <DashboardPanel icon={CalendarClock} title="Upcoming deadlines" subtitle="Nearest date-sensitive items" href="/daily">
+        <DashboardPanel icon={CalendarClock} title="Upcoming deadlines" href="/daily">
           <div className="divide-y divide-white/[0.045]">
             {deadlines.map((item) => <DeadlineRow key={item.title} item={item} />)}
           </div>
         </DashboardPanel>
 
-        <DashboardPanel icon={RadioTower} title="Hunting pulse" subtitle="Compact project and attention signals" href="/projects" className="xl:row-span-2">
+        <DashboardPanel icon={RadioTower} title="Hunting pulse" href="/projects" className="xl:row-span-2">
           <SectionLabel label="Overview" />
           <div className="grid grid-cols-2 gap-2">
             {overviewMetrics.map((metric) => <MetricTile key={metric.label} item={metric} />)}
@@ -129,13 +129,13 @@ export function DashboardPreview() {
           </div>
         </DashboardPanel>
 
-        <DashboardPanel icon={Inbox} title="Inbox to process" subtitle="Raw input waiting for a decision" href="/inbox">
+        <DashboardPanel icon={Inbox} title="Inbox to process" href="/inbox">
           <div className="divide-y divide-white/[0.045]">
             {inboxItems.map((item) => <InboxRow key={item.title} item={item} />)}
           </div>
         </DashboardPanel>
 
-        <DashboardPanel icon={AlertCircle} title="Recent activity" subtitle="Small latest changes" href="/projects">
+        <DashboardPanel icon={AlertCircle} title="Recent activity" href="/projects">
           <div className="divide-y divide-white/[0.045]">
             {recentActivity.map((activity) => <Activity key={activity.text} {...activity} />)}
           </div>
@@ -145,7 +145,7 @@ export function DashboardPreview() {
   );
 }
 
-function DashboardPanel({ icon: Icon, title, subtitle, href, className = "", children }: { icon: typeof Inbox; title: string; subtitle: string; href: string; className?: string; children: ReactNode }) {
+function DashboardPanel({ icon: Icon, title, href, className = "", children }: { icon: typeof Inbox; title: string; href: string; className?: string; children: ReactNode }) {
   return (
     <section className={"soft-panel overflow-hidden rounded-xl bg-card " + className}>
       <div className="flex items-center justify-between gap-3 px-3 py-2.5">
@@ -153,7 +153,6 @@ function DashboardPanel({ icon: Icon, title, subtitle, href, className = "", chi
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/[0.04] text-muted-foreground"><Icon className="size-4" /></span>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold">{title}</h2>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{subtitle}</p>
           </div>
         </div>
         <Link href={href} className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground">Open</Link>

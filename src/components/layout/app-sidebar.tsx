@@ -31,7 +31,6 @@ const mainNavigation = [
 ] as const;
 
 const projectNavigation = [
-  { label: "All Project", href: "/projects", icon: FolderKanban, active: "Projects" },
   { label: "Watchlist", href: "/projects?view=watchlist", icon: Eye, active: "Projects" },
   { label: "Daily", href: "/daily", icon: CalendarCheck2, active: "Daily" },
   { label: "Tasks", href: "/tasks", icon: ListChecks, active: "Tasks" },
@@ -70,24 +69,34 @@ export function AppSidebar({ active }: { active: AppSection }) {
             ))}
 
             <div className="pt-1">
-              <button
-                type="button"
-                aria-expanded={projectOpen}
-                aria-current={projectGroupActive ? "page" : undefined}
-                onClick={() => setProjectOpen((value) => !value)}
+              <div
                 className={cn(
-                  "flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                  projectGroupActive ? "text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                  "flex h-9 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
+                  active === "Projects" ? "soft-control border border-border bg-accent text-foreground" : projectGroupActive ? "text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                 )}
               >
-                <FolderKanban aria-hidden="true" className="size-4" strokeWidth={1.8} />
-                <span className="min-w-0 flex-1 truncate">Projects</span>
-                <ChevronDown aria-hidden="true" className={cn("size-3.5 text-muted-foreground transition-transform", projectOpen ? "rotate-0" : "-rotate-90")} strokeWidth={1.8} />
-              </button>
+                <Link
+                  href="/projects"
+                  aria-current={active === "Projects" ? "page" : undefined}
+                  className="flex h-full min-w-0 flex-1 items-center gap-3 rounded-lg px-3 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <FolderKanban aria-hidden="true" className="size-4" strokeWidth={1.8} />
+                  <span className="min-w-0 flex-1 truncate">Projects</span>
+                </Link>
+                <button
+                  type="button"
+                  aria-expanded={projectOpen}
+                  onClick={() => setProjectOpen((value) => !value)}
+                  className="grid h-full w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Toggle project navigation"
+                >
+                  <ChevronDown aria-hidden="true" className={cn("size-3.5 transition-transform", projectOpen ? "rotate-0" : "-rotate-90")} strokeWidth={1.8} />
+                </button>
+              </div>
 
               {projectOpen ? <div className="mt-1 space-y-0.5 pl-4">
                 {projectNavigation.map(({ label, href, icon: Icon, active: itemActive }) => {
-                  const isActive = label === "All Project" ? active === "Projects" : label === "Watchlist" ? false : active === itemActive;
+                  const isActive = label === "Watchlist" ? false : active === itemActive;
                   return (
                     <Link
                       key={label}
