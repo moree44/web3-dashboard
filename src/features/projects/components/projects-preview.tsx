@@ -1,13 +1,12 @@
 "use client";
 
 import { CalendarClock, Check, ChevronDown, Columns3, ExternalLink, Filter, MoreHorizontal, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const tabs = ["All 6", "Watchlist 2", "Free Hunts 3", "Retro 1", "NFT 1", "Waitlist 1"];
 
 const projects = [
   {
@@ -102,9 +101,19 @@ const projects = [
   },
 ];
 
-export function ProjectsPreview() {
+export function ProjectsPreview({ view = "all" }: { view?: "all" | "watchlist" }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const watchlistProjects = projects.filter((project) => project.status === "Watching" || project.stage === "Waiting result" || project.stage === "Joined whitelist");
+  const visibleProjects = view === "watchlist" ? watchlistProjects : projects;
+  const tabs = [
+    { label: `All ${projects.length}`, href: "/projects", active: view === "all" },
+    { label: `Watchlist ${watchlistProjects.length}`, href: "/projects?view=watchlist", active: view === "watchlist" },
+    { label: "Free Hunts 3", href: "/projects", active: false },
+    { label: "Retro 1", href: "/projects", active: false },
+    { label: "NFT 1", href: "/projects", active: false },
+    { label: "Waitlist 1", href: "/projects", active: false },
+  ];
 
   return (
     <div className="min-w-0 py-5 lg:py-7">
@@ -117,8 +126,8 @@ export function ProjectsPreview() {
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
         <div className="scrollbar-subtle flex gap-1 overflow-x-auto py-2.5">
-          {tabs.map((tab, index) => (
-            <button key={tab} className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-medium", index === 0 ? "bg-accent text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}>{tab}</button>
+          {tabs.map((tab) => (
+            <Link key={tab.label} href={tab.href} className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-medium", tab.active ? "bg-accent text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}>{tab.label}</Link>
           ))}
         </div>
       </div>
@@ -163,13 +172,13 @@ export function ProjectsPreview() {
               <th className="w-12 border-b border-white/[0.045] px-3 py-3"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody>{projects.map((project) => <ProjectRow key={project.name} project={project} onOpen={() => setSelectedProject(project)} />)}</tbody>
+          <tbody>{visibleProjects.map((project) => <ProjectRow key={project.name} project={project} onOpen={() => setSelectedProject(project)} />)}</tbody>
         </table>
       </div>
 
-      <div className="divide-y divide-white/[0.045] lg:hidden">{projects.map((project) => <ProjectCard key={project.name} project={project} onOpen={() => setSelectedProject(project)} />)}</div>
+      <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project) => <ProjectCard key={project.name} project={project} onOpen={() => setSelectedProject(project)} />)}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
-        <span>Showing 6 preview projects</span>
+        <span>Showing {visibleProjects.length} preview {view === "watchlist" ? "watchlist" : "projects"}</span>
         <button className="font-medium hover:text-foreground">Add real data later</button>
       </footer>
 
@@ -451,7 +460,7 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           </div>
 
-          <div className="mt-2 px-2">
+          <div className="mt-4 border-t soft-divider px-2 pt-3">
             <div className="mb-2">
               <p className="text-xs font-semibold">Optional context</p>
             </div>

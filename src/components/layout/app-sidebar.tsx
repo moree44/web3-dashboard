@@ -22,7 +22,7 @@ import Link from "next/link";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { cn } from "@/lib/utils";
 
-export type AppSection = "Dashboard" | "Inbox" | "Docs" | "Daily" | "Projects" | "Trading" | "Tasks" | "Accounts" | "Archive" | "Settings";
+export type AppSection = "Dashboard" | "Inbox" | "Docs" | "Daily" | "Projects" | "Watchlist" | "Trading" | "Tasks" | "Accounts" | "Archive" | "Settings";
 
 const mainNavigation = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -31,7 +31,7 @@ const mainNavigation = [
 ] as const;
 
 const projectNavigation = [
-  { label: "Watchlist", href: "/projects?view=watchlist", icon: Eye, active: "Projects" },
+  { label: "Watchlist", href: "/projects?view=watchlist", icon: Eye, active: "Watchlist" },
   { label: "Daily", href: "/daily", icon: CalendarCheck2, active: "Daily" },
   { label: "Tasks", href: "/tasks", icon: ListChecks, active: "Tasks" },
 ] as const;
@@ -43,7 +43,7 @@ const lowerNavigation = [
 ] as const;
 
 export function AppSidebar({ active }: { active: AppSection }) {
-  const projectGroupActive = active === "Projects" || active === "Daily" || active === "Tasks";
+  const projectGroupActive = active === "Projects" || active === "Watchlist" || active === "Daily" || active === "Tasks";
   const [projectOpen, setProjectOpen] = useState(true);
 
   return (
@@ -96,7 +96,7 @@ export function AppSidebar({ active }: { active: AppSection }) {
 
               {projectOpen ? <div className="mt-1 space-y-0.5 pl-4">
                 {projectNavigation.map(({ label, href, icon: Icon, active: itemActive }) => {
-                  const isActive = label === "Watchlist" ? false : active === itemActive;
+                  const isActive = active === itemActive;
                   return (
                     <Link
                       key={label}

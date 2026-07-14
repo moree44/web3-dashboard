@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.10
-**Status:** Final visual direction for current Phase 1 preview, compact create modals, Dashboard V3 clean desk, and softer workbench tone
+**Version:** 2.11
+**Status:** Current visual direction for Phase 1 preview, completed sidebar coverage, layout-first workflow, and pre-CRUD UI baseline
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -1092,6 +1092,69 @@ Wallet is address.
 Do not merge account and wallet.
 
 ---
+
+
+## 21B. Sidebar Page Completion Baseline
+
+Accounts, Archive, and Settings should follow the accepted `/projects` visual baseline during preview work.
+
+Use:
+
+* compact page header with the page title as the first visible header element
+* muted filter/tab rows where needed
+* soft dividers only for major structure
+* compact tables or cards depending on the content density
+* dummy data only until Supabase and CRUD wiring are approved
+
+Do not add permanent explanatory subtitles under these page titles. Use tab counters, badges, and concise row metadata instead.
+
+## 21C. Archive Page Direction
+
+Archive is project-only in Phase 1.
+
+Archive should be table-first and should stay calmer than the active Projects table.
+
+Use:
+
+* compact archive reason filters
+* muted semantic reason badges
+* Title Case reason labels in the UI, such as Claimed, Dropped, Scam Risk, Expired, Not Worth, Duplicate, Completed, and Other
+* restore actions as explicit controls
+* archive date as supporting metadata
+
+Avoid:
+
+* bright archive colors
+* treating Archive like Trash
+* permanent explanatory captions in the page header
+* delete-first language
+
+## 21D. Settings Page Direction
+
+Settings should not feel blank, but it should not pretend future integrations are implemented.
+
+Preview Settings can show sections for:
+
+* profile
+* workspace
+* account security
+* authentication method
+* app preferences
+* future integrations
+* future API key placeholders
+* data and storage boundaries
+
+Security rule: do not store or display real API keys, secrets, seed phrases, private keys, recovery phrases, or exchange API secrets unless a future PRD explicitly defines a secure storage model. Future API key sections should be disabled placeholders or safe metadata until approved.
+
+## 21E. Layout Before CRUD Rule
+
+The current implementation is still in layout-first preview mode.
+
+Before CRUD begins, core sidebar pages should be visually acceptable enough that CRUD can be wired without repeatedly changing large layout structures.
+
+Small CRUD-required UI changes are allowed later, such as loading states, empty states, error messages, save states, edit buttons, and confirmation dialogs.
+
+Major page layout changes should be completed before Supabase and server actions are wired, because changing layout after CRUD increases risk and slows debugging.
 
 ## 22. Density Rules
 

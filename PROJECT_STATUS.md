@@ -6,9 +6,9 @@ Last updated: 2026-07-14
 
 Web3 Hunting OS is currently in early Phase 1 preview implementation.
 
-The repository has moved from documentation-only into a Next.js 15 app with a desktop-first preview shell, authentication screens, Dashboard preview, Daily preview, Projects preview, Tasks preview, Inbox preview, and Docs preview.
+The repository has moved from documentation-only into a Next.js 15 app with a desktop-first preview shell, authentication screens, Dashboard preview, Inbox preview, Docs preview, Daily preview, Projects preview, Watchlist preview, Tasks preview, Accounts preview, Archive preview, and Settings preview.
 
-The app is still using preview and dummy data. Real Supabase database tables, RLS policies, CRUD flows, Inbox persistence, Docs persistence, project persistence, task logs, and activity logs are not implemented yet.
+The app is still using preview and dummy data. Real Supabase database tables, RLS policies, CRUD flows, Inbox persistence, Docs persistence, project persistence, account-wallet persistence, task logs, and activity logs are not implemented yet.
 
 ## Active Source of Truth
 
@@ -270,6 +270,21 @@ Implemented:
 - Follow-up kept Add Task Status, Priority, and Frequency as fixed-option controls because they map to database enum behavior later
 - Follow-up removed the persistent Add Task footer preview caption so the footer only contains Cancel and Create task actions
 
+
+### Batch 2L - Missing Navigation Preview Pages
+
+Completed on 2026-07-14.
+
+Implemented:
+
+- Added `/accounts` preview route with Identities, Wallets, and Groups tabs
+- Added `/archive` preview route for archived project review by reason
+- Added `/settings` preview route for profile, workspace, and MVP boundary settings
+- Wired Projects Watchlist as `/projects?view=watchlist` using the same Projects table preview
+- Kept Watchlist, Accounts, Archive, and Settings as preview-only UI with dummy data
+- Kept the new pages aligned to the accepted `/projects` visual baseline: compact header, soft dividers, muted chips, and calm table/card density
+- Did not add Supabase persistence, CRUD, real account-wallet relations, archive actions, or settings saves
+
 ## Current Product Direction
 
 Current preview direction:
@@ -282,9 +297,9 @@ Daily = full checklist
 Projects = full project database
 Trading = portfolio wallets, trade journal, and profit/minus notes
 Tasks = preview implemented, visual only
-Accounts = not implemented yet
-Archive = not implemented yet
-Settings = not implemented yet
+Accounts = preview implemented, visual only
+Archive = preview implemented, visual only
+Settings = preview implemented, visual only
 ```
 
 Dashboard should answer quickly:
@@ -298,6 +313,29 @@ Dashboard should answer quickly:
 
 Dashboard should not duplicate the full Daily checklist or the full Projects table.
 
+## Current UI Caveats
+
+Known preview issues that are acceptable to fix before CRUD:
+
+- Archive reason labels should be capitalized in the UI and visually softened.
+- Archive colors should stay muted and semantic, not loud.
+- Settings is currently shallow and should become a stronger preview of profile, workspace, security, preferences, and future integration areas.
+- Future API key areas may be represented as disabled placeholders only. Real secret storage is not approved yet.
+- Accounts, Archive, Settings, and Watchlist still need a visual polish pass against the `/projects` baseline.
+- Search and filters are preview-level unless explicitly wired in the component.
+
+## Recommended Next Sequence
+
+Recommended order before CRUD:
+
+1. User updates PRD to clarify any missing product rules.
+2. Finish layout polish for Accounts, Archive, Settings, Watchlist, and any remaining Tasks cleanup.
+3. Lock the core sidebar page layout baseline.
+4. Start data foundation: Supabase, Drizzle schema, migrations, RLS, workspace helpers.
+5. Start CRUD in order: Projects, Accounts, Wallets, Tasks, Daily logs, Archive, Inbox, Docs, Activity logs.
+
+Reason: CRUD should be wired after the major page structures are stable. Small CRUD-required UI states can still be added during CRUD.
+
 ## Current Routes
 
 Available preview routes:
@@ -308,7 +346,11 @@ Available preview routes:
 /docs
 /daily
 /projects
+/projects?view=watchlist
 /tasks
+/accounts
+/archive
+/settings
 /login
 /signup
 ```
@@ -320,8 +362,11 @@ Notes:
 - `/docs` is dummy/static preview data only.
 - `/daily` is dummy/static preview data only.
 - `/projects` is dummy/static preview data only.
+- `/projects?view=watchlist` filters the Projects preview to watchlist/waiting items only.
 - `/tasks` is dummy/static preview data only.
-- Routes for Accounts, Archive, and Settings appear in navigation but are not implemented yet.
+- `/accounts` is dummy/static preview data only.
+- `/archive` is dummy/static preview data only.
+- `/settings` is dummy/static preview data only.
 
 ## Current Auth State
 
