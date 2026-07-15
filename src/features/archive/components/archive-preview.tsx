@@ -80,7 +80,7 @@ export function ArchivePreview() {
       <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => <ArchiveMobileCard key={project.name} project={project} />)}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
         <span>Showing {filtered.length} archived preview projects</span>
-        <span>Archive is project-only in Phase 1</span>
+        <span>Archive tracks projects only</span>
       </footer>
     </div>
   );

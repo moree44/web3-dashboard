@@ -78,7 +78,7 @@ export function InboxPreview() {
     <div className="px-4 py-4 sm:px-5 lg:px-6 lg:py-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs text-muted-foreground">Inbox · Preview queue</p>
+          <p className="text-xs text-muted-foreground">Inbox</p>
           <h1 className="font-display mt-1 text-2xl font-semibold tracking-[-0.025em]">Raw input before it becomes work</h1>
         </div>
         <Button size="sm"><Plus />New inbox item</Button>
@@ -102,7 +102,6 @@ export function InboxPreview() {
               <span className="grid size-8 place-items-center rounded-lg border border-border bg-muted text-muted-foreground"><Inbox className="size-4" /></span>
               <div>
                 <h2 className="text-sm font-semibold">Inbox list</h2>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Preview data only. Actions are visual placeholders.</p>
               </div>
             </div>
             <Badge variant="secondary">4 open</Badge>
@@ -128,7 +127,7 @@ export function InboxPreview() {
         <aside className="soft-panel rounded-xl border border-border bg-card p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] text-muted-foreground">Selected preview</p>
+              <p className="text-[11px] text-muted-foreground">Selected item</p>
               <h2 className="mt-1 text-base font-semibold">{selected.title}</h2>
             </div>
             <Badge variant={selected.variant}>{selected.priority}</Badge>
@@ -137,7 +136,7 @@ export function InboxPreview() {
 
           <div className="mt-4 rounded-lg border border-border bg-muted/45 p-3">
             <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Processing note</p>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">Inbox is not email sync in Phase 1. These are manual captures waiting to become a project, task, doc, link, archive item, or ignored note.</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">Inbox is for manual input only — links, notes, or reminders you capture yourself. Turn each item into a project, task, doc, or archive it.</p>
           </div>
 
           <div className="mt-4 grid gap-2">

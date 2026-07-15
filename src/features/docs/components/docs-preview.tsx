@@ -82,7 +82,7 @@ export function DocsPreview() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold">Folders</h2>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Compact file-library structure for Phase 1 preview</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Compact file-library structure for quick access</p>
               </div>
               <button className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">View all<ArrowUpRight className="size-3.5" /></button>
             </div>
