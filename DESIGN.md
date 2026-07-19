@@ -465,6 +465,8 @@ Projects = project database management
 
 ## 13. Dashboard Layout
 
+**v3.0 change:** the "Today Desk | Signal Rail" two-column formula is retired. The implementation evolved into a five-panel grid with no separate top-level status strip — overview numbers live inside the Hunting Pulse panel instead.
+
 Dashboard must be compact and should avoid long vertical scrolling on normal desktop viewport.
 
 Target:
@@ -476,37 +478,37 @@ main overview visible without long scroll
 
 Small laptop or mobile may scroll, but default desktop should feel like one clean overview.
 
-Locked Dashboard V3 structure:
+Locked structure:
 
 ```txt
 Header + Quick Capture
-Compact Status Line
-Today Desk | Signal Rail
+Five-panel grid
 ```
 
 Example layout:
 
 ```txt
-┌──────────────────────────────────────────────┐
-│ Header + Quick Capture                       │
-├──────────────────────────────────────────────┤
-│ Projects 38 · Active 31 · Inbox 4 · Due 6    │
-├───────────────────────────────┬──────────────┤
-│ Today Desk                    │ Signal Rail  │
-│ - Inbox to Process            │ - Today Brief│
-│ - Important Docs              │ - Reminders  │
-│ - Hunting Pulse               │ - Deadlines  │
-│                               │ - Activity   │
-└───────────────────────────────┴──────────────┘
+┌──────────────────────────────────────────────────────────┐
+│ Header + Quick Capture                                   │
+├───────────────────┬───────────────────┬──────────────────┤
+│ Notes desk         │ Upcoming deadlines │ Hunting pulse    │
+│ - Pinned notes      │ - nearest dates    │ - Overview tiles │
+│ - Recent notes      │                    │ - Category pills │
+│                     │                    │ (spans 2 rows)   │
+├───────────────────┼───────────────────┤                  │
+│ Inbox to process    │ Recent activity    │                  │
+└───────────────────┴───────────────────┴──────────────────┘
 ```
 
-Dashboard should read as two primary surfaces, not a wall of separate cards.
+Each panel is its own bounded card (soft-panel, no persistent subtitle line under the title — see Section 14). Hunting Pulse is visually taller, spanning two row-heights, since it carries both the Overview stat tiles and the Category pills.
 
-Today Brief belongs at the top of Signal Rail, not inside Today Desk.
+There is no separate "Compact Status Line" strip above the panels — overview numbers (Projects, Active, Inbox, Due, Running, Archived) render as small tiles inside the Hunting Pulse panel itself.
 
 ---
 
 ## 14. Dashboard Sections
+
+**v3.0 change:** the "Today Desk" and "Signal Rail" grouping containers are retired. Each dashboard section below is now its own standalone panel in the five-panel grid (Section 13) — there is no outer wrapper grouping three or four of them together.
 
 ### Header
 
@@ -516,8 +518,10 @@ Example:
 
 ```txt
 Good evening, Moree
-Tuesday, June 30 · WIB
+Saturday, July 18 · WIB
 ```
+
+A short rotating motivational line may render under the header (decorative only).
 
 ### Quick Capture
 
@@ -532,156 +536,53 @@ Capture project link, Twitter watchlist, note, or inbox item...
 Quick actions:
 
 ```txt
-Task
 Project
-Doc
+Watchlist
+Note
 Inbox
 ```
 
-### Compact Status Line
+### Notes desk
 
-Use one compact horizontal status line for key numbers.
+Links to `/docs`. Combines pinned and recent Docs entries in one panel.
 
-Example:
+* Pinned notes — up to 3 items
+* Recent notes — up to 3 items
 
-```txt
-Projects 38 · Active 31 · Inbox 4 · Due 6 · Running 3 · Archived 7
-```
+Each item shows title and short metadata (folder/type, updated time).
 
-Do not use large KPI cards.
+### Upcoming deadlines
 
-Maximum visual height:
+Links to `/daily`. Shows the nearest date-sensitive items.
 
-```txt
-44–56px
-```
+Limit: 3 items. Each item shows title, short context, and a due label (e.g. "Today", "Tomorrow", or a date).
 
-### Today Desk
+### Hunting pulse
 
-Today Desk is the main dashboard surface.
+Links to `/projects`. Spans two row-heights in the grid since it carries two groups:
 
-It combines three preview groups inside one organized panel:
+* **Overview** — small stat tiles: Projects, Active, Inbox, Due, Running, Archived
+* **Categories** — compact pill counts: Testnet, Free Hunt, Retro, NFT, Waitlist
 
-* Inbox to Process
-* Important Docs
-* Hunting Pulse
+Trading is not shown here — Trading has its own sidebar section (Section 39A of PRD).
 
-Rules:
-
-* Use one outer panel.
-* Use internal dividers instead of separate cards.
-* Keep rows compact.
-* Avoid repeated icon blocks.
-* Avoid nested card inside card visual weight.
-* Do not show the full Daily checklist.
-* Do not show the full Projects table.
-
-### Inbox to Process
-
-Shows raw input that may need attention.
-
-Limit:
-
-```txt
-3 items
-```
-
-Each item should show:
-
-* title
-* source or short metadata
-* priority/status badge
-
-### Important Docs
-
-Shows pinned or important docs.
-
-Limit:
-
-```txt
-3 items
-```
-
-Each item should show:
-
-* title
-* folder/type
-* short metadata
-
-### Today Brief
-
-Shows a compact summary of today’s work.
-
-Limit:
-
-```txt
-3 signals
-```
-
-Example:
-
-```txt
-6 due
-3 accounts active
-2 high priority
-```
-
-### Hunting Pulse
-
-Shows a compact category snapshot, not project rows.
-
-Categories:
-
-* Testnet
-* Free Hunt
-* Retro
-* NFT
-* Waitlist
-
-Trading is removed from Hunting Pulse.
-Trading has its own sidebar section for portfolio wallets, trade journal, and profit/minus notes. UI implementation is deferred.
+Running/Recheck does not appear as an expandable list inside Hunting Pulse — "Running" is a number tile only. The live Running/Recheck list lives in Daily and Projects, not Dashboard.
 
 Use small chips or short rows, not large cards.
 
-### Signal Rail
+### Inbox to process
 
-Signal Rail is the secondary dashboard surface.
+Links to `/inbox`. Shows raw input that may need attention.
 
-Signal Rail combines:
+Limit: 3 items. Each item shows title, source/metadata, and a priority/status badge.
 
-* Today Brief
-* Reminders
-* Upcoming Deadlines
-* Recent Activity
+### Recent activity
 
-Removed:
+Links to `/projects`. Shows the latest changes across the workspace as a compact short list — title/action text and relative time (e.g. "8m", "24m", "1h").
 
-* Running / Recheck. It is removed from dashboard and visible in Daily and Projects instead.
+### Open question — Reminders panel
 
-Rules:
-
-* Use one outer panel.
-* Grouped headings and compact rows.
-* Limit each group to 3 items.
-* No outer card border.
-* Sections separated by label and hairline only.
-* Today Brief must be the first group.
-
-### Reminders
-
-Shows time-sensitive reminders needing attention.
-
-Limit:
-
-```txt
-3 items
-```
-
-Each item shows:
-
-* title
-* due date or time context
-* account or project reference if relevant
+An earlier planning pass considered adding a dedicated "Reminders" panel/section to the dashboard. This was not implemented in the shipped five-panel grid — confirm whether it's still wanted before building it. If added later, it becomes a sixth standalone panel following the same shape as the others, not a sub-section nested inside another panel.
 
 ---
 
@@ -1261,18 +1162,18 @@ Error states should be clear and not expose provider internals.
 Before closing a visual/design batch, verify:
 
 * Dashboard is a compact opening overview
-* Dashboard uses the V3 clean desk structure
+* Dashboard uses the five-panel grid structure (Section 13)
 * Dashboard fits normal desktop view without long scroll
-* Dashboard has one Today Desk and one Signal Rail
+* Dashboard has five standalone panels: Notes desk, Upcoming deadlines, Hunting pulse, Inbox to process, Recent activity
 * Dashboard does not duplicate Daily
 * Dashboard does not duplicate Projects
 * Sidebar includes Inbox and Docs
 * Notes are merged into Docs
 * Inbox is top-level
 * Docs has folder/library direction
-* Overview numbers are compact, not large KPI cards
-* Today Desk contains Inbox to Process, Important Docs, Today Brief, and Hunting Pulse
-* Signal Rail contains Running/Recheck, Deadlines, and Recent Activity
+* Overview numbers are compact, living inside the Hunting Pulse panel, not large KPI cards
+* Notes desk contains pinned and recent Docs entries
+* Hunting Pulse contains Overview stat tiles and Category pills, not Running/Recheck
 * Dashboard avoids fragmented widget cards and accidental blank middle space
 * Visual mood uses premium dark gradient ambience
 * Content panels remain mostly solid and readable
@@ -1287,7 +1188,7 @@ Before closing a visual/design batch, verify:
 
 ---
 
-## 26. Dashboard V3 Clean Desk Lock
+## 26. Dashboard Structure Lock
 
 For the current Phase 1 preview, the implemented UI should follow this final split:
 
@@ -1302,7 +1203,7 @@ Projects = full project database
 Rules:
 
 * Dashboard stays compact and should not become a mini Daily, mini Projects, Gmail clone, analytics wall, or widget wall.
-* Dashboard uses one Today Desk panel and one Signal Rail panel.
+* Dashboard uses the five-panel grid: Notes desk, Upcoming deadlines, Hunting pulse, Inbox to process, Recent activity (Section 13).
 * The desktop sidebar stays fixed while the main content area scrolls.
 * Inbox and Docs are preview routes with dummy/static data only.
 * Notes are merged into Docs for top-level navigation and preview UI.

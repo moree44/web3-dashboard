@@ -1,10 +1,27 @@
 # PRD — Web3 Hunting OS
 
-**Version:** 2.8
-**Status:** Implementation-ready draft
+**Version:** 3.0
+**Status:** Implementation-ready draft. Supersedes v2.8. Synced against current UI implementation and product decisions made after v2.8.
 **Primary Use:** Personal Web3 hunting workbench
-**Product Type:** Private Web3 activity tracker, inbox, notes system, task manager, account/wallet tracker, and project dashboard
+**Product Type:** Private Web3 activity tracker, inbox, notes system, task manager, account/wallet tracker, project dashboard, and personal trading ledger
 **Stack:** Next.js 15 · TypeScript · Tailwind CSS · shadcn/ui · Supabase PostgreSQL · Supabase Auth · Supabase Storage · Supabase RLS · Drizzle ORM · Zod · React Hook Form · Vercel
+
+### v3.0 Phasing Note
+
+To reach a usable state quickly, implementation is split into two waves within Phase 1:
+
+```
+Phase 1 Core       Auth, Workspace, Inbox, Docs, Accounts, Wallets,
+                    Projects, Tasks, Daily, Archive
+                    → build and ship first
+
+Phase 1.5          Trading (Trade Log, Portfolio, Token Watchlist),
+                    Personal Items, Settings Integrations
+                    → fully specified in this document, built as
+                      a fast-follow after Core is usable
+```
+
+Both waves are fully specified below so implementation does not need to pause for further spec work. Phase 1.5 items are marked accordingly in their section headers.
 
 ---
 
@@ -290,8 +307,11 @@ Wallet = address yang digunakan
 Project = garapan Web3
 Task = pekerjaan dalam project
 Task Log = bukti/status aktivitas per hari
+Personal Item = checklist pribadi tanpa project (Phase 1.5)
 Inbox Item = raw input yang belum diproses
-Note = catatan personal atau project knowledge
+Note = catatan personal atau project knowledge (satu sistem, lihat Section 10)
+Trade Log = satu baris histori trade CEX (Phase 1.5)
+Portfolio Holding = saldo wallet/CEX pada satu titik waktu (Phase 1.5)
 ```
 
 Relasi utama:
@@ -300,18 +320,54 @@ Relasi utama:
 Workspace
 ├── Inbox
 ├── Docs
+│   └── Notes (global, dan project-linked via linked_project_id)
 ├── Accounts
-│   └── Wallets
+│   └── Wallets (owner_account_id)
 ├── Wallet Groups
-│   └── Wallets
+│   └── Wallets (wallet_group_id, untuk wallet tanpa owner tunggal)
 ├── Projects
 │   ├── Assigned Accounts
-│   ├── Assigned Wallets
+│   ├── Assigned Wallets (project_wallet)
 │   ├── Tasks
-│   ├── Project Notes
+│   │   └── Task Logs
 │   └── Activity Logs
-└── Archive
+├── Daily
+│   ├── Task Checklist (task dengan project_id)
+│   └── Personal Items (checklist tanpa project_id) — Phase 1.5
+├── Trading — Phase 1.5
+│   ├── Trade Logs
+│   ├── Portfolio Holdings
+│   ├── Portfolio Transfers
+│   └── Token Watchlist
+└── Archive (project-only)
 ```
+
+### Catatan Relasi Penting
+
+**Wallet punya dua entry point pembuatan, satu sumber data:**
+
+```txt
+Dibuat dari Account detail
+  → owner_account_id otomatis ke-set ke account itu
+  → wallet_type default "main", bisa diubah manual
+
+Dibuat dari Project detail
+  → wallet_type otomatis "project_wallet"
+  → otomatis linked ke project itu
+  → owner_account_id tetap harus dipilih manual
+
+Wallet tanpa owner (owner_account_id = null)
+  → masuk wallet_group (mis. "L1", "Burner")
+  → dipakai untuk wallet acak lintas-project
+```
+
+Kedua jalur di atas menulis ke tabel `wallets` yang sama. Tidak ada tabel wallet terpisah per entry point.
+
+**`chain_type` pada wallet adalah free text, bukan enum.** Boleh diisi EVM, Solana, Sui, Aptos, Cosmos, atau chain apa pun — tidak dibatasi daftar tetap.
+
+**Notes adalah satu sistem, bukan dua.** Note yang ditulis dari dalam Project Detail dan note global di halaman Docs sama-sama masuk ke tabel `notes` yang sama, dibedakan lewat `linked_project_id`. Tidak ada tabel `project_notes` terpisah. Lihat Section 10 untuk detail.
+
+**Task vs Personal Item.** Task selalu terikat ke `project_id` dan punya assigned accounts/wallet/proof. Personal Item tidak terikat project sama sekali, field-nya lebih ringan (judul, frekuensi, catatan opsional), untuk checklist pribadi non-crypto seperti cek berita atau update market. Lihat Section 20A.
 
 ---
 
@@ -446,31 +502,11 @@ Full inbox management lives in the Inbox page.
 
 ## 10. Docs / Notes System
 
-Aplikasi memakai label UI `Docs`, dengan data model notes. Sistem harus mendukung dua jenis notes:
+**v3.0 change:** Notes adalah satu sistem tunggal. Tidak ada lagi tabel `project_notes` terpisah dari tabel `notes`. Note yang ditulis dari dalam Project Detail dan note global di Docs sama-sama disimpan di tabel `notes`, dibedakan lewat `linked_project_id`.
 
-```txt
-Global Notes
-Project Notes
-```
+Aplikasi memakai label UI `Docs`. Docs adalah tempat untuk semua notes: knowledge umum, temuan project, temuan tools, guide, SOP, template, dan safe access metadata.
 
-### Global Notes
-
-Global Notes tidak wajib terhubung ke project.
-
-Global Notes hidup di halaman Docs dan bisa optionally di-link ke project, task, account, wallet, atau inbox item.
-
-Examples:
-
-```txt
-Wallet warm-up rules
-General hunting strategy
-List of projects to recheck
-Random alpha note
-Airdrop checklist
-Research note
-```
-
-### Global Note Fields
+### Note Fields (tabel tunggal)
 
 ```txt
 id
@@ -501,57 +537,35 @@ reminder
 strategy
 result
 private_note
+keys_hint
 ```
 
-### Global Notes Rules
+### Folder System
+
+Docs ditampilkan dalam struktur folder + notes di dalamnya, bukan flat list. Folder adalah kategori tampilan (bisa berbasis `note_type`, atau kategori manual), bukan tabel terpisah — cukup grouping di level UI/query.
+
+Folder default:
 
 ```txt
-Notes can be global.
-Notes can optionally link to a project.
+Research
+Tools & Links
+Guides / SOP
+Project References     — otomatis berisi semua note dengan linked_project_id terisi
+Accounts & Access
+Templates
+Personal Notes
+```
+
+Folder "Project References" adalah view otomatis: semua `notes` yang punya `linked_project_id` muncul di sini, dikelompokkan per project. Note yang ditulis dari dalam Project Detail otomatis masuk folder ini tanpa aksi tambahan dari user.
+
+### Notes Rules
+
+```txt
+Notes can be global or linked to a project (or task/account/wallet/inbox item).
+Writing a note from inside Project Detail automatically sets linked_project_id.
 Pinned notes may appear on the dashboard.
 Recent notes may appear on the dashboard.
 Never store seed phrases, raw private keys, recovery phrases, exchange API secrets, or sensitive passwords.
-```
-
-### Project Notes
-
-Project Notes live inside a project detail page.
-
-They are linked to a specific project.
-
-Examples:
-
-```txt
-Setup commands
-Generated public key
-Project-specific reminder
-Result note
-Eligibility note
-```
-
-### Project Note Fields
-
-```txt
-id
-workspace_id
-project_id
-title
-content
-note_type
-created_at
-updated_at
-```
-
-### Project Note Types
-
-```txt
-general
-setup
-commands
-links
-keys_hint
-result
-private_note
 ```
 
 ### Security Rule
@@ -889,20 +903,35 @@ Gunakan field:
 stage_result
 ```
 
-Contoh values:
+**v3.0 change:** `stage_result` bukan CHECK-constrained enum. Field ini free text dengan starter preset yang bisa dipilih lewat combobox, dan user boleh mengetik value custom kapan saja. Preset ini bisa dihapus/diedit, bukan daftar permanen.
+
+Starter preset values:
 
 ```txt
-not_started
+not_applicable
+watching
 registered
+joined_discord
 waiting_result
 accepted
 whitelisted
-eligible
 not_eligible
 claimable
 mint_open
-done
 ```
+
+Catatan: value `done` sengaja tidak masuk preset Stage. Project yang sudah selesai/claimed masuk ke Archive (`archive_reason: claimed`), bukan Stage. Stage mengurus "posisi project selagi masih aktif", Archive mengurus "bagaimana project itu berakhir".
+
+### Default per Hunt Type
+
+Field Stage tetap tampil untuk semua Hunt Type (tidak disembunyikan secara dinamis), tapi default value-nya berbeda:
+
+```txt
+Hunt Type: waitlist, nft   → default "watching"
+Hunt Type: free_hunts, retro → default "not_applicable"
+```
+
+Alasan: Waitlist dan NFT project memang berjalan lewat tahapan menunggu hasil eksternal, jadi Stage relevan sejak awal. Free Hunts dan Retro biasanya dikerjakan langsung (testnet, interaction) sehingga progress sudah cukup terwakili oleh `status`.
 
 Contoh:
 
@@ -912,8 +941,6 @@ Hunt Type: Waitlist
 Work Type: Early access / Waitlist registration
 Stage Result: Waiting result
 ```
-
-
 
 Jangan dihitung otomatis dari task logs untuk MVP.
 
@@ -1016,8 +1043,12 @@ in_progress
 running
 recheck
 done
-skipped
+dropped
 ```
+
+**v3.0 change:** renamed from `skipped` to `dropped`. This is a permanent task-level state — the task will not be worked on again, even though its parent project stays active. This is different from a daily miss recorded in `task_logs.status = 'skip'` (Section 23), which only means "not done today, reappears tomorrow" for recurring tasks. Do not confuse the two: `tasks.status = 'dropped'` is permanent, `task_logs.status = 'skip'` is a single day's record.
+
+When marking a task as `dropped`, the reason (if any) is recorded as free text in the related `task_logs.notes` field rather than a separate archive-style reason enum. This keeps Archive (Section 24) exclusively project-scoped — there is no parallel archive system for individual tasks.
 
 ### Task Frequency
 
@@ -1111,6 +1142,60 @@ Logic:
 If task_accounts for task X is not empty → show only for accounts in task_accounts
 If task_accounts for task X is empty → show for all accounts in project_accounts
 ```
+
+---
+
+## 20A. Personal Item Model (Phase 1.5)
+
+Personal Item is a lightweight checklist entry that is not tied to any project. It exists for recurring personal habits that are still worth tracking in Daily but don't belong to Web3 hunting work — e.g. checking crypto news, market updates, or hot topics on X.
+
+This is intentionally a separate, lighter entity from Task — it does not have project assignment, account assignment, wallet assignment, or proof/log tracking.
+
+### Personal Item Fields
+
+```txt
+id
+workspace_id
+title
+frequency
+note
+status
+created_at
+updated_at
+```
+
+### Personal Item Frequency
+
+Reuses the same frequency values as Task:
+
+```txt
+once
+daily
+weekly
+monthly
+custom
+```
+
+### Personal Item Status
+
+```txt
+todo
+done
+dropped
+```
+
+No `running` or `recheck` states — those are process-monitoring concepts that don't apply to personal checklist items.
+
+### Where Personal Item Appears
+
+```txt
+Daily page    → new tab/filter alongside "By Account" and "By Project",
+                 e.g. "Personal"
+Tasks page    → quick-add entry point also available here, so a
+                 Personal Item can be created without leaving Tasks
+```
+
+Personal Item does not appear on Dashboard's Hunting Pulse or any other Dashboard panel — it is a Daily-only concept for Phase 1.5.
 
 ---
 
@@ -1273,9 +1358,19 @@ Trash diganti menjadi Archive.
 
 Archive bukan delete. Semua data tetap disimpan.
 
-For Phase 1, archive applies to Projects.
+**Archive is project-scoped only.** There is no separate archive system for tasks. This is confirmed for v3.0 — Archive applies exclusively to Projects, not Tasks.
+
+### Cascade Behavior
+
+When a project is archived, its tasks are not individually archived — they simply stop appearing in Daily and active views because their parent project is archived. No `is_archived` flag is needed on the `tasks` table itself.
+
+For dropping a single task while its parent project stays active, use `tasks.status = 'dropped'` (Section 20) instead — this does not touch Archive at all.
 
 ### Archive Reasons
+
+**v3.0 change:** `archive_reason` is free text, not a CHECK-constrained enum. The list below is a starter preset shown in a combobox — user can select from it, edit it, remove entries, or type a custom reason at any time.
+
+Starter preset:
 
 ```txt
 claimed
@@ -1299,7 +1394,7 @@ other
 | completed | Selesai dan tidak perlu dipantau lagi |
 | other     | Alasan lain                           |
 
-Archive page harus bisa filter berdasarkan reason.
+Archive page harus bisa filter berdasarkan reason, termasuk reason custom yang ditambahkan user.
 
 ---
 
@@ -1312,7 +1407,6 @@ Dashboard
 Inbox
 Docs
 Projects
-  All Project
   Watchlist
   Daily
   Tasks
@@ -1322,6 +1416,8 @@ Trading
 Settings
 ```
 
+**v3.0 change:** `Projects` parent item is itself a direct link to the full project table (no separate "All Project" child). Clicking the sidebar label "Projects" opens `/projects` directly; the chevron only toggles expand/collapse of its sub-items (Watchlist, Daily, Tasks). This avoids the earlier confusing pattern of two adjacent items both meaning "the same list of all projects."
+
 ### Navigation Roles
 
 | Menu      | Purpose                                                   |
@@ -1329,13 +1425,14 @@ Settings
 | Dashboard | Personal desk: inbox, docs, and pulse                     |
 | Inbox     | Raw input waiting to be processed                         |
 | Docs      | Notes, guides, links, templates, SOP, and safe references |
-| Projects  | Main project database and workflow group                  |
-| Daily     | Full checklist grouped by account, nested under Projects  |
+| Projects  | Main project database — parent item links directly to the full table, also groups Watchlist/Daily/Tasks |
+| Watchlist | Filtered Projects view for stage-pending items, nested under Projects |
+| Daily     | Full checklist grouped by account, plus Personal Items (Phase 1.5), nested under Projects |
 | Tasks     | Cross-project task management, nested under Projects      |
-| Trading   | Portfolio wallets, trade journal, and profit/minus notes  |
+| Trading   | Trade log, portfolio, and token watchlist (Phase 1.5)     |
 | Accounts  | Identities, wallets, and groups                           |
-| Archive   | Archived projects and results                             |
-| Settings  | Workspace and account settings                            |
+| Archive   | Archived projects and results (project-scoped only)       |
+| Settings  | Workspace, account, and integration settings              |
 
 Sidebar harus tetap kecil dan stabil. Projects boleh menjadi dropdown workflow, tetapi hunt category tetap tidak menjadi top-level navigation.
 
@@ -1388,6 +1485,8 @@ Daily remains a dedicated top-level screen and is not duplicated as the primary 
 
 ## 26. Dashboard UX
 
+**v3.0 change:** this section is rewritten to match the actual shipped dashboard structure. The earlier "Today Desk | Signal Rail" two-column formula and "Running / Recheck" as a dashboard section are both retired — the real implementation evolved into a five-panel grid, and Running/Recheck moved to Daily and Projects only (confirmed in Section 44).
+
 Dashboard adalah personal command desk.
 
 Dashboard bukan mini Daily page, mini Projects page, atau analytics dashboard.
@@ -1404,23 +1503,24 @@ Dashboard harus menjawab:
 What needs to be processed?
 What did I recently capture?
 What notes are important?
-What needs my attention today?
-What is currently running or needs recheck?
+What's coming up soon?
+What happened recently?
 ```
 
-### Dashboard Priority Order
+### Dashboard Panel Structure
+
+Five panels in a grid, not a two-column "desk vs rail" split:
 
 ```txt
-1. Header / context
-2. Quick Capture
-3. Inbox to Process
-4. Pinned Docs
-5. Recent Docs
-6. Hunting Pulse
-7. Running / Recheck
-8. Upcoming Deadlines
-9. Recent Activity
+Header + Quick Capture (full width)
+├── Notes desk         → links to /docs
+├── Upcoming deadlines → links to /daily
+├── Hunting pulse      → links to /projects (spans two row-heights)
+├── Inbox to process   → links to /inbox
+└── Recent activity    → links to /projects
 ```
+
+Each panel has a consistent shape: icon + title in the header row, a small "Open" link to its full page, and compact content below — no persistent subtitle line under the panel title (removed in an earlier cleanup pass, do not reintroduce it).
 
 ### Header
 
@@ -1428,10 +1528,10 @@ Example:
 
 ```txt
 Good evening, Moree.
-Monday, June 29 · WIB
+Saturday, July 18 · WIB
 ```
 
-The header should stay compact. It should not become a marketing hero.
+The header should stay compact. It should not become a marketing hero. A short rotating motivational line may appear under the header (e.g. "Consistency finds what noise misses.") — this is decorative only, not a functional element.
 
 ### Quick Capture
 
@@ -1454,24 +1554,61 @@ Inbox
 
 Quick Capture should not require a modal for basic capture. Watchlist is a capture intent only and should become an inbox item or docs entry unless a dedicated model is approved later.
 
-### Inbox to Process
+### Notes desk
 
-Inbox to Process is the primary dashboard section.
+Shows pinned and recent Docs entries together in one panel (not two separate "Pinned Docs" / "Recent Docs" panels as in earlier drafts).
 
-It shows raw captured items that still need review.
+```txt
+Pinned notes    — notes marked pinned=true
+Recent notes    — most recently created/updated notes
+```
 
 Examples:
 
 ```txt
-Waitlist result email to review
-Project link from X
-Campaign reminder
-Eligibility check
-Random alpha note
-Mint reminder
+Wallet warm-up rules
+Project setup checklist
+Safe access metadata
+Project Alpha command note (updated 8m ago)
 ```
 
-Actions:
+### Upcoming deadlines
+
+Shows the nearest date-sensitive items.
+
+Examples:
+
+```txt
+Project Alpha proof — Submit before reset — Today
+Project Beta result check — Waitlist eligibility — Tomorrow
+Project Gamma campaign — Interaction window — Jul 18
+```
+
+### Hunting pulse
+
+Shows a compact status summary. It replaces large KPI card walls.
+
+```txt
+Overview       — Projects, Active, Inbox, Due, Running, Archived
+                 (small stat tiles)
+Categories     — Testnet, Free Hunt, Retro, NFT, Waitlist
+                 (compact pill counts)
+```
+
+**v3.0 note:** Running/Recheck rows do not appear inside Hunting Pulse on Dashboard — that live monitoring list belongs to Daily and Projects only (Section 44). Hunting Pulse's "Running" count is a number tile only, not an expandable list.
+
+### Inbox to process
+
+Shows raw captured items that still need review. Limit to a few items — full triage happens on the Inbox page.
+
+Examples:
+
+```txt
+Project Alpha waitlist result — Manual capture — Review
+Project Beta link captured — Quick capture — Process
+```
+
+Actions available from the Inbox page (not inline on Dashboard):
 
 ```txt
 Create Project
@@ -1484,83 +1621,16 @@ Ignore
 
 No item should automatically create a project or task without user confirmation.
 
-### Pinned Docs
+### Recent activity
 
-Pinned Docs shows notes, guides, links, templates, or references the user wants to keep visible.
-
-Examples:
-
-```txt
-Wallet warm-up rules
-Projects to recheck this week
-Soundness setup notes
-Airdrop farming checklist
-```
-
-Pinned docs can be global or linked to a project.
-
-### Recent Docs
-
-Recent Docs shows the latest notes, guides, links, templates, or references created or edited.
-
-This helps the dashboard feel like a personal workbench instead of a pure task tracker.
-
-### Hunting Pulse
-
-Hunting Pulse is a compact status summary.
-
-It replaces large KPI card walls.
+Shows the latest changes across the workspace as a short list.
 
 Examples:
 
 ```txt
-31 active projects
-6 due today
-3 running/recheck
-4 inbox items to process
-7 archived
-```
-
-Hunting Pulse should stay compact and should not dominate the dashboard.
-
-### Running / Recheck
-
-Running and Recheck remains a compact monitoring section.
-
-Examples:
-
-```txt
-NexusHQ prover running
-Huddle01 eligibility recheck
-Soundness proof pending
-```
-
-### Upcoming Deadlines
-
-Upcoming Deadlines shows the nearest important dates.
-
-Examples:
-
-```txt
-Proof deadline today
-Waitlist result tomorrow
-Mint date in 2 days
-Campaign ends this week
-```
-
-### Recent Activity
-
-Recent Activity is secondary.
-
-It can appear as a compact bottom strip or short list.
-
-Examples:
-
-```txt
-Moree completed Linera daily
-Wdym added new wallet
-Soundness note updated
-Project moved to archive
+Saved Project Alpha command note — 8m
+Processed Project Beta reminder — 24m
+Moved Project Gamma to Running — 1h
 ```
 
 ### Dashboard Must Not Show
@@ -1568,11 +1638,13 @@ Project moved to archive
 ```txt
 Full Daily checklist
 Full Projects table
+Running / Recheck as its own dashboard section
 Crypto news
 Gmail-connected inbox
 X/Twitter monitoring
 AI summaries
 Token price widget
+Trading data (Trading has its own dedicated page)
 ```
 
 ---
@@ -1986,57 +2058,92 @@ Wallets
 Groups
 ```
 
-### Account Card
+### Account Card (Identities tab, main grid)
+
+**v3.0 change:** Card is trimmed — it no longer lists every wallet as pills. This prevents cards from growing uneven and cluttered as the number of wallets per account grows. Wallets are shown as a count only; full detail lives in the Account Detail Panel.
 
 ```txt
-Moree
-X: @...
-Email: ...
-Wallets: 5
-Active Projects: 12
-Daily Tasks Today: 8
+[avatar] Moree
+Personal hunting identity
+
+Projects: 12       Daily tasks: 8
+X: @moree
+Discord: moree.web3
+Email: tracking only
+
+Wallets: 3          (count only, not listed)
 ```
 
-### Account Detail
+Card is clickable — clicking anywhere on it opens the Account Detail Panel.
+
+### Account Avatar
+
+Account may have a profile photo, following the same pattern as Project Logo System (Section 19): upload manually or paste an image URL, fallback to initial-letter circle if empty. Phase 1 ships this as a working UI (upload control, URL input, fallback state) even before Supabase Storage wiring is complete — the control should feel real, storage connection can follow once Storage is implemented.
+
+Storage path (once wired):
 
 ```txt
-Moree
-
-Active Projects
-- Soundness
-- Linera
-- Huddle01
-
-Daily Tasks Today
-- Soundness Submit Proof
-- Linera Galxe
-
-Wallets
-- Moree EVM Main
-- Moree SOL Main
-- Project-specific wallet
-
-Recent Logs
-- Done Linera Galxe
-- Done Huddle01 Daily
+account-avatars/{workspace_id}/{account_id}/avatar.png
 ```
+
+### Account Detail Panel
+
+**v3.0 change:** Account Detail opens as a right-side panel (drawer), not a separate full page — following the same pattern as Project Detail's side panel (Section 19B). This keeps the Identities grid visible/context-preserved behind the panel.
+
+Panel content, top to bottom:
+
+```txt
+Header      avatar (clickable, editable) + name + handle
+
+Quick stats  Projects count, Daily tasks count
+
+Wallets      list of wallets where owner_account_id = this account
+             "+ Add wallet" button — creates a wallet with
+             owner_account_id pre-filled to this account
+             clicking a wallet row opens Wallet Detail Panel (Section 34)
+
+Active projects   list of projects this account is assigned to,
+                   each row clickable → opens Project Detail Panel
+
+Profile      X, Discord, Email (tracking only)
+```
+
+Wallets without a clear single owner (e.g. L1, burner wallets) are not managed from this panel — they are added from the global Wallets tab instead (Section 34).
 
 ---
 
 ## 34. Wallet Detail Page
 
+**v3.0 change:** Wallet Detail is a right-side panel (drawer), matching Project Detail and Account Detail. It opens from clicking any wallet row — in the global Wallets tab, or from inside an Account Detail Panel.
+
 Wallet detail helps track wallet usage.
 
-Example:
+Panel content:
+
+```txt
+Header       icon + wallet label + address (with copy button)
+
+Properties   Chain, Type, Group, Owner
+             Owner is a clickable link back to the Account Detail
+             Panel when owner_account_id is set. Shows "No persona"
+             when owner_account_id is null (e.g. L1/burner wallets).
+
+Used in      list of projects this wallet is assigned to,
+             each row clickable → opens Project Detail Panel
+
+Recent activity   short list of recent task logs or transfers
+                   involving this wallet
+```
+
+Example data:
 
 ```txt
 L1 Wallet 02
 
-Address: 0x...
 Chain: EVM
-Type: l1
+Type: L1
 Group: L1
-Owner: none
+Owner: No persona
 
 Used in:
 - Retro Project A
@@ -2048,7 +2155,31 @@ Recent Activity:
 - Submitted form Y
 ```
 
-This is useful for random wallets and project-specific wallets.
+This is useful for random wallets and project-specific wallets alike.
+
+### Wallet Type Display Formatting
+
+**v3.0 fix:** raw enum values (`main`, `l1`, `project_wallet`) must not be displayed as-is in the UI. Apply title-case formatting with underscores converted to spaces: `main` → "Main", `l1` → "L1", `project_wallet` → "Project wallet".
+
+### Wallet Creation Entry Points
+
+Confirmed dual entry point, both writing to the same `wallets` table (see Section 8 for the relation note):
+
+```txt
+From Account Detail Panel  → owner_account_id pre-filled,
+                              wallet_type defaults to "main"
+
+From Project Detail Panel  → wallet_type defaults to
+                              "project_wallet", auto-linked to
+                              that project, owner_account_id
+                              still must be picked manually
+
+From global Wallets tab    → no pre-fill, used for L1/burner/
+                              ownerless wallets assigned to a
+                              wallet_group instead
+```
+
+`chain_type` is free text in all three entry points — not restricted to a fixed chain list.
 
 ---
 
@@ -2290,6 +2421,175 @@ See `DESIGN.md` for exact responsive and component specifications.
 
 ---
 
+## 39A. Trading Page Direction (Phase 1.5)
+
+Trading is a separate top-level menu, not a Projects category. It covers three sub-areas: Trade Log with realized PnL, Portfolio, and Token Watchlist.
+
+Trading should feel like a calm personal ledger, not a crypto exchange terminal (per DESIGN.md 19A).
+
+### Trade Log
+
+Records spot CEX trade history and computes realized PnL.
+
+**Import flow — paste and parse, not manual form entry:**
+
+```txt
+1. User pastes raw trade history text copied from the exchange
+2. System parses it into structured rows
+3. PREVIEW is shown before anything is saved — parsed rows,
+   date range covered, and any rows that failed to parse
+   (flagged, not silently dropped)
+4. Duplicate detection — rows with an exchange_order_id already
+   present in trade_logs are automatically skipped, so re-pasting
+   an overlapping date range is safe
+5. User confirms → only then rows are written to trade_logs
+```
+
+No auto-save without user confirmation — same principle as Inbox (Section 9).
+
+**Partial fills:** if one order fills across multiple trade history rows, each row is stored separately, not merged. FIFO matching (below) operates per-row, so partial fills are handled correctly without extra logic.
+
+**Fee handling:** `fee_amount` and `fee_currency` are captured per-row exactly as they appear in the pasted source. Fee currency is not assumed — it can be the quote currency (e.g. USDT) or the base currency (e.g. SOL) depending on trade side and exchange. Do not derive fee from a percentage; always take the literal value from the source.
+
+### Trade Log Fields
+
+```txt
+id
+workspace_id
+exchange
+pair
+market_type
+order_type
+side
+total_quote
+price
+amount_base
+fee_amount
+fee_currency
+executed_at
+exchange_order_id
+notes
+created_at
+```
+
+### Realized PnL — FIFO Matching
+
+**Confirmed approach:** Realized PnL via FIFO (First In, First Out) matching, not simple daily net cash flow.
+
+Reason: spot trades can carry a position open across multiple days. A simple "sells minus buys per day" calculation would show a misleading large loss on the day a position is opened and a misleading large gain on the day it's closed, even when the trade was genuinely profitable. FIFO matching pairs each sell against the oldest unmatched buy(s) for that pair, so PnL is attributed to the day a position is realized (closed), not the day capital moved.
+
+```txt
+Rule: every SELL row is matched against the oldest unmatched
+BUY row(s) for the same pair, oldest first. A sell can consume
+multiple buy lots if quantities don't align 1:1.
+
+Unmatched BUY rows (still held, not yet sold) do not appear in
+the PnL calendar — they are reflected in Portfolio Holdings
+instead (see below), because their gain/loss isn't realized yet.
+
+Realized PnL for a matched pair = 
+  (sell price - buy price) × matched quantity - proportional fees
+```
+
+FIFO is the default and only matching method for Phase 1.5 — no LIFO toggle.
+
+### Trade Log Calendar View
+
+Calendar UI where each day shows net realized PnL for trades closed that day (e.g. "+$12" or "-$23"). Clicking a day shows the individual matched trades contributing to that total.
+
+### Portfolio
+
+Tracks current holdings across on-chain wallets and CEX accounts, plus fund movement between them.
+
+**Phase 1.5 scope: manual entry only.** No live RPC or exchange API balance fetching — that requires the Settings Integrations API keys (Section 39B) to move beyond scaffolding, which is out of scope for this wave.
+
+### Portfolio Holding Fields
+
+```txt
+id
+workspace_id
+source_type          -- 'wallet' or 'cex'
+source_label          -- e.g. "Moree EVM Main" or "Bybit"
+linked_wallet_id      -- nullable, set when source_type = 'wallet'
+asset
+amount
+recorded_at
+created_at
+```
+
+### Portfolio Transfer Fields
+
+Records movement of funds between two sources — CEX to CEX, or CEX to bank (fiat off-ramp).
+
+```txt
+id
+workspace_id
+from_source
+to_source
+asset
+amount
+transferred_at
+notes
+created_at
+```
+
+Example: "Withdrew IDR from Pintu to bank account" or "Moved USDT from Binance to Bybit."
+
+### Token Watchlist
+
+**Confirmed scope for Phase 1.5: manual watchlist only.** User adds tokens they want to keep an eye on; no live price feed integration yet (that is tied to the Crypto Price Feed API key in Settings Integrations, Section 39B, which is scaffold-only in this phase).
+
+### Token Watchlist Fields
+
+```txt
+id
+workspace_id
+symbol
+chain
+note
+added_at
+```
+
+Purpose: a quick personal shortlist to scan instead of checking exchanges one-by-one, per the user's stated need. Does not connect to the separately-existing price alert bot (external, still in testing) — that integration is not scoped for Phase 1.5 and would be considered later as its own connector.
+
+---
+
+## 39B. Settings — Integrations (Phase 1.5)
+
+Settings gains a new "Integrations" section for API keys the user plans to use for real-time data.
+
+**Confirmed scope: UI/form only in this phase.** The form captures and stores the key, but no fetch, sync, or active use of the key happens yet. This mirrors how Trading's Portfolio and Token Watchlist are manual-only until these integrations become functional.
+
+### Integrations Fields
+
+```txt
+Crypto Price Feed
+  provider        -- e.g. CoinGecko, CoinMarketCap, Custom
+  api_key         -- stored server-side, masked in UI, never
+                     returned in plaintext to the client
+  status          -- "Not connected" until Phase 2+ activation
+
+AI Assistant
+  provider        -- e.g. OpenAI, Anthropic, Custom endpoint
+  api_key         -- same storage/masking rule as above
+  status          -- "Not connected" until Phase 2+ activation
+```
+
+### Security Rule for API Keys
+
+Unlike wallet addresses or trade history, API keys are credentials and must be handled accordingly:
+
+```txt
+Stored server-side only, never exposed in client-side bundles
+Masked in UI at all times after saving (e.g. ••••••1234)
+Never returned in plaintext by any read query
+If an exchange API key is ever added in a future phase for live
+trading data, it should be scoped read-only on the exchange side
+wherever the exchange supports permission scoping
+```
+
+---
+
 ## 40. Technical Stack
 
 ### Frontend
@@ -2401,12 +2701,14 @@ updated_at timestamptz default now()
 
 ### notes
 
+**v3.0 change:** this is now the single notes table for both global and project-linked notes. The separate `project_notes` table from v2.8 is removed — see Section 10.
+
 ```sql
 id uuid primary key
 workspace_id uuid references workspaces(id)
 title text
 content text
-note_type text check (note_type in ('general','alpha','research','setup','commands','links','reminder','strategy','result','private_note'))
+note_type text check (note_type in ('general','alpha','research','setup','commands','links','reminder','strategy','result','private_note','keys_hint'))
 pinned boolean default false
 linked_project_id uuid references projects(id)
 linked_task_id uuid references tasks(id)
@@ -2424,6 +2726,7 @@ id uuid primary key
 workspace_id uuid references workspaces(id)
 label text not null
 avatar_url text
+avatar_source text check (avatar_source in ('uploaded','external_url','manual','none'))
 color text
 x_username text
 x_url text
@@ -2433,6 +2736,8 @@ notes text
 created_at timestamptz default now()
 updated_at timestamptz default now()
 ```
+
+`avatar_url` and `avatar_source` added in v3.0, mirroring the Project Logo System pattern (Section 19).
 
 ### wallet_groups
 
@@ -2460,6 +2765,8 @@ notes text
 created_at timestamptz default now()
 updated_at timestamptz default now()
 ```
+
+`chain_type` remains free text (not a CHECK enum) — confirmed in Section 8, supports any chain name, not restricted to EVM/Solana.
 
 ### projects
 
@@ -2494,6 +2801,8 @@ created_at timestamptz default now()
 updated_at timestamptz default now()
 ```
 
+`stage_result` and `archive_reason` are intentionally free text (no CHECK constraint) — starter preset values are enforced at the application/UI level via combobox, not the database, per Section 18A and Section 24.
+
 ### project_accounts
 
 ```sql
@@ -2512,13 +2821,15 @@ primary key (project_id, wallet_id)
 
 ### tasks
 
+**v3.0 change:** `status` enum value `skipped` renamed to `dropped` — see Section 20.
+
 ```sql
 id uuid primary key
 workspace_id uuid references workspaces(id)
 project_id uuid references projects(id)
 title text not null
 description text
-status text check (status in ('todo','in_progress','running','recheck','done','skipped'))
+status text check (status in ('todo','in_progress','running','recheck','done','dropped'))
 frequency text check (frequency in ('once','daily','weekly','monthly','custom'))
 priority text check (priority in ('high','medium','low'))
 url text
@@ -2562,15 +2873,19 @@ created_at timestamptz default now()
 updated_at timestamptz default now()
 ```
 
-### project_notes
+Note: `status = 'skip'` here is unrelated to `tasks.status = 'dropped'`. This is a single day's record for a recurring task, not a permanent state — see Section 20.
+
+### personal_items (Phase 1.5)
+
+New table for Daily checklist items not tied to any project — see Section 20A.
 
 ```sql
 id uuid primary key
 workspace_id uuid references workspaces(id)
-project_id uuid references projects(id)
-title text
-content text
-note_type text check (note_type in ('general','setup','commands','links','keys_hint','result','private_note'))
+title text not null
+frequency text check (frequency in ('once','daily','weekly','monthly','custom'))
+status text check (status in ('todo','done','dropped'))
+note text
 created_at timestamptz default now()
 updated_at timestamptz default now()
 ```
@@ -2589,6 +2904,100 @@ note_id uuid references notes(id)
 action text not null
 metadata jsonb
 created_at timestamptz default now()
+```
+
+### trade_logs (Phase 1.5)
+
+One row per parsed trade history entry — see Section 39A.
+
+```sql
+id uuid primary key
+workspace_id uuid references workspaces(id)
+exchange text
+pair text not null
+market_type text
+order_type text
+side text check (side in ('buy','sell'))
+total_quote numeric
+price numeric
+amount_base numeric
+fee_amount numeric
+fee_currency text
+executed_at timestamptz not null
+exchange_order_id text
+notes text
+created_at timestamptz default now()
+```
+
+### trade_matches (Phase 1.5)
+
+Records FIFO pairing between a sell row and the buy row(s) it consumed, so realized PnL can be attributed to the correct calendar day without recomputing FIFO on every read.
+
+```sql
+id uuid primary key
+workspace_id uuid references workspaces(id)
+sell_trade_id uuid references trade_logs(id)
+buy_trade_id uuid references trade_logs(id)
+matched_quantity numeric not null
+realized_pnl numeric not null
+matched_at timestamptz not null
+created_at timestamptz default now()
+```
+
+### portfolio_holdings (Phase 1.5)
+
+Manual snapshot of holdings per wallet or CEX — see Section 39A.
+
+```sql
+id uuid primary key
+workspace_id uuid references workspaces(id)
+source_type text check (source_type in ('wallet','cex'))
+source_label text not null
+linked_wallet_id uuid references wallets(id)
+asset text not null
+amount numeric not null
+recorded_at timestamptz not null
+created_at timestamptz default now()
+```
+
+### portfolio_transfers (Phase 1.5)
+
+```sql
+id uuid primary key
+workspace_id uuid references workspaces(id)
+from_source text not null
+to_source text not null
+asset text not null
+amount numeric not null
+transferred_at timestamptz not null
+notes text
+created_at timestamptz default now()
+```
+
+### token_watchlist (Phase 1.5)
+
+```sql
+id uuid primary key
+workspace_id uuid references workspaces(id)
+symbol text not null
+chain text
+note text
+added_at timestamptz default now()
+```
+
+### Settings — Integrations (Phase 1.5)
+
+Not a full table draft yet, but confirmed shape for the API key scaffolding described in Section 39B:
+
+```sql
+workspace_settings
+  id uuid primary key
+  workspace_id uuid references workspaces(id)
+  price_feed_provider text
+  price_feed_api_key text          -- store encrypted, never returned plaintext
+  ai_provider text
+  ai_api_key text                  -- store encrypted, never returned plaintext
+  updated_at timestamptz default now()
 ```
 
 ---
@@ -2667,7 +3076,9 @@ User must not be able to link an inbox item or note to a project/task/account/wa
 
 ## 44. MVP Scope
 
-Phase 1 should include:
+**v3.0 change:** split into Phase 1 Core (build first, ships a usable app) and Phase 1.5 (fully specified, built as fast-follow). See phasing note at the top of this document.
+
+### Phase 1 Core
 
 ```txt
 Auth
@@ -2675,62 +3086,80 @@ Username signup/login/logout
 Auto-create default personal workspace
 Protected routes
 
-Dashboard with Inbox + Docs + Pulse
+Dashboard — compact overview only (see Dashboard Scope below)
 Manual Inbox
 Inbox item CRUD
 Inbox item conversion actions
-Global Notes
+Docs (unified notes system — global and project-linked)
 Pinned Docs
 Recent Docs
 
 Accounts CRUD
+Account avatar (upload/URL, scaffold-first per Section 33)
 Wallet Groups CRUD
-Wallets CRUD
+Wallets CRUD (dual entry point: from Account, from Project)
+Account Detail Panel
+Wallet Detail Panel
 Projects CRUD
 Project logo upload / URL
 Project detail with tabs
-Project Notes
+Project-linked Docs (via linked_project_id, not a separate table)
 Task CRUD with quick add
 Task frequency and status badges in UI
 Task assignment to accounts
 Task logs
 Daily checklist with checklist / running-recheck split
-Archive with archive reason
+Archive with archive reason (project-scoped only)
 Basic activity logs
 ```
 
-### Phase 1 Dashboard Scope
+### Phase 1.5 (fully specified, built after Core ships)
+
+```txt
+Personal Item (Section 20A)
+Trading — Trade Log with FIFO realized PnL (Section 39A)
+Trading — Portfolio Holdings and Transfers, manual entry
+Trading — Token Watchlist, manual entry
+Settings — Integrations section, API key storage (scaffold only,
+  no live fetch/activation — Section 39B)
+```
+
+### Phase 1 Core Dashboard Scope
+
+**v3.0 change:** Running/Recheck removed from Dashboard entirely (moved to Daily and Projects only). A "Reminders" panel was discussed in earlier planning but is not present in the current shipped five-panel grid (Notes desk, Upcoming deadlines, Hunting pulse, Inbox to process, Recent activity) — see DESIGN.md Section 14 "Open question — Reminders panel." Confirm with the user whether to still build it before including it in scope.
 
 Dashboard must show:
 
 ```txt
 Quick Capture
-Inbox to Process
-Pinned Docs
-Recent Docs
-Hunting Pulse
-Running / Recheck
+Notes desk (pinned + recent Docs combined in one panel)
 Upcoming Deadlines
+Hunting Pulse (Overview stat tiles + Category pills)
+Inbox to Process
 Recent Activity
 ```
+
+Reminders is not yet built — see DESIGN.md Section 14 open question above. Add it as a sixth standalone panel only after confirming it's still wanted.
 
 Dashboard should not show:
 
 ```txt
 Full Daily checklist
 Full Projects table
+Running / Recheck section
 Crypto news
 Gmail-connected inbox
 X/Twitter monitoring
 AI summaries
 Token price widget
+Trading data (Trading has its own dedicated page)
 ```
 
 ---
 
 ## 45. Out of Scope for MVP
 
-Do not implement in Phase 1:
+Do not implement in Phase 1 Core or Phase 1.5:
 
 ```txt
 Gmail integration
@@ -2740,14 +3169,18 @@ auto email detection
 AI email classification
 scheduled inbox sync
 X/Twitter monitoring
+Watchlist auto-monitoring bot (X/Discord activity detection)
 agent discovery
 crypto news widget
-token price widget
+live token price widget (Token Watchlist is manual-only in Phase 1.5)
 team invite UI
 workspace switcher UI
 role permission UI
 billing
-auto wallet balance tracking
+auto wallet balance tracking (Portfolio is manual entry in Phase 1.5)
+CEX API auto-sync for trading/portfolio data
+Crypto Price Feed API — live activation (UI scaffold only in Phase 1.5)
+AI Assistant API — live activation (UI scaffold only in Phase 1.5)
 auto-detect transactions
 push notifications
 email notifications
@@ -2756,7 +3189,7 @@ public sharing
 native mobile app
 advanced analytics
 automatic favicon fetch in MVP
-general file attachments beyond project logos and task proof links
+general file attachments beyond project logos, account avatars, and task proof links
 ```
 
 ---
@@ -2778,6 +3211,9 @@ wallet usage analytics
 soft notification system
 CSV export
 keyboard shortcuts
+Activate Crypto Price Feed API — live price fetch for Token Watchlist
+Activate AI Assistant API — functional chat using stored key
+CEX API auto-sync for Portfolio Holdings (read-only permission)
 ```
 
 ---
@@ -2791,6 +3227,8 @@ AI summary for inbox items
 suggest create project/task/note from email
 scheduled Gmail sync
 X/Twitter monitoring
+Watchlist auto-monitoring bot — auto-detect project X/Discord
+  activity and surface updates in Watchlist
 alpha notes assistant
 Discovery / Alpha Inbox
 on-chain wallet activity sync
@@ -2798,6 +3236,8 @@ token price widget
 team comments
 advanced permission roles
 Supabase Edge Functions for background tools
+Connect existing external price alert bot (currently in testing,
+  separate system) into Trading/Token Watchlist
 ```
 
 ---
