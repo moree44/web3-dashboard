@@ -17,7 +17,7 @@ export function SettingsPreview() {
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Settings</h1>
         </div>
-        <Button variant="secondary" size="sm">Save changes</Button>
+        <Button variant="secondary" size="sm" disabled>Save changes</Button>
       </header>
 
       <div className="grid gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">

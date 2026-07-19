@@ -39,7 +39,7 @@ const projectNavigation = [
 const lowerNavigation = [
   { label: "Accounts", href: "/accounts", icon: UsersRound },
   { label: "Archive", href: "/archive", icon: Archive },
-  { label: "Trading", href: "#", icon: TrendingUp, placeholder: true },
+  { label: "Trading", icon: TrendingUp, placeholder: true },
 ] as const;
 
 export function AppSidebar({ active }: { active: AppSection }) {
@@ -115,8 +115,8 @@ export function AppSidebar({ active }: { active: AppSection }) {
               </div> : null}
             </div>
 
-            {lowerNavigation.map(({ label, href, icon: Icon, ...item }) => (
-              <NavItem key={label} label={label} href={href} icon={Icon} active={active === label} placeholder={"placeholder" in item} />
+            {lowerNavigation.map(({ label, icon: Icon, ...item }) => (
+              <NavItem key={label} label={label} href={"href" in item ? item.href : undefined} icon={Icon} active={active === label} placeholder={"placeholder" in item} />
             ))}
           </nav>
         </div>
@@ -149,23 +149,30 @@ export function AppSidebar({ active }: { active: AppSection }) {
   );
 }
 
-function NavItem({ label, href, icon: Icon, active, count, placeholder = false }: { label: string; href: string; icon: typeof LayoutDashboard; active: boolean; count?: number; placeholder?: boolean }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-        active
-          ? "soft-control border border-border bg-accent text-foreground"
-          : placeholder
-            ? "text-muted-foreground/55 hover:bg-accent/40 hover:text-muted-foreground"
-            : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-      )}
-    >
+function NavItem({ label, href, icon: Icon, active, count, placeholder = false }: { label: string; href?: string; icon: typeof LayoutDashboard; active: boolean; count?: number; placeholder?: boolean }) {
+  const className = cn(
+    "flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+    active
+      ? "soft-control border border-border bg-accent text-foreground"
+      : placeholder
+        ? "cursor-not-allowed text-muted-foreground/45"
+        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+  );
+  const content = (
+    <>
       <Icon aria-hidden="true" className="size-4" strokeWidth={1.8} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {count ? <span className="rounded-md border border-white/[0.06] bg-card px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">{count}</span> : null}
+    </>
+  );
+
+  if (placeholder) {
+    return <div className={className} aria-disabled="true">{content}</div>;
+  }
+
+  return (
+    <Link href={href ?? "#"} aria-current={active ? "page" : undefined} className={className}>
+      {content}
     </Link>
   );
 }

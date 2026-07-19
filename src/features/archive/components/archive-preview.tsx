@@ -11,7 +11,7 @@ const filters = ["All 7", "Claimed 2", "Dropped 1", "Scam risk 1", "Expired 1", 
 
 const archivedProjects = [
   { name: "Old Mint Pass", mark: "O", hunt: "NFT", reason: "claimed", status: "Archived", result: "Mint completed", account: "Moree", archived: "Jul 08" },
-  { name: "Beta Exchange Quest", mark: "B", hunt: "Trading", reason: "not worth", status: "Archived", result: "Low reward", account: "Wdym", archived: "Jul 04" },
+  { name: "Beta Exchange Quest", mark: "B", hunt: "Retro", reason: "not worth", status: "Archived", result: "Low reward", account: "Wdym", archived: "Jul 04" },
   { name: "Retro Bridge Alpha", mark: "R", hunt: "Retro", reason: "completed", status: "Archived", result: "Interaction saved", account: "Moree", archived: "Jun 28" },
   { name: "Unknown Faucet Campaign", mark: "U", hunt: "Free Hunts", reason: "scam risk", status: "Archived", result: "Stopped before wallet use", account: "Wayss", archived: "Jun 24" },
   { name: "Expired Waitlist Form", mark: "E", hunt: "Waitlist", reason: "expired", status: "Archived", result: "Deadline passed", account: "Wdym", archived: "Jun 19" },
@@ -23,7 +23,18 @@ type ArchivedProject = (typeof archivedProjects)[number];
 
 export function ArchivePreview() {
   const [activeFilter, setActiveFilter] = useState<(typeof filters)[number]>("All 7");
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(() => new Set());
   const filtered = activeFilter === "All 7" ? archivedProjects : archivedProjects.filter((project) => project.reason === reasonFromFilter(activeFilter));
+  const selectedCount = selectedProjects.size;
+
+  function toggleSelected(projectName: string) {
+    setSelectedProjects((current) => {
+      const next = new Set(current);
+      if (next.has(projectName)) next.delete(projectName);
+      else next.add(projectName);
+      return next;
+    });
+  }
 
   return (
     <div className="min-w-0 py-5 lg:py-7">
@@ -31,7 +42,7 @@ export function ArchivePreview() {
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Archive</h1>
         </div>
-        <Button variant="secondary" size="sm"><RotateCcw />Restore selected</Button>
+        <Button variant="secondary" size="sm" disabled={selectedCount === 0}><RotateCcw />Restore selected</Button>
       </header>
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
@@ -73,11 +84,11 @@ export function ArchivePreview() {
               <th className="border-b border-white/[0.045] px-3 py-3"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody>{filtered.map((project) => <ArchiveRow key={project.name} project={project} />)}</tbody>
+          <tbody>{filtered.map((project) => <ArchiveRow key={project.name} project={project} selected={selectedProjects.has(project.name)} onSelect={() => toggleSelected(project.name)} />)}</tbody>
         </table>
       </div>
 
-      <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => <ArchiveMobileCard key={project.name} project={project} />)}</div>
+      <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => <ArchiveMobileCard key={project.name} project={project} selected={selectedProjects.has(project.name)} onSelect={() => toggleSelected(project.name)} />)}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
         <span>Showing {filtered.length} archived preview projects</span>
         <span>Archive tracks projects only</span>
@@ -86,10 +97,15 @@ export function ArchivePreview() {
   );
 }
 
-function ArchiveRow({ project }: { project: ArchivedProject }) {
+function ArchiveRow({ project, selected, onSelect }: { project: ArchivedProject; selected: boolean; onSelect: () => void }) {
   return (
     <tr className="h-[58px] border-b border-white/[0.035] hover:bg-white/[0.025]">
-      <td className="px-4 lg:px-8"><ArchiveIdentity project={project} /></td>
+      <td className="px-4 lg:px-8">
+        <div className="flex items-center gap-3">
+          <ArchiveCheckbox project={project} selected={selected} onSelect={onSelect} />
+          <ArchiveIdentity project={project} />
+        </div>
+      </td>
       <td className="px-3"><Reason reason={project.reason} /></td>
       <td className="px-3 text-xs text-muted-foreground">{project.hunt}</td>
       <td className="px-3 text-xs text-muted-foreground">{project.result}</td>
@@ -100,8 +116,28 @@ function ArchiveRow({ project }: { project: ArchivedProject }) {
   );
 }
 
-function ArchiveMobileCard({ project }: { project: ArchivedProject }) {
-  return <article className="px-4 py-4 sm:px-6"><ArchiveIdentity project={project} /><div className="mt-3 flex flex-wrap gap-2"><Reason reason={project.reason} /><Badge variant="secondary">{project.hunt}</Badge><Badge variant="outline">{project.archived}</Badge></div></article>;
+function ArchiveMobileCard({ project, selected, onSelect }: { project: ArchivedProject; selected: boolean; onSelect: () => void }) {
+  return (
+    <article className="px-4 py-4 sm:px-6">
+      <div className="flex items-center gap-3">
+        <ArchiveCheckbox project={project} selected={selected} onSelect={onSelect} />
+        <ArchiveIdentity project={project} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2"><Reason reason={project.reason} /><Badge variant="secondary">{project.hunt}</Badge><Badge variant="outline">{project.archived}</Badge></div>
+    </article>
+  );
+}
+
+function ArchiveCheckbox({ project, selected, onSelect }: { project: ArchivedProject; selected: boolean; onSelect: () => void }) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={"Select " + project.name}
+      checked={selected}
+      onChange={onSelect}
+      className="size-4 shrink-0 accent-white"
+    />
+  );
 }
 
 function ArchiveIdentity({ project }: { project: ArchivedProject }) {
@@ -118,7 +154,11 @@ function ArchiveIdentity({ project }: { project: ArchivedProject }) {
 
 function Reason({ reason }: { reason: string }) {
   const variant = reason === "claimed" || reason === "completed" ? "success" : reason === "scam risk" ? "destructive" : reason === "expired" ? "warning" : "secondary";
-  return <Badge variant={variant}>{reason}</Badge>;
+  return <Badge variant={variant}>{toTitleCase(reason)}</Badge>;
+}
+
+function toTitleCase(value: string) {
+  return value.split(" ").map((word) => word.slice(0, 1).toUpperCase() + word.slice(1)).join(" ");
 }
 
 function reasonFromFilter(filter: string) {

@@ -50,12 +50,6 @@ const recentNotes = [
   { title: "Retro farming notes", meta: "Updated yesterday" },
 ];
 
-const runningItems = [
-  { title: "Project Alpha prover", meta: "Running on Moree", tone: "info" as const },
-  { title: "Project Beta eligibility", meta: "Recheck on Wdym", tone: "warning" as const },
-  { title: "Project Gamma proof", meta: "Pending submit", tone: "warning" as const },
-];
-
 const deadlines = [
   { title: "Project Alpha proof", meta: "Submit before reset", due: "Today", tone: "text-destructive" },
   { title: "Project Beta result check", meta: "Waitlist eligibility", due: "Tomorrow", tone: "text-warning" },
@@ -123,10 +117,6 @@ export function DashboardPreview() {
             {pulseItems.map((item) => <PulsePill key={item.label} item={item} />)}
           </div>
 
-          <SectionLabel label="Running / recheck" className="mt-2.5" />
-          <div className="divide-y divide-white/[0.045]">
-            {runningItems.map((item) => <SignalRow key={item.title} item={item} />)}
-          </div>
         </DashboardPanel>
 
         <DashboardPanel icon={Inbox} title="Inbox to process" href="/inbox">
@@ -218,18 +208,6 @@ function PulsePill({ item }: { item: (typeof pulseItems)[number] }) {
   );
 }
 
-function SignalRow({ item }: { item: (typeof runningItems)[number] }) {
-  const color = item.tone === "info" ? "text-info" : "text-warning";
-  return (
-    <button className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 py-1.5 text-left hover:bg-white/[0.025]">
-      <Circle className={"size-2 fill-current " + color} />
-      <span className="min-w-0">
-        <span className="block truncate text-[13px] font-medium">{item.title}</span>
-        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{item.meta}</span>
-      </span>
-    </button>
-  );
-}
 
 function DeadlineRow({ item }: { item: (typeof deadlines)[number] }) {
   return (

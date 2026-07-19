@@ -52,7 +52,7 @@ export function DocsPreview() {
       <section className="soft-panel mt-4 grid gap-2 rounded-xl border border-border bg-card p-2 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="soft-inset flex min-w-0 items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
           <Search className="size-4 text-muted-foreground" />
-          <span className="truncate text-[13px] text-muted-foreground">Search docs, folders, project references, links, or safe metadata...</span>
+          <input aria-label="Search docs" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground" placeholder="Search docs, folders, project references, links, or safe metadata..." />
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm"><SlidersHorizontal />Filter</Button>

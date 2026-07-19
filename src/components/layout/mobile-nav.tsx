@@ -1,4 +1,4 @@
-import { CalendarCheck2, FolderKanban, Inbox, LayoutDashboard, Plus, UsersRound } from "lucide-react";
+import { CalendarCheck2, FolderKanban, Inbox, LayoutDashboard, UsersRound } from "lucide-react";
 import Link from "next/link";
 
 import type { AppSection } from "@/components/layout/app-sidebar";
@@ -15,12 +15,6 @@ const items = [
 export function MobileNav({ active }: { active: AppSection }) {
   return (
     <>
-      <button
-        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] right-4 z-30 grid size-12 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-black/30 transition-transform active:scale-95 lg:hidden"
-        aria-label="Quick create"
-      >
-        <Plus aria-hidden="true" className="size-5" />
-      </button>
       <nav
         className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-20 grid h-16 grid-cols-5 rounded-2xl border border-border bg-secondary px-2 shadow-xl shadow-black/30 lg:hidden"
         aria-label="Mobile navigation"
