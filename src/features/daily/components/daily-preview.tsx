@@ -1,7 +1,7 @@
 "use client";
 
-import { CalendarDays, Check, ChevronDown, ChevronRight, Circle, ExternalLink, MoreHorizontal, Plus, RefreshCw, Search } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { CalendarDays, ChevronDown, ChevronRight, Circle, ExternalLink, MoreHorizontal, Plus, RefreshCw, Search } from "lucide-react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,12 +41,30 @@ type ProjectGroupData = {
 export function DailyPreview() {
   const [activeView, setActiveView] = useState<ViewMode>("account");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set([sectionKey("account", accountGroups[0]?.name ?? "")]));
+  const [checkedTasks, setCheckedTasks] = useState<Record<string, boolean>>(() => {
+    return Object.fromEntries(
+      accountGroups.flatMap((group) => group.tasks.map((task) => [taskKey(group.name, task.project, task.title), Boolean(task.done)])),
+    );
+  });
   const dateLabel = getJakartaDateLabel();
   const shortDateLabel = getJakartaShortDateLabel();
-  const totalDone = accountGroups.reduce((sum, group) => sum + group.done, 0);
-  const totalTasks = accountGroups.reduce((sum, group) => sum + group.total, 0);
-  const projectGroups = useMemo(() => buildProjectGroups(), []);
-  const visibleGroups = activeView === "account" ? accountGroups : projectGroups;
+  const interactiveAccountGroups = useMemo(() => {
+    return accountGroups.map((group) => {
+      const tasks = group.tasks.map((task) => ({ ...task, done: checkedTasks[taskKey(group.name, task.project, task.title)] ?? Boolean(task.done) }));
+
+      return { ...group, tasks, done: tasks.filter((task) => task.done).length, total: tasks.length };
+    });
+  }, [checkedTasks]);
+  const totalDone = interactiveAccountGroups.reduce((sum, group) => sum + group.done, 0);
+  const totalTasks = interactiveAccountGroups.reduce((sum, group) => sum + group.total, 0);
+  const projectGroups = useMemo(() => buildProjectGroups(interactiveAccountGroups), [interactiveAccountGroups]);
+  const visibleGroups = activeView === "account" ? interactiveAccountGroups : projectGroups;
+
+  function toggleTask(task: AccountTask | (AccountTask & { account: string; accountInitials: string }), fallbackAccount: string) {
+    const accountName = "account" in task ? task.account : fallbackAccount;
+    const key = taskKey(accountName, task.project, task.title);
+    setCheckedTasks((current) => ({ ...current, [key]: !(current[key] ?? Boolean(task.done)) }));
+  }
 
   function toggleSection(name: string) {
     const key = sectionKey(activeView, name);
@@ -80,14 +98,14 @@ export function DailyPreview() {
       <div className="mt-5 space-y-4">
         {visibleGroups.map((group) => {
           const key = sectionKey(activeView, group.name);
-          return <DailyGroup key={key} group={group} mode={activeView} expanded={expandedSections.has(key)} onToggle={() => toggleSection(group.name)} />;
+          return <DailyGroup key={key} group={group} mode={activeView} expanded={expandedSections.has(key)} onToggle={() => toggleSection(group.name)} onToggleTask={toggleTask} />;
         })}
       </div>
     </div>
   );
 }
 
-function DailyGroup({ group, mode, expanded, onToggle }: { group: AccountGroupData | ProjectGroupData; mode: ViewMode; expanded: boolean; onToggle: () => void }) {
+function DailyGroup({ group, mode, expanded, onToggle, onToggleTask }: { group: AccountGroupData | ProjectGroupData; mode: ViewMode; expanded: boolean; onToggle: () => void; onToggleTask: (task: AccountTask | (AccountTask & { account: string; accountInitials: string }), fallbackAccount: string) => void }) {
   const progress = group.total > 0 ? Math.round((group.done / group.total) * 100) : 0;
   const runningCount = group.watching.filter((item) => item.status === "Running").length;
   const recheckCount = group.watching.filter((item) => item.status === "Recheck").length;
@@ -103,17 +121,17 @@ function DailyGroup({ group, mode, expanded, onToggle }: { group: AccountGroupDa
         <ChevronRight className={cn("size-4 text-muted-foreground transition-transform", expanded && "rotate-90")} />
         <span className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label={"More options for " + group.name}><MoreHorizontal className="size-4" /></span>
       </button>
-      {expanded ? <ExpandedGroupBody group={group} mode={mode} /> : null}
+      {expanded ? <ExpandedGroupBody group={group} mode={mode} onToggleTask={onToggleTask} /> : null}
     </section>
   );
 }
 
-function ExpandedGroupBody({ group, mode }: { group: AccountGroupData | ProjectGroupData; mode: ViewMode }) {
+function ExpandedGroupBody({ group, mode, onToggleTask }: { group: AccountGroupData | ProjectGroupData; mode: ViewMode; onToggleTask: (task: AccountTask | (AccountTask & { account: string; accountInitials: string }), fallbackAccount: string) => void }) {
   return (
     <div className={cn("grid", group.watching.length > 0 && "xl:grid-cols-[minmax(0,1fr)_300px]")}> 
       <div className={cn(group.watching.length > 0 && "xl:border-r soft-divider")}>
         <div className="px-4 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Checklist</div>
-        {group.tasks.map((task) => <TaskRow key={task.title + ("account" in task ? task.account : "")} task={task} mode={mode} />)}
+        {group.tasks.map((task) => <TaskRow key={task.title + ("account" in task ? task.account : "")} task={task} mode={mode} onToggle={() => onToggleTask(task, group.name)} />)}
         <button className="flex items-center gap-2 px-4 py-3 text-xs font-medium text-muted-foreground hover:text-foreground"><Plus className="size-3.5" />Quick add for {group.name}</button>
       </div>
       {group.watching.length > 0 ? <WatchingPanel items={group.watching} mode={mode} /> : null}
@@ -121,11 +139,22 @@ function ExpandedGroupBody({ group, mode }: { group: AccountGroupData | ProjectG
   );
 }
 
-function TaskRow({ task, mode }: { task: AccountTask | (AccountTask & { account: string; accountInitials: string }); mode: ViewMode }) {
+function TaskRow({ task, mode, onToggle }: { task: AccountTask | (AccountTask & { account: string; accountInitials: string }); mode: ViewMode; onToggle: () => void }) {
   const accountTask = "account" in task ? task : null;
   return (
     <div className="group flex min-h-14 items-center gap-3 border-t soft-divider px-4 py-2.5 hover:bg-accent/30">
-      <button className={cn("grid size-6 shrink-0 place-items-center rounded-md border", task.done ? "border-success/40 bg-success/10 text-success" : "soft-divider bg-background text-muted-foreground hover:border-primary")}>{task.done ? <Check className="size-3.5" /> : null}</button>
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={task.done ? "true" : "false"}
+        onClick={onToggle}
+        style={{ "--check-len": 15 } as CSSProperties}
+        className={cn("t-check grid size-5 shrink-0 place-items-center rounded-[6px] border", task.done ? "border-white bg-white text-background shadow-sm shadow-black/20" : "soft-divider bg-background text-muted-foreground hover:border-white/25 hover:bg-white/[0.035]")}
+      >
+        <svg className="size-3" viewBox="0 0 10.1668 10.1668" aria-hidden="true">
+          <path d="M1 5.52L3.92 9.17L9.17 1" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+        </svg>
+      </button>
       <span className="grid size-7 shrink-0 place-items-center rounded-md bg-elevated text-[10px] font-semibold">{mode === "project" && accountTask ? accountTask.accountInitials : task.mark}</span>
       <div className="min-w-0 flex-1">
         <p className={cn("truncate text-[13px] font-medium", task.done && "text-muted-foreground line-through")}>{task.title}</p>
@@ -159,10 +188,10 @@ function CompactPill({ children, tone }: { children: ReactNode; tone: "info" | "
   return <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", tone === "info" ? "bg-info/10 text-info" : "bg-warning/10 text-warning")}>{children}</span>;
 }
 
-function buildProjectGroups(): ProjectGroupData[] {
+function buildProjectGroups(groups: AccountGroupData[]): ProjectGroupData[] {
   const map = new Map<string, ProjectGroupData>();
 
-  for (const account of accountGroups) {
+  for (const account of groups) {
     for (const task of account.tasks) {
       const project = getOrCreateProjectGroup(map, task.project, task.mark);
       project.tasks.push({ ...task, account: account.name, accountInitials: account.initials });
@@ -191,6 +220,10 @@ function getOrCreateProjectGroup(map: Map<string, ProjectGroupData>, name: strin
 
 function sectionKey(mode: ViewMode, name: string) {
   return mode + ":" + name;
+}
+
+function taskKey(accountName: string, projectName: string, taskTitle: string) {
+  return accountName + ":" + projectName + ":" + taskTitle;
 }
 
 function getJakartaDateLabel() {

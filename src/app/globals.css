@@ -72,6 +72,11 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --check-box: 150ms;
+  --check-draw: 350ms;
+  --check-delay: 0ms;
+  --check-uncheck: 150ms;
+  --check-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @layer base {
@@ -102,6 +107,22 @@
   .soft-divider-strong { border-color: rgb(255 255 255 / 0.07); }
   .modal-backdrop-in { animation: modalBackdropIn 120ms ease-out both; }
   .modal-card-in { animation: modalCardIn 160ms cubic-bezier(.2, .8, .2, 1) both; transform-origin: center; }
+  .t-check {
+    transition:
+      background var(--check-box) var(--check-ease),
+      border-color var(--check-box) var(--check-ease),
+      box-shadow var(--check-box) var(--check-ease),
+      color var(--check-box) var(--check-ease);
+  }
+  .t-check svg path {
+    stroke-dasharray: var(--check-len, 15);
+    stroke-dashoffset: var(--check-len, 15);
+    transition: stroke-dashoffset var(--check-uncheck) var(--check-ease);
+  }
+  .t-check[aria-checked="true"] svg path {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset var(--check-draw) var(--check-ease) var(--check-delay);
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -121,6 +142,11 @@
     transition-property: background-color, border-color, color, opacity !important;
     animation: none !important;
     transform: none !important;
+  }
+
+  .t-check,
+  .t-check svg path {
+    transition: none !important;
   }
 }
 

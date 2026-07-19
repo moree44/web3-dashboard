@@ -410,6 +410,7 @@ const previewAccounts = [
 
 function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [openSelect, setOpenSelect] = useState<string | null>(null);
+  const [showOptionalContext, setShowOptionalContext] = useState(false);
 
   if (!open) return null;
 
@@ -419,7 +420,6 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
         <div className="flex items-start justify-between gap-4 px-4 py-3.5">
           <div className="min-w-0">
             <h2 id="add-project-title" className="text-base font-semibold tracking-[-0.02em]">Add project</h2>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Create the project first. Details can be completed later.</p>
           </div>
           <button onClick={onClose} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.045] hover:text-foreground" aria-label="Close add project"><X className="size-4" /></button>
         </div>
@@ -462,17 +462,29 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
           <div className="mt-4 border-t soft-divider px-2 pt-3">
             <div className="mb-2">
-              <p className="text-xs font-semibold">Optional context</p>
+              <button
+                type="button"
+                onClick={() => setShowOptionalContext((value) => !value)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-foreground"
+                aria-expanded={showOptionalContext}
+              >
+                Optional context
+                <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", showOptionalContext ? "rotate-180" : "")} />
+              </button>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              <Field label="Project URL" placeholder="https://..." />
-              <ComboboxPreview label="Work type" initialValue="Testnet" options={["Testnet", "Node", "CLI running", "Farm role", "Galxe", "Whitelist", "Proof submit"]} placeholder="Add work type..." />
-              <ComboboxPreview label="Project type" initialValue="ZK" options={["ZK", "AI", "DePIN", "L1", "L2", "Security", "Data"]} placeholder="Add project type..." />
-            </div>
-            <label className="mt-3 block">
-              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Short note</span>
-              <textarea className="mt-1.5 min-h-12 w-full resize-none soft-inset rounded-lg border border-white/[0.055] bg-input px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-ring" placeholder="Result, deadline, setup, wallet plan, or proof..." />
-            </label>
+            {showOptionalContext ? (
+              <>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Field label="Project URL" placeholder="https://..." />
+                  <ComboboxPreview label="Work type" initialValue="Testnet" options={["Testnet", "Node", "CLI running", "Farm role", "Galxe", "Whitelist", "Proof submit"]} placeholder="Add work type..." />
+                  <ComboboxPreview label="Project type" initialValue="ZK" options={["ZK", "AI", "DePIN", "L1", "L2", "Security", "Data"]} placeholder="Add project type..." />
+                </div>
+                <label className="mt-3 block">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Short note</span>
+                  <textarea className="mt-1.5 min-h-12 w-full resize-none soft-inset rounded-lg border border-white/[0.055] bg-input px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-ring" placeholder="Result, deadline, setup, wallet plan, or proof..." />
+                </label>
+              </>
+            ) : null}
           </div>
         </div>
 
