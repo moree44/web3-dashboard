@@ -42,8 +42,10 @@ The design should support high-volume project, task, inbox, docs, account, and w
 The app uses a stable desktop shell:
 
 ```txt
-Fixed Left Sidebar | Scrollable Main Content
+Fixed Full-Height Sidebar | Open Scrollable Main Workspace
 ```
+
+The shell should feel like a desktop productivity app, not a website card placed inside the browser. Avoid a large rounded outer container around the entire application on desktop.
 
 The sidebar is the primary navigation and should stay fixed on desktop while the main content area scrolls independently.
 
@@ -71,6 +73,7 @@ Locked visual mood:
 premium dark gradient
 royal charcoal
 soft-depth
+open desktop workspace
 compact productivity interface
 solid content surfaces
 subtle atmospheric ambience
@@ -135,7 +138,7 @@ Do not use bright green, neon blue, or colorful crypto gradients as base UI colo
 Allowed:
 
 * outer app stage
-* app shell ambience
+* full-height app shell ambience
 * subtle dashboard header ambience
 * selected or highlighted panels only when needed
 
@@ -159,6 +162,8 @@ background:
 ```
 
 Content panels should mostly use solid dark surfaces with soft borders, slight elevation, and readable contrast.
+
+Do not wrap the desktop workspace in a large browser-card frame. Use full-height shell structure with subtle sidebar/content separation instead.
 
 ---
 
@@ -242,6 +247,7 @@ Use:
 
 * near-black base surfaces
 * sidebar and app canvas separation
+* open full-height desktop shell
 * softer borders
 * visible but subtle shadows
 * inset inputs that differ from card backgrounds
@@ -994,6 +1000,11 @@ Do not merge account and wallet.
 
 ---
 
+
+
+### Sidebar Page Precision Cleanup
+
+After the open desktop shell update, page titles should stay short and direct. Use labels such as Docs, Inbox, Projects, Tasks, Daily, Accounts, Archive, and Settings as primary page titles. Longer explanations belong in panel content only when they help the current task. Older hard `border-border` panel treatments should be softened to the current soft-divider direction, especially on Docs and Inbox. Daily should not present Add Task as a primary header action while task creation is owned by Tasks and project workflows.
 
 ## 21B. Sidebar Page Completion Baseline
 

@@ -47,23 +47,23 @@ export function AppSidebar({ active }: { active: AppSection }) {
   const [projectOpen, setProjectOpen] = useState(true);
 
   return (
-    <aside className="hidden h-full flex-col border-r soft-divider bg-secondary px-4 py-5 lg:flex">
-      <Link href="/" className="flex items-center gap-3 rounded-xl px-1 py-1.5 focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="soft-control grid size-9 place-items-center rounded-xl border border-white/[0.06] bg-card text-foreground">
-          <Radar aria-hidden="true" className="size-4" strokeWidth={1.8} />
+    <aside className="hidden h-screen flex-col border-r soft-divider bg-secondary px-5 py-6 lg:flex">
+      <Link href="/" className="flex items-center gap-3 rounded-xl px-1 py-1 focus-visible:ring-2 focus-visible:ring-ring">
+        <span className="soft-control grid size-10 place-items-center rounded-xl border border-white/[0.06] bg-card text-foreground">
+          <Radar aria-hidden="true" className="size-[17px]" strokeWidth={1.8} />
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-[13px] font-semibold">Hunting OS</span>
-          <span className="block truncate text-[11px] text-muted-foreground">Moree&apos;s workspace</span>
+          <span className="block truncate text-sm font-semibold">Hunting OS</span>
+          <span className="block truncate text-xs text-muted-foreground">Moree&apos;s workspace</span>
         </span>
       </Link>
 
-      <div className="my-5 h-px bg-border" />
+      <div className="my-6 h-px bg-white/[0.06]" />
 
-      <div className="space-y-5">
+      <div className="space-y-6">
         <div>
-          <p className="mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
-          <nav className="space-y-1" aria-label="Main navigation">
+          <p className="mb-3 px-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
+          <nav className="space-y-1.5" aria-label="Main navigation">
             {mainNavigation.map(({ label, href, icon: Icon, ...item }) => (
               <NavItem key={label} label={label} href={href} icon={Icon} active={active === label} count={"count" in item ? item.count : undefined} />
             ))}
@@ -72,7 +72,7 @@ export function AppSidebar({ active }: { active: AppSection }) {
               <div
                 className={cn(
                   "flex h-9 w-full items-center rounded-lg text-[13px] font-medium transition-colors",
-                  active === "Projects" ? "soft-control border border-border bg-accent text-foreground" : projectGroupActive ? "text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                  active === "Projects" ? "soft-control border soft-divider-strong bg-accent text-foreground" : projectGroupActive ? "text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                 )}
               >
                 <Link
@@ -104,7 +104,7 @@ export function AppSidebar({ active }: { active: AppSection }) {
                       aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "flex h-8 items-center gap-2.5 rounded-lg px-3 text-[12px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                        isActive ? "soft-control border border-border bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                        isActive ? "soft-control border soft-divider-strong bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                       )}
                     >
                       <Icon aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
@@ -128,7 +128,7 @@ export function AppSidebar({ active }: { active: AppSection }) {
           aria-current={active === "Settings" ? "page" : undefined}
           className={cn(
             "flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors hover:bg-accent/60 hover:text-foreground",
-            active === "Settings" ? "soft-control border border-border bg-accent text-foreground" : "text-muted-foreground",
+            active === "Settings" ? "soft-control border soft-divider-strong bg-accent text-foreground" : "text-muted-foreground",
           )}
         >
           <Settings aria-hidden="true" className="size-4" />
@@ -153,7 +153,7 @@ function NavItem({ label, href, icon: Icon, active, count, placeholder = false }
   const className = cn(
     "flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring",
     active
-      ? "soft-control border border-border bg-accent text-foreground"
+      ? "soft-control border soft-divider-strong bg-accent text-foreground"
       : placeholder
         ? "cursor-not-allowed text-muted-foreground/45"
         : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",

@@ -592,6 +592,20 @@ Auth-related files:
 - `src/lib/supabase/middleware.ts`
 - `src/middleware.ts`
 
+## Layout Shell Update - Open Desktop Workspace
+
+- Removed the large rounded outer application frame from the desktop shell.
+- App now uses a full-height desktop-style layout with fixed sidebar and independently scrollable main workspace.
+- Sidebar spacing and active item border weight were adjusted to fit the open shell without changing navigation behavior.
+- Internal page layouts were intentionally left unchanged in this pass.
+
+## UI Precision Cleanup - Sidebar Pages
+
+- Shortened Docs and Inbox page titles to match the direct page-title rhythm used by Projects, Tasks, Accounts, Archive, and Settings.
+- Softened older Docs and Inbox border treatment to reduce harsh card outlines after the open desktop shell update.
+- Removed the primary Add Task action from the Daily header so Daily remains a checklist consumption surface.
+- Capitalized Archive filter wording for Scam Risk and removed remaining archived preview wording from the footer.
+
 ## Validation Results
 
 Latest commands passing after Add Project and Add Task modal polish:

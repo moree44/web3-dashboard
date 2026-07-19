@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const filters = ["All 7", "Claimed 2", "Dropped 1", "Scam risk 1", "Expired 1", "Completed 2"] as const;
+const filters = ["All 7", "Claimed 2", "Dropped 1", "Scam Risk 1", "Expired 1", "Completed 2"] as const;
 
 const archivedProjects = [
   { name: "Old Mint Pass", mark: "O", hunt: "NFT", reason: "claimed", status: "Archived", result: "Mint completed", account: "Moree", archived: "Jul 08" },
@@ -90,7 +90,7 @@ export function ArchivePreview() {
 
       <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => <ArchiveMobileCard key={project.name} project={project} selected={selectedProjects.has(project.name)} onSelect={() => toggleSelected(project.name)} />)}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
-        <span>Showing {filtered.length} archived preview projects</span>
+        <span>Showing {filtered.length} archived projects</span>
         <span>Archive tracks projects only</span>
       </footer>
     </div>

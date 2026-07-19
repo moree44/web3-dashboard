@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ChevronDown, ChevronRight, Circle, ExternalLink, MoreHorizontal, Plus, RefreshCw, Search } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronRight, Circle, ExternalLink, MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -84,7 +84,7 @@ export function DailyPreview() {
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Today</h1>
           <p className="mt-1 text-[13px] text-muted-foreground">{dateLabel} · {totalDone} of {totalTasks} tasks completed</p>
         </div>
-        <div className="flex items-center gap-2"><Button variant="outline" size="sm"><CalendarDays />{shortDateLabel}<ChevronDown /></Button><Button size="sm"><Plus />Add task</Button></div>
+        <div className="flex items-center gap-2"><Button variant="outline" size="sm"><CalendarDays />{shortDateLabel}<ChevronDown /></Button></div>
       </header>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -132,7 +132,6 @@ function ExpandedGroupBody({ group, mode, onToggleTask }: { group: AccountGroupD
       <div className={cn(group.watching.length > 0 && "xl:border-r soft-divider")}>
         <div className="px-4 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Checklist</div>
         {group.tasks.map((task) => <TaskRow key={task.title + ("account" in task ? task.account : "")} task={task} mode={mode} onToggle={() => onToggleTask(task, group.name)} />)}
-        <button className="flex items-center gap-2 px-4 py-3 text-xs font-medium text-muted-foreground hover:text-foreground"><Plus className="size-3.5" />Quick add for {group.name}</button>
       </div>
       {group.watching.length > 0 ? <WatchingPanel items={group.watching} mode={mode} /> : null}
     </div>
