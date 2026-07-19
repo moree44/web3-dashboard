@@ -92,7 +92,7 @@ export function DailyPreview() {
           <button onClick={() => setActiveView("account")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium", activeView === "account" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}>By account</button>
           <button onClick={() => setActiveView("project")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium", activeView === "project" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}>By project</button>
         </div>
-        <div className="flex items-center gap-2"><label className="flex h-8 min-w-0 items-center gap-2 rounded-lg border soft-divider-strong bg-card px-3 sm:w-56"><Search className="size-3.5 text-muted-foreground" /><input aria-label="Search daily tasks" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search today…" /></label><button className="h-8 rounded-lg border soft-divider-strong px-3 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">Hide done</button></div>
+        <div className="flex h-9 items-center gap-1 rounded-lg border soft-divider-strong bg-card p-1"><label className="flex h-7 min-w-0 items-center gap-2 px-2 sm:w-56"><Search className="size-3.5 text-muted-foreground" /><input aria-label="Search daily tasks" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search today…" /></label><button className="h-7 rounded-md px-3 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">Hide done</button></div>
       </div>
 
       <div className="mt-5 space-y-4">
@@ -111,8 +111,8 @@ function DailyGroup({ group, mode, expanded, onToggle, onToggleTask }: { group: 
   const recheckCount = group.watching.filter((item) => item.status === "Recheck").length;
 
   return (
-    <section className="overflow-hidden rounded-xl bg-card soft-panel">
-      <button type="button" onClick={onToggle} className="flex w-full flex-wrap items-center gap-3 border-b soft-divider px-4 py-3 text-left hover:bg-accent/25">
+    <section className="overflow-hidden rounded-xl border soft-divider-strong bg-card soft-panel">
+      <button type="button" onClick={onToggle} className="flex w-full flex-wrap items-center gap-3 px-4 py-3 text-left hover:bg-accent/25">
         <span className="grid size-8 place-items-center rounded-full bg-elevated text-[10px] font-semibold">{group.initials}</span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold">{group.name}</h2><span className="text-[11px] tabular-nums text-muted-foreground">{group.done}/{group.total}</span>{runningCount > 0 ? <CompactPill tone="info">{runningCount} running</CompactPill> : null}{recheckCount > 0 ? <CompactPill tone="warning">{recheckCount} recheck</CompactPill> : null}</div>
@@ -128,9 +128,8 @@ function DailyGroup({ group, mode, expanded, onToggle, onToggleTask }: { group: 
 
 function ExpandedGroupBody({ group, mode, onToggleTask }: { group: AccountGroupData | ProjectGroupData; mode: ViewMode; onToggleTask: (task: AccountTask | (AccountTask & { account: string; accountInitials: string }), fallbackAccount: string) => void }) {
   return (
-    <div className={cn("grid", group.watching.length > 0 && "xl:grid-cols-[minmax(0,1fr)_300px]")}> 
-      <div className={cn(group.watching.length > 0 && "xl:border-r soft-divider")}>
-        <div className="px-4 py-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Checklist</div>
+    <div className="px-4 pb-3 pt-1">
+      <div className="space-y-1">
         {group.tasks.map((task) => <TaskRow key={task.title + ("account" in task ? task.account : "")} task={task} mode={mode} onToggle={() => onToggleTask(task, group.name)} />)}
       </div>
       {group.watching.length > 0 ? <WatchingPanel items={group.watching} mode={mode} /> : null}
@@ -141,7 +140,7 @@ function ExpandedGroupBody({ group, mode, onToggleTask }: { group: AccountGroupD
 function TaskRow({ task, mode, onToggle }: { task: AccountTask | (AccountTask & { account: string; accountInitials: string }); mode: ViewMode; onToggle: () => void }) {
   const accountTask = "account" in task ? task : null;
   return (
-    <div className="group flex min-h-14 items-center gap-3 border-t soft-divider px-4 py-2.5 hover:bg-accent/30">
+    <div className="group flex min-h-14 items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-accent/30">
       <button
         type="button"
         role="checkbox"
@@ -166,8 +165,8 @@ function TaskRow({ task, mode, onToggle }: { task: AccountTask | (AccountTask & 
 
 function WatchingPanel({ items, mode }: { items: Array<WatchingItem | (WatchingItem & { account: string; accountInitials: string })>; mode: ViewMode }) {
   return (
-    <aside className="border-t soft-divider p-3 xl:border-t-0">
-      <div className="mb-1 flex items-center gap-2 px-1 py-1"><RefreshCw className="size-3.5 text-muted-foreground" /><p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Running & recheck</p></div>
+    <section className="mt-3 space-y-1">
+      <div className="flex items-center gap-2 px-2 py-1"><RefreshCw className="size-3.5 text-muted-foreground" /><p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Running & recheck</p></div>
       {items.map((item) => {
         const accountItem = "account" in item ? item : null;
         return (
@@ -179,7 +178,7 @@ function WatchingPanel({ items, mode }: { items: Array<WatchingItem | (WatchingI
           </button>
         );
       })}
-    </aside>
+    </section>
   );
 }
 
