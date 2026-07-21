@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { TaskDetailPanel, type TaskDetailPanelTask } from "./task-detail-panel";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -21,12 +23,21 @@ type TaskStatus = "Not started" | "Todo" | "In progress" | "Running" | "Recheck"
 type TaskView = "list" | "board" | "running" | "recheck";
 type BoardGroup = "project" | "status";
 
+type PersonalItem = {
+  id: string;
+  title: string;
+  frequency: Task["frequency"];
+  status: "Todo" | "Done";
+};
+
 type Task = {
   project: string;
   mark: string;
   markClass: string;
   title: string;
   description: string;
+  url?: string;
+  notes?: string;
   mode: string;
   modeGroup: "site" | "discord" | "proof" | "node" | "waitlist" | "claim";
   status: TaskStatus;
@@ -80,6 +91,7 @@ const tasks: Task[] = [
     lastLog: "No log",
     comments: 2,
     proofs: 0,
+    url: "https://soundness.xyz",
   },
   {
     project: "Soundness",
@@ -116,6 +128,7 @@ const tasks: Task[] = [
     proofs: 1,
     runtime: "Running 2d",
     checkCadence: "Check twice daily",
+    url: "https://nexus.xyz",
   },
   {
     project: "Linera",
@@ -202,6 +215,11 @@ const tasks: Task[] = [
     comments: 1,
     proofs: 1,
   },
+];
+
+const personalItemsSeed: PersonalItem[] = [
+  { id: "personal-twitter-watchlist", title: "Review Twitter watchlist", frequency: "daily", status: "Todo" },
+  { id: "personal-clean-notes", title: "Clean uncategorized notes", frequency: "weekly", status: "Done" },
 ];
 
 const boardColumns: TaskStatus[] = ["Not started", "Todo", "In progress", "Recheck", "Done"];
@@ -291,11 +309,9 @@ function TaskIdentity({ task }: { task: Task }) {
 
 function TaskListRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
   return (
-    <tr className="group h-[58px] border-b soft-divider hover:bg-accent/30">
+    <tr onClick={onOpen} className="group h-[58px] cursor-pointer border-b soft-divider hover:bg-accent/30">
       <td className="px-4 lg:px-6">
-        <button type="button" onClick={onOpen} className="w-full text-left">
-          <TaskIdentity task={task} />
-        </button>
+        <TaskIdentity task={task} />
       </td>
       <td className="px-3 align-middle"><div className="flex items-center"><ModeChip task={task} /></div></td>
       <td className="px-3 align-middle"><div className="flex items-center"><Badge variant={statusVariant(task.status)} className="text-[10px]">{task.status}</Badge></div></td>
@@ -304,7 +320,7 @@ function TaskListRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
       <td className="whitespace-nowrap px-3 align-middle text-xs text-muted-foreground">{task.due}</td>
       <td className="px-3 align-middle"><Priority value={task.priority} /></td>
       <td className="w-12 px-3">
-        <button className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" aria-label={"More options for " + task.title}>
+        <button onClick={(event) => event.stopPropagation()} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground" aria-label={"More options for " + task.title}>
           <MoreHorizontal className="size-4" />
         </button>
       </td>
@@ -314,22 +330,22 @@ function TaskListRow({ task, onOpen }: { task: Task; onOpen: () => void }) {
 
 function TaskBoardCard({ task, onOpen, hideProject = false }: { task: Task; onOpen: () => void; hideProject?: boolean }) {
   return (
-    <article className="rounded-xl bg-white/[0.025] p-2.5 transition-colors hover:bg-white/[0.04]">
+    <article onClick={onOpen} className="cursor-pointer rounded-xl bg-white/[0.025] p-2.5 transition-colors hover:bg-white/[0.04]">
       <div className="flex items-start justify-between gap-2">
-        <button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-2 text-left">
+        <button type="button" onClick={(event) => { event.stopPropagation(); onOpen(); }} className="flex min-w-0 items-center gap-2 text-left">
           <TaskMark task={task} size="sm" />
           <span className="min-w-0">
             <span className={cn("block truncate font-medium", hideProject ? "text-[13px] text-foreground" : "text-[11px] text-muted-foreground")}>{hideProject ? task.title : task.project}</span>
             {hideProject ? <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{task.mode}</span> : null}
           </span>
         </button>
-        <button className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground" aria-label={"More options for " + task.title}>
+        <button onClick={(event) => event.stopPropagation()} className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground" aria-label={"More options for " + task.title}>
           <MoreHorizontal className="size-3.5" />
         </button>
       </div>
 
       {!hideProject ? (
-        <button type="button" onClick={onOpen} className="mt-2 block w-full text-left">
+        <button type="button" onClick={(event) => { event.stopPropagation(); onOpen(); }} className="mt-2 block w-full text-left">
           <h3 className="line-clamp-2 text-[13px] font-semibold leading-snug">{task.title}</h3>
         </button>
       ) : null}
@@ -785,85 +801,137 @@ function getCalendarDays(monthDate: Date) {
   });
 }
 
-function TaskDetailPanel({ task, onClose }: { task: Task | null; onClose: () => void }) {
-  if (!task) return null;
+function toTaskDetail(task: Task): TaskDetailPanelTask {
+  return {
+    title: task.title,
+    project: task.project,
+    mark: task.mark,
+    markClass: task.markClass,
+    status: task.status,
+    frequency: formatFrequency(task.frequency),
+    priority: task.priority,
+    accounts: task.accounts,
+    url: task.url,
+    notes: task.notes ?? task.description,
+    mode: task.mode,
+    date: task.due,
+  };
+}
+
+function toPersonalTaskDetail(item: PersonalItem): TaskDetailPanelTask {
+  return {
+    title: item.title,
+    project: "Personal",
+    mark: "P",
+    status: item.status,
+    frequency: formatFrequency(item.frequency),
+    priority: "Medium",
+    accounts: [],
+    notes: "Personal checklist item without project, account, or wallet assignment.",
+    date: item.frequency === "daily" ? "Daily" : formatFrequency(item.frequency),
+  };
+}
+
+function PersonalItemCreator({
+  title,
+  frequency,
+  onTitleChange,
+  onFrequencyChange,
+  onCreate,
+  onCancel,
+}: {
+  title: string;
+  frequency: Task["frequency"];
+  onTitleChange: (value: string) => void;
+  onFrequencyChange: (value: Task["frequency"]) => void;
+  onCreate: () => void;
+  onCancel: () => void;
+}) {
+  const [frequencyOpen, setFrequencyOpen] = useState(false);
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
-      <aside className="h-full w-full max-w-[500px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
-          <h2 id="task-detail-title" className="truncate text-base font-semibold">Task detail</h2>
-          <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close task detail"><X className="size-4" /></button>
-        </div>
-        <div className="px-5 py-5">
-          <div className="flex items-start gap-3">
-            <TaskMark task={task} />
-            <div className="min-w-0 flex-1">
-              <h3 className="text-2xl font-semibold tracking-[-0.03em]">{task.title}</h3>
-              <p className="mt-1 text-xs text-muted-foreground">{task.project}</p>
+    <div className="border-b soft-divider px-4 py-3 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-2 rounded-xl bg-white/[0.025] p-2 sm:flex-row sm:items-center">
+        <input
+          autoFocus
+          value={title}
+          onChange={(event) => onTitleChange(event.target.value)}
+          className="h-9 min-w-0 flex-1 rounded-lg bg-background px-3 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+          placeholder="Personal item title..."
+        />
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setFrequencyOpen((current) => !current)}
+            className="flex h-9 min-w-32 items-center justify-between gap-2 rounded-lg bg-background px-3 text-xs font-medium text-foreground outline-none focus:ring-1 focus:ring-ring"
+            aria-label="Personal item frequency"
+          >
+            {formatFrequency(frequency)}
+            <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", frequencyOpen ? "rotate-180" : "")} />
+          </button>
+          {frequencyOpen ? (
+            <div className="absolute left-0 top-full z-[70] mt-1.5 w-full rounded-xl border border-white/[0.08] bg-[#161618] p-1.5 shadow-2xl shadow-black/50">
+              {frequencyOptions.map((option) => {
+                const selected = frequency === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => {
+                      onFrequencyChange(option);
+                      setFrequencyOpen(false);
+                    }}
+                    className={cn("flex h-8 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-left text-xs transition-colors", selected ? "bg-white/[0.075] text-foreground" : "text-muted-foreground hover:bg-white/[0.055] hover:text-foreground")}
+                  >
+                    <span className="font-medium">{formatFrequency(option)}</span>
+                    {selected ? <Check className="size-3.5 text-muted-foreground" /> : null}
+                  </button>
+                );
+              })}
             </div>
-          </div>
-
-          <section className="mt-6 grid gap-x-6 gap-y-4 border-t border-white/[0.045] pt-4 sm:grid-cols-2">
-            <TaskProperty label="Status"><Badge variant={statusVariant(task.status)}>{task.status}</Badge></TaskProperty>
-            <TaskProperty label="Frequency"><Badge variant="outline">{formatFrequency(task.frequency)}</Badge></TaskProperty>
-            <TaskProperty label="Priority"><Priority value={task.priority} /></TaskProperty>
-            <TaskProperty label="Date start"><span>{task.due}</span></TaskProperty>
-            <TaskProperty label="Mode"><ModeChip task={task} /></TaskProperty>
-            <TaskProperty label="Accounts"><AccountChips accounts={task.accounts} /></TaskProperty>
-          </section>
-
-          {task.status === "Running" ? (
-            <section className="mt-5 rounded-xl bg-white/[0.025] p-3">
-              <h4 className="text-sm font-semibold">Running check</h4>
-              <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-                <div className="flex justify-between"><span>Runtime</span><span className="text-foreground">{task.runtime ?? "Running"}</span></div>
-                <div className="flex justify-between"><span>Last check</span><span className="text-foreground">{task.lastLog}</span></div>
-                <div className="flex justify-between"><span>Cadence</span><span className="text-foreground">{task.checkCadence ?? "Manual"}</span></div>
-              </div>
-            </section>
           ) : null}
-
-          <section className="mt-5">
-            <h4 className="text-sm font-semibold">Task note</h4>
-            <p className="mt-2 rounded-xl bg-white/[0.025] px-3 py-3 text-xs leading-relaxed text-muted-foreground">{task.description}</p>
-          </section>
-
-          <section className="mt-5">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold">Links</h4>
-              <button className="text-[11px] text-muted-foreground hover:text-foreground">Open project</button>
-            </div>
-            <div className="mt-2 divide-y divide-white/[0.035] overflow-hidden rounded-xl bg-white/[0.025]">
-              <TaskDetailRow title="Project docs" meta="Linked project notes" />
-              <TaskDetailRow title="Task logs" meta="Daily completion history later" />
-              <TaskDetailRow title="Proof / tx" meta="Attach proof when task logging is real" />
-            </div>
-          </section>
         </div>
-      </aside>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={onCancel}>Cancel</Button>
+          <Button size="sm" className="bg-accent text-foreground hover:bg-white/[0.09]" disabled={!title.trim()} onClick={onCreate}>Add item</Button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function TaskProperty({ label, children }: { label: string; children: ReactNode }) {
-  return <div><p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p><div className="mt-1 text-xs text-foreground">{children}</div></div>;
-}
+function PersonalItemsStrip({ items, onOpen }: { items: PersonalItem[]; onOpen: (item: PersonalItem) => void }) {
+  if (items.length === 0) return null;
 
-function TaskDetailRow({ title, meta }: { title: string; meta: string }) {
-  return <button className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-accent/35"><span className="min-w-0"><span className="block truncate text-xs font-medium">{title}</span><span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{meta}</span></span><span className="text-[11px] text-muted-foreground">Open</span></button>;
+  return (
+    <div className="border-b soft-divider px-4 py-2.5 sm:px-6 lg:px-8">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Personal</span>
+        {items.map((item) => (
+          <button key={item.id} type="button" onClick={() => onOpen(item)} className="inline-flex items-center gap-2 rounded-full bg-white/[0.035] px-3 py-1.5 text-xs text-muted-foreground hover:bg-white/[0.06] hover:text-foreground">
+            <span className="max-w-48 truncate font-medium">{item.title}</span>
+            <Badge variant="outline" className="text-[10px]">{formatFrequency(item.frequency)}</Badge>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function TasksPreview() {
   const [view, setView] = useState<TaskView>("list");
   const [boardGroup, setBoardGroup] = useState<BoardGroup>("project");
   const [taskItems, setTaskItems] = useState<Task[]>(tasks);
+  const [personalItems, setPersonalItems] = useState<PersonalItem[]>(personalItemsSeed);
   const [selectedProject, setSelectedProject] = useState("All");
   const [selectedAccount, setSelectedAccount] = useState("All");
   const [selectedMode, setSelectedMode] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isPersonalCreatorOpen, setIsPersonalCreatorOpen] = useState(false);
+  const [personalTitle, setPersonalTitle] = useState("");
+  const [personalFrequency, setPersonalFrequency] = useState<Task["frequency"]>("daily");
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<TaskDetailPanelTask | null>(null);
   const [openFilter, setOpenFilter] = useState<string | null>(null);
 
   const runningTasks = taskItems.filter((task) => task.status === "Running");
@@ -896,14 +964,45 @@ export function TasksPreview() {
     }))
     .filter((group) => selectedProject !== "All" || group.items.length > 0);
 
+  function openTaskDetail(task: Task) {
+    setSelectedTaskDetail(toTaskDetail(task));
+  }
+
+  function createPersonalItem() {
+    const trimmedTitle = personalTitle.trim();
+    if (!trimmedTitle) return;
+
+    setPersonalItems((items) => [
+      { id: "personal-" + Date.now(), title: trimmedTitle, frequency: personalFrequency, status: "Todo" },
+      ...items,
+    ]);
+    setPersonalTitle("");
+    setPersonalFrequency("daily");
+    setIsPersonalCreatorOpen(false);
+  }
+
   return (
     <div className="min-w-0 py-5 lg:py-7">
       <header className="flex flex-col gap-4 border-b soft-divider px-4 pb-5 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Tasks</h1>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add task</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setIsPersonalCreatorOpen(true)}>Add personal item</Button>
+          <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add task</Button>
+        </div>
       </header>
+
+      {isPersonalCreatorOpen ? (
+        <PersonalItemCreator
+          title={personalTitle}
+          frequency={personalFrequency}
+          onTitleChange={setPersonalTitle}
+          onFrequencyChange={setPersonalFrequency}
+          onCreate={createPersonalItem}
+          onCancel={() => setIsPersonalCreatorOpen(false)}
+        />
+      ) : null}
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
         <div className="scrollbar-subtle flex items-center gap-1 overflow-x-auto py-2.5">
@@ -960,6 +1059,8 @@ export function TasksPreview() {
         </div>
       </div>
 
+      <PersonalItemsStrip items={personalItems} onOpen={(item) => setSelectedTaskDetail(toPersonalTaskDetail(item))} />
+
       {view === "board" ? (
         <div className="space-y-4 p-4 sm:p-6 lg:p-8">
           {filteredRunningTasks.length > 0 ? (
@@ -968,7 +1069,7 @@ export function TasksPreview() {
                 <h2 className="text-sm font-semibold">Running monitor</h2>
               </div>
               <div className="mt-3 grid gap-2">
-                {filteredRunningTasks.map((task) => <CompactRunningMonitor key={`${task.project}-${task.title}`} task={task} onOpen={() => setSelectedTask(task)} />)}
+                {filteredRunningTasks.map((task) => <CompactRunningMonitor key={`${task.project}-${task.title}`} task={task} onOpen={() => openTaskDetail(task)} />)}
               </div>
             </section>
           ) : null}
@@ -976,8 +1077,8 @@ export function TasksPreview() {
           <div className="scrollbar-subtle overflow-x-auto">
             <div className="flex min-w-max gap-3">
               {boardGroup === "project"
-                ? projectBoardGroups.map((group) => <ProjectBoardColumn key={group.project} project={group.project} items={group.items} total={group.total} onOpenTask={setSelectedTask} />)
-                : boardColumns.map((column) => <BoardColumn key={column} status={column} items={boardTaskItems.filter((task) => task.status === column)} onOpenTask={setSelectedTask} />)}
+                ? projectBoardGroups.map((group) => <ProjectBoardColumn key={group.project} project={group.project} items={group.items} total={group.total} onOpenTask={openTaskDetail} />)
+                : boardColumns.map((column) => <BoardColumn key={column} status={column} items={boardTaskItems.filter((task) => task.status === column)} onOpenTask={openTaskDetail} />)}
             </div>
           </div>
         </div>
@@ -986,7 +1087,7 @@ export function TasksPreview() {
           <div className="soft-panel rounded-xl bg-card p-3">
             <h2 className="text-sm font-semibold">Running work</h2>
           </div>
-          {filterTasks(runningTasks).map((task) => <CompactRunningMonitor key={`${task.project}-${task.title}`} task={task} onOpen={() => setSelectedTask(task)} />)}
+          {filterTasks(runningTasks).map((task) => <CompactRunningMonitor key={`${task.project}-${task.title}`} task={task} onOpen={() => openTaskDetail(task)} />)}
         </div>
       ) : view === "recheck" ? (
         <div className="overflow-hidden">
@@ -994,7 +1095,7 @@ export function TasksPreview() {
             <h2 className="text-sm font-semibold">Recheck queue</h2>
           </div>
           <div>
-            {filterTasks(recheckTasks).map((task) => <ReviewQueueCard key={`${task.project}-${task.title}`} task={task} onOpen={() => setSelectedTask(task)} />)}
+            {filterTasks(recheckTasks).map((task) => <ReviewQueueCard key={`${task.project}-${task.title}`} task={task} onOpen={() => openTaskDetail(task)} />)}
           </div>
         </div>
       ) : (
@@ -1024,13 +1125,13 @@ export function TasksPreview() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTasks.map((task) => <TaskListRow key={`${task.project}-${task.title}`} task={task} onOpen={() => setSelectedTask(task)} />)}
+                {filteredTasks.map((task) => <TaskListRow key={`${task.project}-${task.title}`} task={task} onOpen={() => openTaskDetail(task)} />)}
               </tbody>
             </table>
           </div>
 
           <div className="divide-y divide-white/[0.045] lg:hidden">
-            {filteredTasks.map((task) => <TaskMobileCard key={`${task.project}-${task.title}`} task={task} onOpen={() => setSelectedTask(task)} />)}
+            {filteredTasks.map((task) => <TaskMobileCard key={`${task.project}-${task.title}`} task={task} onOpen={() => openTaskDetail(task)} />)}
           </div>
         </>
       )}
@@ -1048,7 +1149,7 @@ export function TasksPreview() {
           setIsAddOpen(false);
         }}
       />
-      <TaskDetailPanel task={selectedTask} onClose={() => setSelectedTask(null)} />
+      <TaskDetailPanel task={selectedTaskDetail} onClose={() => setSelectedTaskDetail(null)} />
     </div>
   );
 }
