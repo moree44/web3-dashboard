@@ -46,17 +46,17 @@ export function DocsPreview() {
           <p className="text-xs text-muted-foreground">Docs · Knowledge library</p>
           <h1 className="font-display mt-1 text-2xl font-semibold tracking-[-0.025em]">Docs</h1>
         </div>
-        <Button variant="secondary" size="sm"><Plus />New doc</Button>
+        <Button variant="secondary" size="sm" disabled title="Preview only"><Plus />New doc</Button>
       </header>
 
       <section className="soft-panel mt-4 grid gap-2 rounded-xl border soft-divider bg-card p-2 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="soft-inset flex min-w-0 items-center gap-3 rounded-lg border soft-divider bg-input px-3 py-2.5">
           <Search className="size-4 text-muted-foreground" />
-          <input aria-label="Search docs" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground" placeholder="Search docs, folders, project references, links, or safe metadata..." />
+          <input aria-label="Search docs" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground" placeholder="Search docs, folders, project references, links, or safe metadata..." readOnly title="Preview only" />
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm"><SlidersHorizontal />Filter</Button>
-          <Button variant="secondary" size="sm">Quick add</Button>
+          <Button variant="secondary" size="sm" disabled title="Preview only"><SlidersHorizontal />Filter</Button>
+          <Button variant="secondary" size="sm" disabled title="Preview only">Quick add</Button>
         </div>
       </section>
 

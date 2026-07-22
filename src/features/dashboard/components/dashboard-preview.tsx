@@ -13,7 +13,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const overviewMetrics = [
   { label: "Projects", value: "38" },
@@ -82,10 +83,10 @@ export function DashboardPreview() {
           <span className="truncate text-[13px] text-muted-foreground">Capture project link, Twitter watchlist, note, or inbox item...</span>
         </div>
         <div className="grid grid-cols-4 gap-2 xl:flex">
-          <Button className="soft-control" variant="secondary" size="sm">Project</Button>
-          <Button className="soft-control" variant="secondary" size="sm">Watchlist</Button>
-          <Button className="soft-control" variant="secondary" size="sm">Note</Button>
-          <Button className="soft-control" variant="secondary" size="sm">Inbox</Button>
+          <Link href="/projects" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "soft-control")}>Project</Link>
+          <Link href="/projects?view=watchlist" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "soft-control")}>Watchlist</Link>
+          <Link href="/docs" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "soft-control")}>Note</Link>
+          <Link href="/inbox" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "soft-control")}>Inbox</Link>
         </div>
       </section>
       <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_350px] 2xl:grid-cols-[minmax(420px,1fr)_minmax(340px,0.82fr)_350px]">

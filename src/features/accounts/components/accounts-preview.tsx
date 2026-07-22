@@ -7,6 +7,7 @@ import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
 
 const tabs = ["Identities", "Wallets", "Groups"] as const;
 type AccountTab = (typeof tabs)[number];
@@ -127,7 +128,7 @@ export function AccountsPreview() {
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Accounts</h1>
         </div>
-        <Button variant="secondary" size="sm"><Plus />Add account</Button>
+        <Button variant="secondary" size="sm" disabled title="Preview only"><Plus />Add account</Button>
       </header>
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
@@ -141,11 +142,11 @@ export function AccountsPreview() {
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
           <Search className="size-4 text-muted-foreground" />
-          <input aria-label="Search accounts" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder={activeTab === "Wallets" ? "Search wallets..." : "Search accounts..."} />
+          <input aria-label="Search accounts" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder={activeTab === "Wallets" ? "Search wallets..." : "Search accounts..."} readOnly title="Preview only" />
         </label>
         <div className="flex flex-1 flex-wrap items-center gap-2">
-          <button className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"><ShieldCheck className="size-3.5" />Workspace scoped</button>
-          <button className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"><WalletCards className="size-3.5" />Wallet usage</button>
+          <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><ShieldCheck className="size-3.5" />Workspace scoped</button>
+          <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><WalletCards className="size-3.5" />Wallet usage</button>
         </div>
       </div>
 
@@ -295,6 +296,8 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
   const [walletChain, setWalletChain] = useState("EVM");
   const [walletType, setWalletType] = useState("main");
 
+  useDrawerDismiss(onClose, Boolean(account));
+
   if (!account) return null;
 
   const accountName = account.name;
@@ -312,8 +315,17 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
   }
 
   return (
-    <div className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="account-detail-title">
-      <aside className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle">
+    <div
+      className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="account-detail-title"
+      onClick={onClose}
+    >
+      <aside
+        className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <h2 id="account-detail-title" className="truncate text-base font-semibold">Account detail</h2>
           <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close account detail"><X className="size-4" /></button>
@@ -378,11 +390,22 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
 }
 
 function WalletDetailPanel({ wallet, onClose, onOpenAccount }: { wallet: Wallet | null; onClose: () => void; onOpenAccount: (name: string) => void }) {
+  useDrawerDismiss(onClose, Boolean(wallet));
+
   if (!wallet) return null;
 
   return (
-    <div className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="wallet-detail-title">
-      <aside className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle">
+    <div
+      className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="wallet-detail-title"
+      onClick={onClose}
+    >
+      <aside
+        className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <h2 id="wallet-detail-title" className="truncate text-base font-semibold">Wallet detail</h2>
           <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close wallet detail"><X className="size-4" /></button>

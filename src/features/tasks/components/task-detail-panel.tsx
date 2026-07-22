@@ -5,6 +5,7 @@ import { ArrowUpRight, ExternalLink, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
 
 export type TaskDetailPanelTask = {
   title: string;
@@ -22,6 +23,8 @@ export type TaskDetailPanelTask = {
 };
 
 export function TaskDetailPanel({ task, onClose }: { task: TaskDetailPanelTask | null; onClose: () => void }) {
+  useDrawerDismiss(onClose, Boolean(task));
+
   if (!task) return null;
 
   const projectName = task.project ?? "Personal";
@@ -29,8 +32,17 @@ export function TaskDetailPanel({ task, onClose }: { task: TaskDetailPanelTask |
   const taskMarkClass = task.markClass ?? "bg-white/[0.065] text-[#c4cad3]";
 
   return (
-    <div className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
-      <aside className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle">
+    <div
+      className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="task-detail-title"
+      onClick={onClose}
+    >
+      <aside
+        className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <h2 id="task-detail-title" className="truncate text-base font-semibold">Task detail</h2>
           <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close task detail">

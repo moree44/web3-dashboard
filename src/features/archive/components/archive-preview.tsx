@@ -42,7 +42,7 @@ export function ArchivePreview() {
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Archive</h1>
         </div>
-        <Button variant="secondary" size="sm" disabled={selectedCount === 0}><RotateCcw />Restore selected</Button>
+        <Button variant="secondary" size="sm" disabled={selectedCount === 0} title="Preview only — restore needs backend"><RotateCcw />Restore selected</Button>
       </header>
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
@@ -56,10 +56,10 @@ export function ArchivePreview() {
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
           <Search className="size-4 text-muted-foreground" />
-          <input aria-label="Search archive" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search archived projects..." />
+          <input aria-label="Search archive" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search archived projects..." readOnly title="Preview only" />
         </label>
-        <button className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"><CalendarClock className="size-3.5" />Archived date</button>
-        <button className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"><ShieldAlert className="size-3.5" />Reason filter</button>
+        <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><CalendarClock className="size-3.5" />Archived date</button>
+        <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><ShieldAlert className="size-3.5" />Reason filter</button>
       </div>
 
       <div className="hidden overflow-x-auto lg:block">

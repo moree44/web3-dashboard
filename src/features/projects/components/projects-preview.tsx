@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
 
 const projects = [
   {
@@ -135,14 +136,14 @@ export function ProjectsPreview({ view = "all" }: { view?: "all" | "watchlist" }
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
           <Search className="size-4 text-muted-foreground" />
-          <input aria-label="Search projects" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search projects..." />
+          <input aria-label="Search projects" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search projects..." readOnly title="Preview only" />
         </label>
         <div className="flex flex-1 flex-wrap items-center gap-2">
-          <button className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"><Filter className="size-3.5" />Status: Active</button>
-          <button className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground">Stage: Open</button>
-          <button className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"><SlidersHorizontal className="size-3.5" />More filters</button>
+          <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><Filter className="size-3.5" />Status: Active</button>
+          <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50">Stage: Open</button>
+          <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><SlidersHorizontal className="size-3.5" />More filters</button>
           <span className="hidden flex-1 lg:block" />
-          <button className="grid size-8 place-items-center rounded-lg border border-white/[0.045] text-muted-foreground hover:bg-white/[0.04] hover:text-foreground" aria-label="Choose columns"><Columns3 className="size-3.5" /></button>
+          <button type="button" disabled title="Preview only" className="grid size-8 place-items-center rounded-lg border border-white/[0.045] text-muted-foreground opacity-50" aria-label="Choose columns"><Columns3 className="size-3.5" /></button>
         </div>
       </div>
 
@@ -304,11 +305,22 @@ function ProjectCard({ project, onOpen }: { project: Project; onOpen: () => void
 }
 
 function ProjectDetailPanel({ project, onClose }: { project: Project | null; onClose: () => void }) {
+  useDrawerDismiss(onClose, Boolean(project));
+
   if (!project) return null;
 
   return (
-    <div className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="project-detail-title">
-      <aside className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle">
+    <div
+      className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="project-detail-title"
+      onClick={onClose}
+    >
+      <aside
+        className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <div className="min-w-0">
             <h2 id="project-detail-title" className="truncate text-base font-semibold">{project.name}</h2>
@@ -344,7 +356,7 @@ function ProjectDetailPanel({ project, onClose }: { project: Project | null; onC
           <section className="mt-5">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Links</h4>
-              <button className="text-[11px] text-muted-foreground hover:text-foreground">Edit links</button>
+              <button type="button" disabled title="Preview only" className="text-[11px] text-muted-foreground opacity-50">Edit links</button>
             </div>
             <div className="mt-2 grid gap-2">
               <DetailLink label="Website" value="https://project.example" />
@@ -355,7 +367,7 @@ function ProjectDetailPanel({ project, onClose }: { project: Project | null; onC
           <section className="mt-5">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Project docs</h4>
-              <button className="text-[11px] text-muted-foreground hover:text-foreground">Open Docs</button>
+              <Link href="/docs" className="text-[11px] text-muted-foreground hover:text-foreground">Open Docs</Link>
             </div>
             <div className="mt-2 divide-y divide-white/[0.035] overflow-hidden rounded-xl bg-white/[0.025]">
               <DetailRow title={project.name + " project doc"} meta="Main project notes · auto-created later" />
@@ -367,7 +379,7 @@ function ProjectDetailPanel({ project, onClose }: { project: Project | null; onC
           <section className="mt-5">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Tasks</h4>
-              <button className="text-[11px] text-muted-foreground hover:text-foreground">Add task</button>
+              <Link href="/tasks" className="text-[11px] text-muted-foreground hover:text-foreground">Add task</Link>
             </div>
             <div className="mt-2 divide-y divide-white/[0.035] overflow-hidden rounded-xl bg-white/[0.025]">
               <DetailRow title="Submit initial task" meta="Todo · once" />

@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Archive,
   ArrowUpRight,
@@ -10,9 +12,11 @@ import {
   Search,
   SlidersHorizontal,
 } from "lucide-react";
+import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const inboxItems = [
   {
@@ -62,6 +66,8 @@ const inboxItems = [
   },
 ];
 
+type InboxItem = (typeof inboxItems)[number];
+
 const actionButtons = [
   { label: "Create Project", icon: Plus },
   { label: "Create Task", icon: ClipboardList },
@@ -72,7 +78,8 @@ const actionButtons = [
 ];
 
 export function InboxPreview() {
-  const selected = inboxItems[0];
+  const [selectedTitle, setSelectedTitle] = useState(inboxItems[0]?.title ?? "");
+  const selected = inboxItems.find((item) => item.title === selectedTitle) ?? inboxItems[0];
 
   return (
     <div className="px-4 py-4 sm:px-5 lg:px-6 lg:py-5">
@@ -81,17 +88,17 @@ export function InboxPreview() {
           <p className="text-xs text-muted-foreground">Inbox</p>
           <h1 className="font-display mt-1 text-2xl font-semibold tracking-[-0.025em]">Inbox</h1>
         </div>
-        <Button variant="secondary" size="sm"><Plus />Capture item</Button>
+        <Button variant="secondary" size="sm" disabled title="Preview only"><Plus />Capture item</Button>
       </header>
 
       <section className="soft-panel mt-4 grid gap-2 rounded-xl border soft-divider bg-card p-2 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div className="soft-inset flex min-w-0 items-center gap-3 rounded-lg border soft-divider bg-input px-3 py-2.5">
           <Search className="size-4 text-muted-foreground" />
-          <input aria-label="Search inbox" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground" placeholder="Search inbox items, source, project, or reminder..." />
+          <input aria-label="Search inbox" className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground" placeholder="Search inbox items, source, project, or reminder..." readOnly title="Preview only" />
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" size="sm"><SlidersHorizontal />Filter</Button>
-          <Button variant="secondary" size="sm">Unprocessed</Button>
+          <Button variant="secondary" size="sm" disabled title="Preview only"><SlidersHorizontal />Filter</Button>
+          <Button variant="secondary" size="sm" disabled title="Preview only">Unprocessed</Button>
         </div>
       </section>
 
@@ -104,11 +111,20 @@ export function InboxPreview() {
                 <h2 className="text-sm font-semibold">Inbox list</h2>
               </div>
             </div>
-            <Badge variant="secondary">4 open</Badge>
+            <Badge variant="secondary">{inboxItems.length} open</Badge>
           </div>
           <div className="divide-y divide-white/[0.045]">
             {inboxItems.map((item, index) => (
-              <button key={item.title} className="grid w-full gap-2 px-4 py-3 text-left hover:bg-accent/35 md:grid-cols-[minmax(0,1fr)_120px_88px_96px] md:items-center">
+              <button
+                key={item.title}
+                type="button"
+                onClick={() => setSelectedTitle(item.title)}
+                aria-current={selected?.title === item.title ? "true" : undefined}
+                className={cn(
+                  "grid w-full gap-2 px-4 py-3 text-left hover:bg-accent/35 md:grid-cols-[minmax(0,1fr)_120px_88px_96px] md:items-center",
+                  selected?.title === item.title ? "bg-accent/40" : "",
+                )}
+              >
                 <span className="min-w-0">
                   <span className="flex items-center gap-2">
                     <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-muted text-[11px] font-semibold">{index + 1}</span>
@@ -124,31 +140,43 @@ export function InboxPreview() {
           </div>
         </section>
 
-        <aside className="soft-panel rounded-xl border soft-divider bg-card p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] text-muted-foreground">Selected item</p>
-              <h2 className="mt-1 text-base font-semibold">{selected.title}</h2>
-            </div>
-            <Badge variant={selected.variant}>{selected.priority}</Badge>
-          </div>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">{selected.detail}</p>
-
-          <div className="mt-4 rounded-lg border soft-divider bg-muted/45 p-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Processing note</p>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">Inbox is for manual input only — links, notes, or reminders you capture yourself. Turn each item into a project, task, doc, or archive it.</p>
-          </div>
-
-          <div className="mt-4 grid gap-2">
-            {actionButtons.map(({ label, icon: Icon }) => (
-              <button key={label} className="flex items-center justify-between rounded-lg border soft-divider bg-muted/35 px-3 py-2 text-left text-xs font-medium hover:bg-accent/45">
-                <span className="flex items-center gap-2"><Icon className="size-4 text-muted-foreground" />{label}</span>
-                <ArrowUpRight className="size-3.5 text-muted-foreground" />
-              </button>
-            ))}
-          </div>
-        </aside>
+        {selected ? <InboxDetail selected={selected} /> : null}
       </div>
     </div>
+  );
+}
+
+function InboxDetail({ selected }: { selected: InboxItem }) {
+  return (
+    <aside className="soft-panel rounded-xl border soft-divider bg-card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] text-muted-foreground">Selected item</p>
+          <h2 className="mt-1 text-base font-semibold">{selected.title}</h2>
+        </div>
+        <Badge variant={selected.variant}>{selected.priority}</Badge>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">{selected.detail}</p>
+
+      <div className="mt-4 rounded-lg border soft-divider bg-muted/45 p-3">
+        <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Processing note</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">Inbox is for manual input only — links, notes, or reminders you capture yourself. Turn each item into a project, task, doc, or archive it.</p>
+      </div>
+
+      <div className="mt-4 grid gap-2">
+        {actionButtons.map(({ label, icon: Icon }) => (
+          <button
+            key={label}
+            type="button"
+            disabled
+            title="Preview only — conversion needs backend"
+            className="flex items-center justify-between rounded-lg border soft-divider bg-muted/35 px-3 py-2 text-left text-xs font-medium opacity-50"
+          >
+            <span className="flex items-center gap-2"><Icon className="size-4 text-muted-foreground" />{label}</span>
+            <ArrowUpRight className="size-3.5 text-muted-foreground" />
+          </button>
+        ))}
+      </div>
+    </aside>
   );
 }

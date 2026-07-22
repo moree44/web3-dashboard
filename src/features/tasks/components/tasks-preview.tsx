@@ -1053,7 +1053,7 @@ export function TasksPreview() {
           <TaskFilterSelect id="task-filter-project" label="Project" value={selectedProject} options={projectFilterOptions} onChange={setSelectedProject} openFilter={openFilter} setOpenFilter={setOpenFilter} />
           <TaskFilterSelect id="task-filter-account" label="Account" value={selectedAccount} options={accountFilterOptions} onChange={setSelectedAccount} openFilter={openFilter} setOpenFilter={setOpenFilter} />
           <TaskFilterSelect id="task-filter-mode" label="Mode" value={selectedMode} options={modeFilterOptions} onChange={setSelectedMode} openFilter={openFilter} setOpenFilter={setOpenFilter} icon={<Filter className="size-3.5" />} />
-          <button className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground hover:bg-white/[0.04] hover:text-foreground">
+          <button type="button" disabled title="Preview only" className="flex h-8 shrink-0 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50">
             <SlidersHorizontal className="size-3.5" />More filters
           </button>
         </div>
