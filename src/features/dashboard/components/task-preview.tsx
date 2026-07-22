@@ -13,8 +13,8 @@ const focusItems = [
 
 export function TaskPreview() {
   return (
-    <section className="soft-panel overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+    <section className="soft-panel overflow-hidden rounded-xl border soft-divider bg-card">
+      <div className="flex items-center justify-between gap-3 border-b soft-divider px-4 py-3">
         <div><h2 className="text-sm font-semibold">Today focus</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Signals before opening Daily</p></div>
         <button className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">Open Daily<ArrowUpRight aria-hidden="true" className="size-3.5" /></button>
       </div>

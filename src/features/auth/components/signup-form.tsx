@@ -43,7 +43,7 @@ export function SignupForm() {
   );
 }
 
-const inputClass = "h-10 w-full rounded-lg border border-border/25 bg-background/45 px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-border/60 focus:ring-2 focus:ring-ring/25";
+const inputClass = "h-10 w-full rounded-lg border border-white/[0.055] bg-background/45 px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-ring focus:ring-2 focus:ring-ring/25";
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
   return <label className="block"><span className="mb-1.5 flex items-center justify-between gap-3 text-xs font-medium text-foreground"><span>{label}</span>{hint ? <span className="font-normal text-muted-foreground">{hint}</span> : null}</span>{children}{error ? <span className="mt-1.5 block text-[11px] text-destructive">{error}</span> : null}</label>;

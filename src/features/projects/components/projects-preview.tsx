@@ -178,8 +178,8 @@ export function ProjectsPreview({ view = "all" }: { view?: "all" | "watchlist" }
 
       <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project) => <ProjectCard key={project.name} project={project} onOpen={() => setSelectedProject(project)} />)}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
-        <span>Showing {visibleProjects.length} preview {view === "watchlist" ? "watchlist" : "projects"}</span>
-        <button className="font-medium hover:text-foreground">Add real data later</button>
+        <span>Showing {visibleProjects.length} {view === "watchlist" ? "watchlist items" : "projects"}</span>
+        <span />
       </footer>
 
       <AddProjectDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} />

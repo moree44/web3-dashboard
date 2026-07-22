@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.11
-**Status:** Current visual direction for Phase 1 preview, completed sidebar coverage, layout-first workflow, and pre-CRUD UI baseline
+**Version:** 2.12
+**Status:** Current visual direction for Phase 1 preview, completed sidebar coverage, open desktop shell, and light UI polish baseline
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -302,6 +302,19 @@ Use monospace only for:
 Avoid oversized hero typography.
 
 ---
+
+## 7B. Motion Rules
+
+Motion should stay subtle and purposeful.
+
+Allowed:
+
+* small press feedback
+* modal and panel entrance polish
+* subtle desktop-only hover depth for identity cards
+* checkbox state animation for Daily completion
+
+Account identity cards may use a light pointer tilt on desktop only. Keep the angle low, glare muted, and disable transform motion under reduced-motion preferences. Do not use tilt effects on dense tables, task lists, project rows, or mobile scroll surfaces.
 
 ## 8. Icon Direction
 
@@ -1221,3 +1234,20 @@ Rules:
 * Docs may show safe access metadata, such as login URL, username/email, and password location.
 * Docs must never show raw passwords, seed phrases, private keys, recovery phrases, exchange API secrets, or 2FA backup codes.
 * Gmail integration, multi-email sync, password vault behavior, AI processing, and real database CRUD remain out of scope for this batch.
+
+---
+
+## 27. Light UI Polish Baseline
+
+The accepted visual baseline after the open desktop shell pass is:
+
+* no large outer website frame around the app
+* fixed desktop sidebar with independently scrollable main workspace
+* neutral charcoal action buttons by default, not bright blue
+* soft-divider and soft-divider-strong instead of older hard border treatments
+* compact panel titles without permanent explanatory subtitles unless the content is security-critical or task-critical
+* shared empty, loading, and card primitives should use the same soft-depth surface system as the main app
+* mobile navigation should follow the same muted charcoal tone as desktop navigation
+* preview scaffolding copy should not appear in the user-facing UI
+
+For future UI work, use `/projects` as the alignment reference for table density, button tone, subdued dividers, and compact row hierarchy. Use Dashboard as the reference for overview cards, not for database or checklist screens.

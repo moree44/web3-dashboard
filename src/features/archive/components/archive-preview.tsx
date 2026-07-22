@@ -91,7 +91,7 @@ export function ArchivePreview() {
       <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => <ArchiveMobileCard key={project.name} project={project} selected={selectedProjects.has(project.name)} onSelect={() => toggleSelected(project.name)} />)}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
         <span>Showing {filtered.length} archived projects</span>
-        <span>Archive tracks projects only</span>
+        <span />
       </footer>
     </div>
   );

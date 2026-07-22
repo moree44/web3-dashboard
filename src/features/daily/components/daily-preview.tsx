@@ -147,7 +147,7 @@ function DailyGroup({ group, mode, expanded, onToggle, onToggleTask, onOpenTask 
         <span className="grid size-8 place-items-center rounded-full bg-elevated text-[10px] font-semibold">{group.initials}</span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2"><h2 className="text-sm font-semibold">{group.name}</h2><span className="text-[11px] tabular-nums text-muted-foreground">{group.done}/{group.total}</span>{runningCount > 0 ? <CompactPill tone="info">{runningCount} running</CompactPill> : null}{recheckCount > 0 ? <CompactPill tone="warning">{recheckCount} recheck</CompactPill> : null}</div>
-          <div className="mt-1.5 h-1 w-32 rounded-full bg-elevated"><div className="h-full rounded-full bg-primary" style={{width: progress + "%"}} /></div>
+          <div className="mt-1.5 h-1 w-32 rounded-full bg-elevated"><div className="h-full rounded-full bg-white/60" style={{width: progress + "%"}} /></div>
         </div>
         <ChevronRight className={cn("size-4 text-muted-foreground transition-transform", expanded && "rotate-90")} />
         <span className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label={"More options for " + group.name}><MoreHorizontal className="size-4" /></span>

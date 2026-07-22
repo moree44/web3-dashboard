@@ -30,7 +30,7 @@ export function SettingsPreview() {
               <span className="grid size-11 place-items-center rounded-full bg-white/[0.065] text-sm font-semibold">M</span>
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-semibold">Moree</h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">@moree · display name preview</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">@moree · Personal workspace</p>
               </div>
             </div>
 
@@ -59,12 +59,12 @@ export function SettingsPreview() {
           </section>
 
           <section className="rounded-xl bg-card/80 p-4 soft-panel">
-            <h2 className="text-sm font-semibold">MVP boundaries</h2>
+            <h2 className="text-sm font-semibold">Workspace rules</h2>
             <div className="mt-3 space-y-2 text-xs text-muted-foreground">
-              <p>No team invite UI.</p>
-              <p>No billing.</p>
-              <p>No workspace switcher.</p>
-              <p>No user-facing auth email.</p>
+              <p>Team invites are not enabled.</p>
+              <p>Billing is not enabled.</p>
+              <p>One personal workspace is active.</p>
+              <p>Login uses username, not email.</p>
             </div>
           </section>
         </aside>

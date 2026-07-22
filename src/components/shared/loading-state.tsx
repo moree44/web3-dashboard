@@ -12,7 +12,7 @@ export function LoadingState({ rows = 3, className }: LoadingStateProps) {
       <Skeleton className="h-8 w-48" />
       <div className="grid gap-4 md:grid-cols-3">
         {Array.from({ length: rows }, (_, index) => (
-          <div key={index} className="space-y-4 rounded-xl border border-border/70 bg-card/60 p-6">
+          <div key={index} className="space-y-4 rounded-xl border soft-divider bg-card/70 p-6 soft-panel">
             <Skeleton className="size-10" />
             <Skeleton className="h-5 w-2/3" />
             <Skeleton className="h-4 w-full" />

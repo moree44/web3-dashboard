@@ -77,6 +77,14 @@
   --check-delay: 0ms;
   --check-uncheck: 150ms;
   --check-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tilt-perspective: 1000px;
+  --tilt-return: 620ms;
+  --tilt-return-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tilt-follow: 180ms;
+  --tilt-follow-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tilt-glare-opacity: 0.14;
+  --tilt-glare-fade: 220ms;
+  --tilt-glare-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @layer base {
@@ -123,6 +131,70 @@
     stroke-dashoffset: 0;
     transition: stroke-dashoffset var(--check-draw) var(--check-ease) var(--check-delay);
   }
+  .t-tilt {
+    perspective: var(--tilt-perspective);
+  }
+  .t-tilt-card {
+    position: relative;
+    overflow: hidden;
+    transform:
+      perspective(var(--tilt-perspective))
+      rotateX(var(--tilt-rx, 0deg))
+      rotateY(var(--tilt-ry, 0deg));
+    transform-style: preserve-3d;
+    transition:
+      transform var(--tilt-return) var(--tilt-return-ease),
+      background-color 180ms ease;
+  }
+  .t-tilt-card.is-tilting {
+    transition:
+      transform var(--tilt-follow) var(--tilt-follow-ease),
+      background-color 180ms ease;
+    will-change: transform;
+  }
+  .identity-card {
+    border: 1px solid rgb(255 255 255 / 0.035);
+    background:
+      radial-gradient(circle at 22% 18%, rgb(255 255 255 / 0.085), transparent 34%),
+      linear-gradient(135deg, #28292b 0%, #202123 42%, #19191b 100%);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.035) inset,
+      0 18px 36px rgb(0 0 0 / 0.34);
+  }
+  .identity-card-grid {
+    grid-template-columns: 1fr;
+  }
+  .t-tilt-glare {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    mix-blend-mode: screen;
+    background:
+      radial-gradient(circle 90px at var(--tilt-gx, 50%) var(--tilt-gy, 50%), rgb(255 255 255 / 0.18), rgb(255 255 255 / 0.03) 54%, transparent 84%),
+      radial-gradient(circle 230px at var(--tilt-gx, 50%) var(--tilt-gy, 50%), rgb(255 255 255 / 0.055), transparent 76%);
+    transition: opacity var(--tilt-glare-fade) var(--tilt-glare-ease);
+  }
+  .t-tilt.is-hover .t-tilt-glare {
+    opacity: var(--tilt-glare-opacity);
+  }
+}
+
+@media (min-width: 768px) {
+  @layer utilities {
+    .identity-card-grid {
+      grid-template-columns: repeat(2, minmax(0, 360px));
+      justify-content: start;
+    }
+  }
+}
+
+@media (min-width: 1280px) {
+  @layer utilities {
+    .identity-card-grid {
+      grid-template-columns: repeat(3, minmax(0, 360px));
+    }
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -145,7 +217,9 @@
   }
 
   .t-check,
-  .t-check svg path {
+  .t-check svg path,
+  .t-tilt-card,
+  .t-tilt-glare {
     transition: none !important;
   }
 }

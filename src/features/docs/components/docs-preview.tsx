@@ -68,7 +68,6 @@ export function DocsPreview() {
                 <span className="grid size-8 place-items-center rounded-lg border soft-divider bg-muted text-muted-foreground"><Star className="size-4" /></span>
                 <div>
                   <h2 className="text-sm font-semibold">Pinned docs</h2>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">Important references kept near the top</p>
                 </div>
               </div>
               <Badge variant="secondary">3 pinned</Badge>
@@ -82,7 +81,6 @@ export function DocsPreview() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold">Folders</h2>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Compact file-library structure for quick access</p>
               </div>
               <button className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">View all<ArrowUpRight className="size-3.5" /></button>
             </div>
@@ -110,7 +108,6 @@ export function DocsPreview() {
             <div className="flex items-center justify-between gap-3 border-b soft-divider px-4 py-3">
               <div>
                 <h2 className="text-sm font-semibold">Recent docs</h2>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Latest updated notes</p>
               </div>
               <button className="text-[11px] text-muted-foreground hover:text-foreground">View all</button>
             </div>

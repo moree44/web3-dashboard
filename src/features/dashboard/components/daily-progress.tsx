@@ -8,7 +8,7 @@ const accounts = [
 
 export function DailyProgress() {
   return (
-    <section className="soft-panel rounded-xl border border-border bg-card p-4">
+    <section className="soft-panel rounded-xl border soft-divider bg-card p-4">
       <div className="flex items-start justify-between gap-4">
         <div><h2 className="text-sm font-semibold">Account workload</h2><p className="mt-0.5 text-[11px] text-muted-foreground">11 of 24 daily tasks complete</p></div>
         <button className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">Daily<ArrowUpRight aria-hidden="true" className="size-3.5" /></button>
@@ -24,7 +24,7 @@ export function DailyProgress() {
                 <span className="min-w-0 flex-1 truncate text-xs font-medium">{account.name}</span>
                 <span className="text-[11px] tabular-nums text-muted-foreground">{account.done}/{account.total}</span>
               </span>
-              <span className="soft-inset block h-1.5 overflow-hidden rounded-full bg-background"><span className="block h-full rounded-full bg-primary" style={{ width: percentage + "%" }} /></span>
+              <span className="soft-inset block h-1.5 overflow-hidden rounded-full bg-background"><span className="block h-full rounded-full bg-white/60" style={{ width: percentage + "%" }} /></span>
             </button>
           );
         })}
