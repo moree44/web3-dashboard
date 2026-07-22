@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { CircleUserRound, Copy, CreditCard, FolderOpen, Mail, MoreHorizontal, Plus, Search, ShieldCheck, Upload, WalletCards, X } from "lucide-react";
-import { useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,8 +90,34 @@ const groups = [
 export function AccountsPreview() {
   const [activeTab, setActiveTab] = useState<AccountTab>("Identities");
   const [walletItems, setWalletItems] = useState<Wallet[]>(wallets);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
+  const query = searchQuery.trim().toLowerCase();
+
+  const filteredAccounts = useMemo(() => {
+    if (!query) return accounts;
+    return accounts.filter((account) => {
+      const haystack = [account.name, account.handle, account.discord, account.email, ...account.activeProjects, ...account.wallets].join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [query]);
+
+  const filteredWallets = useMemo(() => {
+    if (!query) return walletItems;
+    return walletItems.filter((wallet) => {
+      const haystack = [wallet.label, wallet.owner, wallet.group, wallet.chain, wallet.type, wallet.address, ...wallet.usedIn].join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [query, walletItems]);
+
+  const filteredGroups = useMemo(() => {
+    if (!query) return groups;
+    return groups.filter((group) => {
+      const haystack = [group.name, group.description].join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [query]);
 
   function openAccountByName(name: string) {
     const account = accounts.find((item) => item.name === name);
@@ -142,7 +168,13 @@ export function AccountsPreview() {
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
           <Search className="size-4 text-muted-foreground" />
-          <input aria-label="Search accounts" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder={activeTab === "Wallets" ? "Search wallets..." : "Search accounts..."} readOnly title="Preview only" />
+          <input
+            aria-label="Search accounts"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            placeholder={activeTab === "Wallets" ? "Search wallets..." : activeTab === "Groups" ? "Search groups..." : "Search accounts..."}
+          />
         </label>
         <div className="flex flex-1 flex-wrap items-center gap-2">
           <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><ShieldCheck className="size-3.5" />Workspace scoped</button>
@@ -150,9 +182,9 @@ export function AccountsPreview() {
         </div>
       </div>
 
-      {activeTab === "Identities" ? <IdentitiesView onOpenAccount={setSelectedAccount} /> : null}
-      {activeTab === "Wallets" ? <WalletsView walletItems={walletItems} onOpenWallet={openWallet} /> : null}
-      {activeTab === "Groups" ? <GroupsView /> : null}
+      {activeTab === "Identities" ? <IdentitiesView accounts={filteredAccounts} onOpenAccount={setSelectedAccount} /> : null}
+      {activeTab === "Wallets" ? <WalletsView walletItems={filteredWallets} onOpenWallet={openWallet} /> : null}
+      {activeTab === "Groups" ? <GroupsView groups={filteredGroups} /> : null}
 
       <AccountDetailPanel account={selectedAccount} walletItems={walletItems} onClose={() => setSelectedAccount(null)} onOpenWallet={openWallet} onAddWallet={addWalletForAccount} />
       <WalletDetailPanel wallet={selectedWallet} onClose={() => setSelectedWallet(null)} onOpenAccount={openAccountByName} />
@@ -208,10 +240,10 @@ function TiltCard({ children, className, onClick }: { children: ReactNode; class
   );
 }
 
-function IdentitiesView({ onOpenAccount }: { onOpenAccount: (account: Account) => void }) {
+function IdentitiesView({ accounts: accountItems, onOpenAccount }: { accounts: Account[]; onOpenAccount: (account: Account) => void }) {
   return (
     <div className="identity-card-grid grid gap-3 px-4 py-4 sm:px-6 lg:px-8">
-      {accounts.map((account) => (
+      {accountItems.map((account) => (
         <TiltCard key={account.name} onClick={() => onOpenAccount(account)} className="identity-card min-h-[154px] w-full p-4">
           <div className="relative z-10 flex h-full flex-col">
             <div className="flex items-start justify-between gap-3">
@@ -455,10 +487,10 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount }: { wallet: Wallet 
   );
 }
 
-function GroupsView() {
+function GroupsView({ groups: groupItems }: { groups: typeof groups }) {
   return (
     <div className="grid gap-3 px-4 py-4 sm:px-6 lg:grid-cols-4 lg:px-8">
-      {groups.map((group) => (
+      {groupItems.map((group) => (
         <article key={group.name} className="rounded-xl bg-card/80 p-4 soft-panel">
           <div className="flex items-start justify-between gap-3">
             <span className="grid size-9 place-items-center rounded-lg bg-white/[0.055] text-muted-foreground"><FolderOpen className="size-4" /></span>

@@ -1,15 +1,24 @@
 "use client";
 
 import { Archive, CalendarClock, MoreHorizontal, RotateCcw, Search, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const filters = ["All 7", "Claimed 2", "Dropped 1", "Scam Risk 1", "Expired 1", "Completed 2"] as const;
+type ArchivedProject = {
+  name: string;
+  mark: string;
+  hunt: string;
+  reason: string;
+  status: string;
+  result: string;
+  account: string;
+  archived: string;
+};
 
-const archivedProjects = [
+const initialArchivedProjects: ArchivedProject[] = [
   { name: "Old Mint Pass", mark: "O", hunt: "NFT", reason: "claimed", status: "Archived", result: "Mint completed", account: "Moree", archived: "Jul 08" },
   { name: "Beta Exchange Quest", mark: "B", hunt: "Retro", reason: "not worth", status: "Archived", result: "Low reward", account: "Wdym", archived: "Jul 04" },
   { name: "Retro Bridge Alpha", mark: "R", hunt: "Retro", reason: "completed", status: "Archived", result: "Interaction saved", account: "Moree", archived: "Jun 28" },
@@ -19,12 +28,44 @@ const archivedProjects = [
   { name: "Duplicate Soundness Note", mark: "D", hunt: "Free Hunts", reason: "duplicate", status: "Archived", result: "Merged into active project", account: "Moree", archived: "May 18" },
 ];
 
-type ArchivedProject = (typeof archivedProjects)[number];
+type ReasonFilter = "all" | "claimed" | "not worth" | "scam risk" | "expired" | "completed" | "duplicate";
 
 export function ArchivePreview() {
-  const [activeFilter, setActiveFilter] = useState<(typeof filters)[number]>("All 7");
+  const [items, setItems] = useState<ArchivedProject[]>(initialArchivedProjects);
+  const [activeFilter, setActiveFilter] = useState<ReasonFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(() => new Set());
-  const filtered = activeFilter === "All 7" ? archivedProjects : archivedProjects.filter((project) => project.reason === reasonFromFilter(activeFilter));
+  const query = searchQuery.trim().toLowerCase();
+
+  const reasonCounts = useMemo(() => {
+    return {
+      all: items.length,
+      claimed: items.filter((item) => item.reason === "claimed").length,
+      dropped: items.filter((item) => item.reason === "not worth").length,
+      scam: items.filter((item) => item.reason === "scam risk").length,
+      expired: items.filter((item) => item.reason === "expired").length,
+      completed: items.filter((item) => item.reason === "completed").length,
+    };
+  }, [items]);
+
+  const filters: { id: ReasonFilter; label: string }[] = [
+    { id: "all", label: `All ${reasonCounts.all}` },
+    { id: "claimed", label: `Claimed ${reasonCounts.claimed}` },
+    { id: "not worth", label: `Dropped ${reasonCounts.dropped}` },
+    { id: "scam risk", label: `Scam Risk ${reasonCounts.scam}` },
+    { id: "expired", label: `Expired ${reasonCounts.expired}` },
+    { id: "completed", label: `Completed ${reasonCounts.completed}` },
+  ];
+
+  const filtered = useMemo(() => {
+    return items.filter((project) => {
+      if (activeFilter !== "all" && project.reason !== activeFilter) return false;
+      if (!query) return true;
+      const haystack = [project.name, project.hunt, project.reason, project.result, project.account, project.archived].join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [activeFilter, items, query]);
+
   const selectedCount = selectedProjects.size;
 
   function toggleSelected(projectName: string) {
@@ -36,19 +77,37 @@ export function ArchivePreview() {
     });
   }
 
+  function restoreSelected() {
+    if (selectedCount === 0) return;
+    setItems((current) => current.filter((project) => !selectedProjects.has(project.name)));
+    setSelectedProjects(new Set());
+  }
+
   return (
     <div className="min-w-0 py-5 lg:py-7">
       <header className="flex flex-col gap-4 border-b soft-divider px-4 pb-5 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Archive</h1>
         </div>
-        <Button variant="secondary" size="sm" disabled={selectedCount === 0} title="Preview only — restore needs backend"><RotateCcw />Restore selected</Button>
+        <Button variant="secondary" size="sm" disabled={selectedCount === 0} onClick={restoreSelected} title={selectedCount === 0 ? "Select projects to restore" : "Remove selected from archive preview"}>
+          <RotateCcw />Restore selected
+        </Button>
       </header>
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
         <div className="scrollbar-subtle flex gap-1 overflow-x-auto py-2.5">
           {filters.map((filter) => (
-            <button key={filter} onClick={() => setActiveFilter(filter)} className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-medium", activeFilter === filter ? "bg-accent text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}>{filter}</button>
+            <button
+              key={filter.id}
+              type="button"
+              onClick={() => setActiveFilter(filter.id)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium",
+                activeFilter === filter.id ? "bg-accent text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
+              )}
+            >
+              {filter.label}
+            </button>
           ))}
         </div>
       </div>
@@ -56,7 +115,13 @@ export function ArchivePreview() {
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
           <Search className="size-4 text-muted-foreground" />
-          <input aria-label="Search archive" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search archived projects..." readOnly title="Preview only" />
+          <input
+            aria-label="Search archive"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            placeholder="Search archived projects..."
+          />
         </label>
         <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><CalendarClock className="size-3.5" />Archived date</button>
         <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><ShieldAlert className="size-3.5" />Reason filter</button>
@@ -159,13 +224,4 @@ function Reason({ reason }: { reason: string }) {
 
 function toTitleCase(value: string) {
   return value.split(" ").map((word) => word.slice(0, 1).toUpperCase() + word.slice(1)).join(" ");
-}
-
-function reasonFromFilter(filter: string) {
-  if (filter.startsWith("Claimed")) return "claimed";
-  if (filter.startsWith("Dropped")) return "dropped";
-  if (filter.startsWith("Scam")) return "scam risk";
-  if (filter.startsWith("Expired")) return "expired";
-  if (filter.startsWith("Completed")) return "completed";
-  return "all";
 }

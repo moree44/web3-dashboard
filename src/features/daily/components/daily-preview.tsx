@@ -49,6 +49,8 @@ type ProjectGroupData = {
 export function DailyPreview() {
   const [activeView, setActiveView] = useState<ViewMode>("account");
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<TaskDetailPanelTask | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [hideDone, setHideDone] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set([sectionKey("account", accountGroups[0]?.name ?? "")]));
   const [checkedTasks, setCheckedTasks] = useState<Record<string, boolean>>(() => {
     return Object.fromEntries(
@@ -58,6 +60,8 @@ export function DailyPreview() {
   const [checkedPersonalItems, setCheckedPersonalItems] = useState<Record<string, boolean>>(() => Object.fromEntries(personalDailyItems.map((item) => [item.id, Boolean(item.done)])));
   const dateLabel = getJakartaDateLabel();
   const shortDateLabel = getJakartaShortDateLabel();
+  const query = searchQuery.trim().toLowerCase();
+
   const interactiveAccountGroups = useMemo(() => {
     return accountGroups.map((group) => {
       const tasks = group.tasks.map((task) => ({ ...task, done: checkedTasks[taskKey(group.name, task.project, task.title)] ?? Boolean(task.done) }));
@@ -68,7 +72,19 @@ export function DailyPreview() {
   const totalDone = interactiveAccountGroups.reduce((sum, group) => sum + group.done, 0);
   const totalTasks = interactiveAccountGroups.reduce((sum, group) => sum + group.total, 0);
   const projectGroups = useMemo(() => buildProjectGroups(interactiveAccountGroups), [interactiveAccountGroups]);
-  const visibleGroups = activeView === "account" ? interactiveAccountGroups : activeView === "project" ? projectGroups : [];
+
+  const filteredAccountGroups = useMemo(() => filterDailyGroups(interactiveAccountGroups, query, hideDone), [interactiveAccountGroups, query, hideDone]);
+  const filteredProjectGroups = useMemo(() => filterDailyGroups(projectGroups, query, hideDone), [projectGroups, query, hideDone]);
+  const visibleGroups = activeView === "account" ? filteredAccountGroups : activeView === "project" ? filteredProjectGroups : [];
+
+  const filteredPersonalItems = useMemo(() => {
+    return personalDailyItems.filter((item) => {
+      const done = checkedPersonalItems[item.id] ?? Boolean(item.done);
+      if (hideDone && done) return false;
+      if (!query) return true;
+      return [item.title, item.frequency, item.status].join(" ").toLowerCase().includes(query);
+    });
+  }, [checkedPersonalItems, hideDone, query]);
 
   function toggleTask(task: AccountTask | (AccountTask & { account: string; accountInitials: string }), fallbackAccount: string) {
     const accountName = "account" in task ? task.account : fallbackAccount;
@@ -112,28 +128,79 @@ export function DailyPreview() {
           <button onClick={() => setActiveView("project")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium", activeView === "project" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}>By project</button>
           <button onClick={() => setActiveView("personal")} className={cn("rounded-md px-3 py-1.5 text-xs font-medium", activeView === "personal" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground")}>Personal</button>
         </div>
-        <div className="flex h-9 items-center gap-1 rounded-lg border soft-divider-strong bg-card p-1"><label className="flex h-7 min-w-0 items-center gap-2 px-2 sm:w-56"><Search className="size-3.5 text-muted-foreground" /><input aria-label="Search daily tasks" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search today…" /></label><button className="h-7 rounded-md px-3 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">Hide done</button></div>
+        <div className="flex h-9 items-center gap-1 rounded-lg border soft-divider-strong bg-card p-1">
+          <label className="flex h-7 min-w-0 items-center gap-2 px-2 sm:w-56">
+            <Search className="size-3.5 text-muted-foreground" />
+            <input
+              aria-label="Search daily tasks"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              placeholder="Search today…"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setHideDone((current) => !current)}
+            className={cn("h-7 rounded-md px-3 text-xs hover:bg-accent hover:text-foreground", hideDone ? "bg-accent text-foreground" : "text-muted-foreground")}
+          >
+            {hideDone ? "Show done" : "Hide done"}
+          </button>
+        </div>
       </div>
 
       {activeView === "personal" ? (
         <PersonalDailyList
-          items={personalDailyItems}
+          items={filteredPersonalItems}
           checkedItems={checkedPersonalItems}
           onToggle={togglePersonalItem}
           onOpen={(item) => setSelectedTaskDetail(toPersonalDailyDetail(item, checkedPersonalItems[item.id] ?? Boolean(item.done)))}
         />
       ) : (
         <div className="mt-5 space-y-4">
-          {visibleGroups.map((group) => {
-            const key = sectionKey(activeView, group.name);
-            return <DailyGroup key={key} group={group} mode={activeView} expanded={expandedSections.has(key)} onToggle={() => toggleSection(group.name)} onToggleTask={toggleTask} onOpenTask={openDailyTaskDetail} />;
-          })}
+          {visibleGroups.length === 0 ? (
+            <p className="rounded-xl border soft-divider-strong bg-card px-4 py-8 text-center text-sm text-muted-foreground">No tasks match this filter.</p>
+          ) : (
+            visibleGroups.map((group) => {
+              const key = sectionKey(activeView, group.name);
+              return <DailyGroup key={key} group={group} mode={activeView} expanded={expandedSections.has(key)} onToggle={() => toggleSection(group.name)} onToggleTask={toggleTask} onOpenTask={openDailyTaskDetail} />;
+            })
+          )}
         </div>
       )}
 
       <TaskDetailPanel task={selectedTaskDetail} onClose={() => setSelectedTaskDetail(null)} />
     </div>
   );
+}
+
+function filterDailyGroups<T extends AccountGroupData | ProjectGroupData>(groups: T[], query: string, hideDone: boolean): T[] {
+  return groups
+    .map((group) => {
+      const tasks = group.tasks.filter((task) => {
+        if (hideDone && task.done) return false;
+        if (!query) return true;
+        const accountLabel = "account" in task ? String(task.account) : "";
+        const status = "status" in task && typeof task.status === "string" ? task.status : "";
+        const frequency = "frequency" in task && typeof task.frequency === "string" ? task.frequency : "";
+        const haystack = [task.project, task.title, task.meta ?? "", status, frequency, accountLabel, group.name].join(" ").toLowerCase();
+        return haystack.includes(query);
+      });
+      const watching = query
+        ? group.watching.filter((item) => [item.title, item.status, "account" in item ? String(item.account) : "", group.name].join(" ").toLowerCase().includes(query))
+        : group.watching;
+
+      if (tasks.length === 0 && watching.length === 0) return null;
+
+      return {
+        ...group,
+        tasks,
+        watching,
+        done: tasks.filter((task) => task.done).length,
+        total: tasks.length,
+      } as T;
+    })
+    .filter((group): group is T => group !== null);
 }
 
 function DailyGroup({ group, mode, expanded, onToggle, onToggleTask, onOpenTask }: { group: AccountGroupData | ProjectGroupData; mode: ViewMode; expanded: boolean; onToggle: () => void; onToggleTask: (task: AccountTask | (AccountTask & { account: string; accountInitials: string }), fallbackAccount: string) => void; onOpenTask: (task: AccountTask | (AccountTask & { account: string; accountInitials: string }), fallbackAccount: string) => void }) {

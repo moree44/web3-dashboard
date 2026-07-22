@@ -2,14 +2,30 @@
 
 import { CalendarClock, Check, ChevronDown, Columns3, ExternalLink, Filter, MoreHorizontal, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
 
-const projects = [
+type Project = {
+  name: string;
+  mark: string;
+  logoClass: string;
+  status: string;
+  priority: string;
+  hunt: string;
+  stage: string;
+  work: string[];
+  type: string[];
+  accounts: string[];
+  progress: number;
+  date: string;
+  activity: string;
+};
+
+const initialProjects: Project[] = [
   {
     name: "Soundness",
     mark: "S",
@@ -103,18 +119,40 @@ const projects = [
 ];
 
 export function ProjectsPreview({ view = "all" }: { view?: "all" | "watchlist" }) {
+  const [projectItems, setProjectItems] = useState<Project[]>(initialProjects);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const watchlistProjects = projects.filter((project) => project.status === "Watching" || project.stage === "Waiting result" || project.stage === "Joined whitelist");
-  const visibleProjects = view === "watchlist" ? watchlistProjects : projects;
+
+  const watchlistProjects = projectItems.filter((project) => project.status === "Watching" || project.stage === "Waiting result" || project.stage === "Joined whitelist");
+  const baseProjects = view === "watchlist" ? watchlistProjects : projectItems;
+  const query = searchQuery.trim().toLowerCase();
+  const visibleProjects = useMemo(() => {
+    if (!query) return baseProjects;
+    return baseProjects.filter((project) => {
+      const haystack = [project.name, project.status, project.stage, project.hunt, project.priority, ...project.work, ...project.type, ...project.accounts].join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [baseProjects, query]);
+
+  const freeHuntsCount = projectItems.filter((project) => project.hunt === "Free Hunts").length;
+  const retroCount = projectItems.filter((project) => project.hunt === "Retro").length;
+  const nftCount = projectItems.filter((project) => project.hunt === "NFT").length;
+  const waitlistCount = projectItems.filter((project) => project.hunt === "Waitlist").length;
+
   const tabs = [
-    { label: `All ${projects.length}`, href: "/projects", active: view === "all" },
+    { label: `All ${projectItems.length}`, href: "/projects", active: view === "all" },
     { label: `Watchlist ${watchlistProjects.length}`, href: "/projects?view=watchlist", active: view === "watchlist" },
-    { label: "Free Hunts 3", href: "/projects", active: false },
-    { label: "Retro 1", href: "/projects", active: false },
-    { label: "NFT 1", href: "/projects", active: false },
-    { label: "Waitlist 1", href: "/projects", active: false },
+    { label: `Free Hunts ${freeHuntsCount}`, href: "/projects", active: false },
+    { label: `Retro ${retroCount}`, href: "/projects", active: false },
+    { label: `NFT ${nftCount}`, href: "/projects", active: false },
+    { label: `Waitlist ${waitlistCount}`, href: "/projects", active: false },
   ];
+
+  function handleCreateProject(project: Project) {
+    setProjectItems((items) => [project, ...items]);
+    setIsAddOpen(false);
+  }
 
   return (
     <div className="min-w-0 py-5 lg:py-7">
@@ -136,7 +174,13 @@ export function ProjectsPreview({ view = "all" }: { view?: "all" | "watchlist" }
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
           <Search className="size-4 text-muted-foreground" />
-          <input aria-label="Search projects" className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search projects..." readOnly title="Preview only" />
+          <input
+            aria-label="Search projects"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            placeholder="Search projects..."
+          />
         </label>
         <div className="flex flex-1 flex-wrap items-center gap-2">
           <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><Filter className="size-3.5" />Status: Active</button>
@@ -173,23 +217,21 @@ export function ProjectsPreview({ view = "all" }: { view?: "all" | "watchlist" }
               <th className="w-12 border-b border-white/[0.045] px-3 py-3"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody>{visibleProjects.map((project) => <ProjectRow key={project.name} project={project} onOpen={() => setSelectedProject(project)} />)}</tbody>
+          <tbody>{visibleProjects.map((project) => <ProjectRow key={`${project.name}-${project.activity}-${project.date}`} project={project} onOpen={() => setSelectedProject(project)} />)}</tbody>
         </table>
       </div>
 
-      <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project) => <ProjectCard key={project.name} project={project} onOpen={() => setSelectedProject(project)} />)}</div>
+      <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project) => <ProjectCard key={`${project.name}-${project.activity}-${project.date}`} project={project} onOpen={() => setSelectedProject(project)} />)}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
         <span>Showing {visibleProjects.length} {view === "watchlist" ? "watchlist items" : "projects"}</span>
         <span />
       </footer>
 
-      <AddProjectDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} />
+      <AddProjectDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} onCreate={handleCreateProject} />
       <ProjectDetailPanel project={selectedProject} onClose={() => setSelectedProject(null)} />
     </div>
   );
 }
-
-type Project = (typeof projects)[number];
 
 function statusVariant(status: string) {
   if (status === "Done") return "success" as const;
@@ -408,23 +450,68 @@ function DetailRow({ title, meta }: { title: string; meta: string }) {
   return <button className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-accent/35"><span className="min-w-0"><span className="block truncate text-xs font-medium">{title}</span><span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{meta}</span></span><span className="text-[11px] text-muted-foreground">Open</span></button>;
 }
 
-const previewAccounts = [
-  {
-    name: "Moree",
-    wallets: ["Moree EVM Main", "Moree SOL Main", "Moree Burner 01"],
-  },
-  {
-    name: "Wdym",
-    wallets: ["Wdym EVM Main", "Wdym SOL Main"],
-  },
-];
-
-
-function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function AddProjectDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (project: Project) => void }) {
   const [openSelect, setOpenSelect] = useState<string | null>(null);
   const [showOptionalContext, setShowOptionalContext] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [hunt, setHunt] = useState("Free Hunts");
+  const [stage, setStage] = useState("Registered");
+  const [status, setStatus] = useState("Watching");
+  const [priority, setPriority] = useState("Medium");
+  const [assignedAccounts, setAssignedAccounts] = useState<string[]>(["Moree"]);
+  const [workType, setWorkType] = useState("Testnet");
+  const [projectType, setProjectType] = useState("ZK");
 
   if (!open) return null;
+
+  const canCreate = projectName.trim().length > 0;
+
+  function resetForm() {
+    setProjectName("");
+    setHunt("Free Hunts");
+    setStage("Registered");
+    setStatus("Watching");
+    setPriority("Medium");
+    setAssignedAccounts(["Moree"]);
+    setWorkType("Testnet");
+    setProjectType("ZK");
+    setShowOptionalContext(false);
+    setOpenSelect(null);
+  }
+
+  function handleClose() {
+    resetForm();
+    onClose();
+  }
+
+  function handleCreate() {
+    const name = projectName.trim();
+    if (!name) return;
+
+    const mark = name.slice(0, 1).toUpperCase();
+    const accounts = assignedAccounts.length > 0 ? assignedAccounts : ["Moree"];
+
+    onCreate({
+      name,
+      mark,
+      logoClass: "bg-white/[0.065] text-[#c4cad3]",
+      status,
+      priority: priority === "No priority" ? "Medium" : priority,
+      hunt,
+      stage,
+      work: [workType],
+      type: [projectType],
+      accounts,
+      progress: 0,
+      date: formatShortDate(new Date()),
+      activity: "now",
+    });
+    resetForm();
+  }
+
+  function toggleAccount(name: string) {
+    setAssignedAccounts((current) => (current.includes(name) ? current.filter((item) => item !== name) : [...current, name]));
+  }
 
   return (
     <div className="modal-backdrop-in fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="add-project-title">
@@ -433,18 +520,24 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
           <div className="min-w-0">
             <h2 id="add-project-title" className="text-base font-semibold tracking-[-0.02em]">Add project</h2>
           </div>
-          <button onClick={onClose} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.045] hover:text-foreground" aria-label="Close add project"><X className="size-4" /></button>
+          <button onClick={handleClose} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.045] hover:text-foreground" aria-label="Close add project"><X className="size-4" /></button>
         </div>
 
         <div className="px-4 pb-4">
           <div className="grid gap-3 px-2 pb-2 pt-0.5 md:grid-cols-[46px_minmax(0,1fr)_92px] md:items-end">
             <label className="block">
               <span className="block w-10 text-center text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Logo</span>
-              <button type="button" className="mt-1.5 grid size-10 place-items-center rounded-lg border border-white/[0.055] bg-white/[0.035] text-sm font-semibold text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" title="Upload or paste logo later">P</button>
+              <button type="button" className="mt-1.5 grid size-10 place-items-center rounded-lg border border-white/[0.055] bg-white/[0.035] text-sm font-semibold text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" title="Upload or paste logo later">{projectName.trim().slice(0, 1).toUpperCase() || "P"}</button>
             </label>
             <label className="min-w-0">
               <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Project name</span>
-              <input autoFocus className="mt-1.5 h-10 w-full soft-inset rounded-lg border border-white/[0.055] bg-input px-3 text-sm font-semibold outline-none placeholder:text-muted-foreground focus:border-ring" placeholder="Soundness, NexusHQ, Linera..." />
+              <input
+                autoFocus
+                value={projectName}
+                onChange={(event) => setProjectName(event.target.value)}
+                className="mt-1.5 h-10 w-full soft-inset rounded-lg border border-white/[0.055] bg-input px-3 text-sm font-semibold outline-none placeholder:text-muted-foreground focus:border-ring"
+                placeholder="Soundness, NexusHQ, Linera..."
+              />
             </label>
             <label className="block">
               <span className="block text-center text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Date</span>
@@ -454,10 +547,10 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
           <div className="px-2 py-2">
             <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
-              <SelectPreview id="hunt" label="Hunt type" value="Free Hunts" options={["Free Hunts", "Retro", "NFT", "Waitlist"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact allowCustom />
-              <SelectPreview id="stage" label="Stage" value="Registered" options={["Not started", "Registered", "Waiting result", "Joined whitelist", "Whitelisted", "Eligible", "Claimable", "Mint open", "Done"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact allowCustom />
-              <SelectPreview id="status" label="Status" value="Watching" options={["Watching", "In progress", "Running", "Recheck", "Paused", "Done"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact />
-              <SelectPreview id="priority" label="Priority" value="Medium" options={["No priority", "High", "Medium", "Low"]} openSelect={openSelect} setOpenSelect={setOpenSelect} compact />
+              <SelectPreview id="hunt" label="Hunt type" value={hunt} options={["Free Hunts", "Retro", "NFT", "Waitlist"]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={setHunt} compact allowCustom />
+              <SelectPreview id="stage" label="Stage" value={stage} options={["Not started", "Registered", "Waiting result", "Joined whitelist", "Whitelisted", "Eligible", "Claimable", "Mint open", "Done"]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={setStage} compact allowCustom />
+              <SelectPreview id="status" label="Status" value={status} options={["Watching", "In progress", "Running", "Recheck", "Paused", "Done"]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={setStatus} compact />
+              <SelectPreview id="priority" label="Priority" value={priority} options={["No priority", "High", "Medium", "Low"]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={setPriority} compact />
             </div>
           </div>
 
@@ -467,8 +560,9 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
               <span className="text-[11px] text-muted-foreground">wallets come from selected accounts</span>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              {previewAccounts.map((account) => <TogglePill key={account.name} label={account.name} active />)}
-              <TogglePill label="Wayss" />
+              {["Moree", "Wdym", "Wayss"].map((account) => (
+                <TogglePill key={account} label={account} active={assignedAccounts.includes(account)} onClick={() => toggleAccount(account)} />
+              ))}
             </div>
           </div>
 
@@ -488,8 +582,8 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
               <>
                 <div className="grid gap-3 md:grid-cols-3">
                   <Field label="Project URL" placeholder="https://..." />
-                  <ComboboxPreview label="Work type" initialValue="Testnet" options={["Testnet", "Node", "CLI running", "Farm role", "Galxe", "Whitelist", "Proof submit"]} placeholder="Add work type..." />
-                  <ComboboxPreview label="Project type" initialValue="ZK" options={["ZK", "AI", "DePIN", "L1", "L2", "Security", "Data"]} placeholder="Add project type..." />
+                  <ComboboxPreview label="Work type" initialValue={workType} options={["Testnet", "Node", "CLI running", "Farm role", "Galxe", "Whitelist", "Proof submit"]} placeholder="Add work type..." onChange={setWorkType} />
+                  <ComboboxPreview label="Project type" initialValue={projectType} options={["ZK", "AI", "DePIN", "L1", "L2", "Security", "Data"]} placeholder="Add project type..." onChange={setProjectType} />
                 </div>
                 <label className="mt-3 block">
                   <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Short note</span>
@@ -502,8 +596,8 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
         <div className="flex items-center justify-end gap-3 border-t soft-divider bg-muted/20 px-4 py-2.5">
           <div className="flex shrink-0 gap-2">
-            <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" className="bg-accent text-foreground hover:bg-white/[0.09]" onClick={onClose}>Create project</Button>
+            <Button variant="secondary" size="sm" onClick={handleClose}>Cancel</Button>
+            <Button size="sm" className="bg-accent text-foreground hover:bg-white/[0.09]" disabled={!canCreate} onClick={handleCreate}>Create project</Button>
           </div>
         </div>
       </div>
@@ -511,8 +605,20 @@ function AddProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-function TogglePill({ label, active = false }: { label: string; active?: boolean }) {
-  return <button className={cn("soft-control rounded-full px-3 py-1 text-xs font-medium", active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}>{label}</button>;
+function formatShortDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit", timeZone: "Asia/Jakarta" }).format(date);
+}
+
+function TogglePill({ label, active = false, onClick }: { label: string; active?: boolean; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn("soft-control rounded-full px-3 py-1 text-xs font-medium", active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}
+    >
+      {label}
+    </button>
+  );
 }
 
 function Field({ label, placeholder, className = "" }: { label: string; placeholder: string; className?: string }) {
@@ -531,6 +637,7 @@ function SelectPreview({
   options,
   openSelect,
   setOpenSelect,
+  onChange,
   compact = false,
   allowCustom = false,
 }: {
@@ -540,21 +647,26 @@ function SelectPreview({
   options: string[];
   openSelect: string | null;
   setOpenSelect: (value: string | null) => void;
+  onChange?: (value: string) => void;
   compact?: boolean;
   allowCustom?: boolean;
 }) {
-  const [selected, setSelected] = useState(value);
   const [items, setItems] = useState(options);
   const [customValue, setCustomValue] = useState("");
   const open = openSelect === id;
   const normalizedCustomValue = customValue.trim();
   const canAddCustom = allowCustom && normalizedCustomValue.length > 0 && !items.some((item) => item.toLowerCase() === normalizedCustomValue.toLowerCase());
+
+  function selectValue(next: string) {
+    onChange?.(next);
+    setOpenSelect(null);
+  }
+
   const addCustomValue = () => {
     if (!canAddCustom) return;
     setItems((current) => [...current, normalizedCustomValue]);
-    setSelected(normalizedCustomValue);
+    selectValue(normalizedCustomValue);
     setCustomValue("");
-    setOpenSelect(null);
   };
 
   return (
@@ -571,8 +683,8 @@ function SelectPreview({
         aria-expanded={open}
       >
         <span className="flex min-w-0 items-center gap-2">
-          <SelectGlyph label={label} value={selected} />
-          <span className="truncate font-medium">{selected}</span>
+          <SelectGlyph label={label} value={value} />
+          <span className="truncate font-medium">{value}</span>
         </span>
         <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open ? "rotate-180" : "")} />
       </button>
@@ -609,19 +721,16 @@ function SelectPreview({
             <button
               key={option}
               type="button"
-              onClick={() => {
-                setSelected(option);
-                setOpenSelect(null);
-              }}
+              onClick={() => selectValue(option)}
               className={cn(
                 "flex h-7 w-full items-center gap-2 rounded-lg px-2 text-left text-xs transition-colors hover:bg-white/[0.055]",
-                selected === option ? "text-foreground" : "text-[#c3c7ce]",
+                value === option ? "text-foreground" : "text-[#c3c7ce]",
               )}
             >
-              <SelectGlyph label={label} value={option} muted={selected !== option} />
+              <SelectGlyph label={label} value={option} muted={value !== option} />
               <span className="min-w-0 flex-1 truncate font-medium">{option}</span>
               {label === "Priority" ? <span className="text-xs tabular-nums text-muted-foreground">{index}</span> : null}
-              {selected === option ? <Check className="size-4 text-muted-foreground" /> : null}
+              {value === option ? <Check className="size-4 text-muted-foreground" /> : null}
             </button>
           ))}
         </div>
@@ -630,19 +739,25 @@ function SelectPreview({
   );
 }
 
-function ComboboxPreview({ label, initialValue, options, placeholder }: { label: string; initialValue: string; options: string[]; placeholder: string }) {
+function ComboboxPreview({ label, initialValue, options, placeholder, onChange }: { label: string; initialValue: string; options: string[]; placeholder: string; onChange?: (value: string) => void }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(options);
   const [selected, setSelected] = useState(initialValue);
   const [customValue, setCustomValue] = useState("");
   const normalizedCustomValue = customValue.trim();
   const canAddCustom = normalizedCustomValue.length > 0 && !items.some((item) => item.toLowerCase() === normalizedCustomValue.toLowerCase());
+
+  function selectValue(next: string) {
+    setSelected(next);
+    onChange?.(next);
+    setOpen(false);
+  }
+
   const addCustomValue = () => {
     if (!canAddCustom) return;
     setItems((current) => [...current, normalizedCustomValue]);
-    setSelected(normalizedCustomValue);
+    selectValue(normalizedCustomValue);
     setCustomValue("");
-    setOpen(false);
   };
 
   return (
@@ -688,10 +803,7 @@ function ComboboxPreview({ label, initialValue, options, placeholder }: { label:
             <button
               key={option}
               type="button"
-              onClick={() => {
-                setSelected(option);
-                setOpen(false);
-              }}
+              onClick={() => selectValue(option)}
               className={cn(
                 "flex h-7 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-xs transition-colors hover:bg-white/[0.055]",
                 selected === option ? "text-foreground" : "text-[#c3c7ce]",
