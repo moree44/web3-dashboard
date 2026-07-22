@@ -115,6 +115,8 @@
   .soft-divider-strong { border-color: rgb(255 255 255 / 0.07); }
   .modal-backdrop-in { animation: modalBackdropIn 120ms ease-out both; }
   .modal-card-in { animation: modalCardIn 160ms cubic-bezier(.2, .8, .2, 1) both; transform-origin: center; }
+  .drawer-backdrop-in { animation: drawerBackdropIn 180ms var(--ease-out) both; }
+  .drawer-panel-in { animation: drawerPanelIn 260ms var(--ease-drawer) both; }
   .t-check {
     transition:
       background var(--check-box) var(--check-ease),
@@ -232,6 +234,16 @@
 @keyframes modalCardIn {
   from { opacity: 0; transform: translateY(6px) scale(.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes drawerBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes drawerPanelIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 ::selection { background: rgb(113 128 255 / 30%); color: var(--foreground); }
