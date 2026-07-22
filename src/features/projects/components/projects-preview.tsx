@@ -381,11 +381,11 @@ function ProjectDetailPanel({ project, onClose }: { project: Project | null; onC
 }
 
 function Property({ label, children }: { label: string; children: ReactNode }) {
-  return <div><p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p><div className="mt-1 text-xs text-foreground">{children}</div></div>;
+  return <div><p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p><div className="mt-1 flex min-h-[22px] items-center text-xs text-foreground">{children}</div></div>;
 }
 
 function PropertyBlock({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="border-t border-white/[0.04] pt-3"><p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p><div className="mt-2">{children}</div></div>;
+  return <div className="border-t border-white/[0.04] pt-3"><p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p><div className="mt-1 flex min-h-[22px] items-center text-xs text-foreground">{children}</div></div>;
 }
 
 function DetailLink({ label, value }: { label: string; value: string }) {

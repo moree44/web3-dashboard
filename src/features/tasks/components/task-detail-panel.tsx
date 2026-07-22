@@ -90,7 +90,7 @@ function TaskProperty({ label, children }: { label: string; children: React.Reac
   return (
     <div>
       <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
-      <div className="mt-1 text-xs text-foreground">{children}</div>
+      <div className="mt-1 flex min-h-[22px] items-center text-xs text-foreground">{children}</div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { AtSign, CircleUserRound, Copy, CreditCard, FolderOpen, Mail, MoreHorizontal, Plus, Search, ShieldCheck, Upload, WalletCards, X } from "lucide-react";
+import { CircleUserRound, Copy, CreditCard, FolderOpen, Mail, MoreHorizontal, Plus, Search, ShieldCheck, Upload, WalletCards, X } from "lucide-react";
 import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -221,7 +221,7 @@ function IdentitiesView({ onOpenAccount }: { onOpenAccount: (account: Account) =
             <div className="mt-4 flex flex-1 items-center justify-between gap-5">
               <EditableAvatar label={account.avatar} size="lg" shape="square" />
               <div className="w-[154px] shrink-0 space-y-2 text-[11px] text-muted-foreground">
-                <IdentityMeta icon={<AtSign className="size-3.5" />} value={account.handle} />
+                <IdentityMeta icon={<XLogoIcon className="size-3.5" />} value={account.handle} />
                 <IdentityMeta icon={<Mail className="size-3.5" />} value={account.email} />
                 <IdentityMeta icon={<DiscordIcon className="size-3.5" />} value={account.discord} />
               </div>
@@ -366,7 +366,7 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
 
           <PanelSection title="Profile">
             <div className="space-y-2 text-xs">
-              <Meta icon={AtSign} label="X" value={account.handle} />
+              <Meta icon={XLogoIcon} label="X" value={account.handle} />
               <Meta icon={CircleUserRound} label="Discord" value={account.discord} />
               <Meta icon={ShieldCheck} label="Email" value={account.email} />
             </div>
@@ -505,7 +505,7 @@ function PanelProperty({ label, children }: { label: string; children: ReactNode
   return (
     <div>
       <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
-      <div className="mt-1 text-xs text-foreground">{children}</div>
+      <div className="mt-1 flex min-h-[22px] items-center text-xs text-foreground">{children}</div>
     </div>
   );
 }
@@ -526,7 +526,15 @@ function DiscordIcon({ className }: { className?: string }) {
   );
 }
 
-function Meta({ icon: Icon, label, value }: { icon: typeof AtSign; label: string; value: string }) {
+function XLogoIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function Meta({ icon: Icon, label, value }: { icon: (props: { className?: string }) => ReactNode; label: string; value: string }) {
   return <div className="flex items-center gap-2 text-muted-foreground"><Icon className="size-3.5" /><span className="w-14 shrink-0">{label}</span><span className="min-w-0 truncate text-foreground/80">{value}</span></div>;
 }
 
