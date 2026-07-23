@@ -1,6 +1,6 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 ## Current Position
 
@@ -225,6 +225,12 @@ Stack gap vs PRD: Drizzle schema, migrations, and RLS are now in place. Remainin
 - Fixed Vitest config to exclude Playwright e2e tests
 - All checks pass: `pnpm typecheck`, `pnpm lint`, `pnpm test` (5/5), `pnpm build`
 
+### Latest env setup work (OpenClaude, 2026-07-23)
+
+- Renamed `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` across 12 files to match Supabase dashboard naming
+- Added Supabase dashboard mapping comments in `.env` and `.env.example`
+- User is currently filling in real Supabase project credentials
+
 ## What Is Not Implemented Yet
 
 ### Phase 1 Core blockers (app is not “real” until these exist)
@@ -232,7 +238,9 @@ Stack gap vs PRD: Drizzle schema, migrations, and RLS are now in place. Remainin
 - ~~Drizzle schema + migrations aligned to PRD v3.0~~ done
 - ~~RLS for workspace-based access~~ done
 - ~~Default personal workspace creation after signup/login~~ done
-- Supabase env configured for real use (needs a real Supabase project)
+- ~~Env variable naming aligned with Supabase dashboard~~ done
+- Supabase env filling (user is entering credentials now)
+- `pnpm db:push` to provision database tables to Supabase (next after env filled)
 - Real CRUD: Projects, Accounts, Wallet Groups, Wallets, Tasks, Inbox, Docs, Archive
 - Task account assignment persistence
 - Task logs with Asia/Jakarta `logged_date`
@@ -323,7 +331,7 @@ Unless the user explicitly pulls them forward.
 
 ## Validation Status
 
-Checked 2026-07-22 after data foundation implementation:
+Checked 2026-07-22 after data foundation implementation, re-verified 2026-07-23 after env rename:
 
 ```txt
 pnpm typecheck  # pass
