@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { loginSchema, signupSchema } from "@/features/auth/schemas";
 import { toInternalEmail } from "@/lib/auth/username";
+import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { createClient } from "@/lib/supabase/server";
 
 export type AuthActionResult = {
@@ -58,6 +59,10 @@ export async function signup(input: unknown): Promise<AuthActionResult> {
     return {
       error: "Signup requires email confirmation to be disabled in Supabase settings",
     };
+  }
+
+  if (data.user) {
+    await ensureDefaultWorkspace(data.user.id);
   }
 
   redirect("/");
