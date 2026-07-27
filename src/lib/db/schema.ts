@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   pgTable,
@@ -10,7 +11,17 @@ import {
   timestamp,
   integer,
   primaryKey,
+  uniqueIndex,
+  pgSchema,
 } from "drizzle-orm/pg-core";
+
+// Supabase owns this schema and table. The declaration exists only so
+// application foreign keys can target auth.users correctly.
+const authSchema = pgSchema("auth");
+
+export const authUsers = authSchema.table("users", {
+  id: uuid("id").primaryKey(),
+});
 
 // ─── Workspaces ───────────────────────────────────────────────────────────────
 
@@ -22,12 +33,6 @@ export const workspaces = pgTable("workspaces", {
     .references(() => authUsers.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
-
-// Auth users reference (used by FK in workspaces and workspace_members)
-// This is a placeholder reference — the actual table lives in Supabase auth schema
-export const authUsers = pgTable("auth_users", {
-  id: uuid("id").primaryKey(),
 });
 
 // ─── Workspace Members ────────────────────────────────────────────────────────
@@ -155,7 +160,11 @@ export const projects = pgTable("projects", {
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("projects_workspace_active_name_unique")
+    .on(table.workspaceId, sql`lower(trim(${table.name}))`)
+    .where(sql`${table.isArchived} = false`),
+]);
 
 // ─── Project Accounts ─────────────────────────────────────────────────────────
 

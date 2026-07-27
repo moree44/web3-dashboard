@@ -19,14 +19,20 @@ export async function login(input: unknown): Promise<AuthActionResult> {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: toInternalEmail(parsed.data.username),
     password: parsed.data.password,
   });
 
-  if (error) {
+  if (error || !data.user) {
     return { error: "Invalid username or password" };
   }
+
+  const displayName =
+    typeof data.user.user_metadata.display_name === "string"
+      ? data.user.user_metadata.display_name
+      : parsed.data.username;
+  await ensureDefaultWorkspace(data.user.id, `${displayName} Hunting OS`);
 
   redirect("/");
 }
@@ -62,7 +68,10 @@ export async function signup(input: unknown): Promise<AuthActionResult> {
   }
 
   if (data.user) {
-    await ensureDefaultWorkspace(data.user.id);
+    await ensureDefaultWorkspace(
+      data.user.id,
+      `${parsed.data.displayName || parsed.data.username} Hunting OS`,
+    );
   }
 
   redirect("/");

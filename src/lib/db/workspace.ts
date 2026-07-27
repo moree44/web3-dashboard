@@ -24,24 +24,42 @@ export async function getUserWorkspace(userId: string) {
   return workspace[0] ?? null;
 }
 
-export async function ensureDefaultWorkspace(userId: string) {
+export async function ensureDefaultWorkspace(
+  userId: string,
+  workspaceName = "My Workspace",
+) {
   const existing = await getUserWorkspace(userId);
 
   if (existing) return existing;
 
-  const [workspace] = await db
-    .insert(workspaces)
-    .values({
-      name: "My Workspace",
-      ownerId: userId,
-    })
-    .returning();
+  return db.transaction(async (tx) => {
+    const memberships = await tx
+      .select({ workspaceId: workspaceMembers.workspaceId })
+      .from(workspaceMembers)
+      .where(eq(workspaceMembers.userId, userId))
+      .limit(1);
 
-  await db.insert(workspaceMembers).values({
-    workspaceId: workspace.id,
-    userId,
-    role: "owner",
+    if (memberships.length > 0) {
+      const [workspace] = await tx
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.id, memberships[0].workspaceId))
+        .limit(1);
+
+      if (workspace) return workspace;
+    }
+
+    const [workspace] = await tx
+      .insert(workspaces)
+      .values({ name: workspaceName, ownerId: userId })
+      .returning();
+
+    await tx.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      userId,
+      role: "owner",
+    });
+
+    return workspace;
   });
-
-  return workspace;
 }
