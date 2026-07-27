@@ -8,23 +8,53 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
+import {
+  createAccount,
+  createWallet,
+  createWalletGroup,
+  deleteAccount,
+  deleteWallet,
+  deleteWalletGroup,
+  setAccountAvatarUrl,
+  updateAccount,
+  updateWallet,
+  uploadAccountAvatar,
+  type AccountWithStats,
+} from "@/features/accounts/actions";
+import type { wallets as walletsSchema, walletGroups as walletGroupsSchema } from "@/lib/db/schema";
+
+type DbAccount = AccountWithStats;
+type DbWallet = typeof walletsSchema.$inferSelect;
+type DbWalletGroup = typeof walletGroupsSchema.$inferSelect;
 
 const tabs = ["Identities", "Wallets", "Groups"] as const;
 type AccountTab = (typeof tabs)[number];
 
 type Account = {
+  id?: string;
   name: string;
   handle: string;
   discord: string;
   email: string;
   avatar: string;
+  avatarUrl?: string;
   projects: number;
   tasks: number;
   wallets: string[];
   activeProjects: string[];
 };
 
+function normalizeAvatarUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 type Wallet = {
+  id?: string;
+  groupId?: string;
+  ownerId?: string;
   label: string;
   owner: string;
   group: string;
@@ -36,7 +66,59 @@ type Wallet = {
   recentActivity: string[];
 };
 
-const accounts: Account[] = [
+function dbToUI(record: DbAccount, walletLabels: string[] = []): Account {
+  const activeProjects = record.activeProjects ?? [];
+  return {
+    id: record.id,
+    name: record.label,
+    handle: record.xUsername ?? "not linked",
+    discord: record.discordUsername ?? "",
+    email: record.email ?? "tracking only",
+    avatar: record.label.slice(0, 1).toUpperCase(),
+    avatarUrl: record.avatarUrl ?? undefined,
+    projects: activeProjects.length,
+    tasks: 0,
+    wallets: walletLabels.length > 0
+      ? walletLabels
+      : Array.from({ length: record.walletCount ?? 0 }, (_, index) => `Wallet ${index + 1}`),
+    activeProjects,
+  };
+}
+
+function dbToUIWallet(
+  record: DbWallet,
+  accountNameMap: Map<string, string>,
+  groupNameMap: Map<string, string>,
+): Wallet {
+  return {
+    id: record.id,
+    groupId: record.walletGroupId ?? undefined,
+    ownerId: record.ownerAccountId ?? undefined,
+    label: record.label,
+    owner: record.ownerAccountId ? (accountNameMap.get(record.ownerAccountId) ?? "unknown") : "none",
+    group: record.walletGroupId ? (groupNameMap.get(record.walletGroupId) ?? "uncategorized") : "uncategorized",
+    chain: record.chainType ?? "EVM",
+    type: record.walletType ?? "main",
+    used: 0,
+    address: record.address,
+    usedIn: [],
+    recentActivity: [],
+  };
+}
+
+type UIGroup = { id?: string; name: string; description: string; wallets: number; projects: number };
+
+function dbToUIGroup(record: DbWalletGroup): UIGroup {
+  return {
+    id: record.id,
+    name: record.name,
+    description: record.description ?? "",
+    wallets: 0,
+    projects: 0,
+  };
+}
+
+const fallbackAccounts: Account[] = [
   {
     name: "Moree",
     handle: "@moree",
@@ -72,7 +154,7 @@ const accounts: Account[] = [
   },
 ];
 
-const wallets: Wallet[] = [
+const fallbackWallets: Wallet[] = [
   { label: "Moree EVM Main", owner: "Moree", group: "Main", chain: "EVM", type: "main", used: 14, address: "0x84...91fa", usedIn: ["Soundness", "Drosera", "GensynAI"], recentActivity: ["Marked Soundness proof done", "Added Drosera operator note"] },
   { label: "Moree SOL Main", owner: "Moree", group: "Main", chain: "Solana", type: "main", used: 5, address: "9xQ...p2L", usedIn: ["Perle Labs", "ORO AI"], recentActivity: ["Saved wallet warm-up note", "Linked to Perle Labs"] },
   { label: "Wdym EVM Main", owner: "Wdym", group: "Main", chain: "EVM", type: "main", used: 11, address: "0x2b...77ac", usedIn: ["Linera", "Huddle01", "Dawn"], recentActivity: ["Completed Galxe quest", "Checked waitlist result"] },
@@ -80,28 +162,78 @@ const wallets: Wallet[] = [
   { label: "Soundness Project Wallet", owner: "Moree", group: "Project Specific", chain: "EVM", type: "project_wallet", used: 1, address: "0xae...4410", usedIn: ["Soundness"], recentActivity: ["Generated project address", "Stored key location hint"] },
 ];
 
-const groups = [
+const fallbackGroups: UIGroup[] = [
   { name: "Main", description: "Primary wallets owned by personas", wallets: 4, projects: 25 },
   { name: "L1", description: "Random L1 wallets not tied to a persona", wallets: 8, projects: 6 },
   { name: "Burner", description: "Temporary wallets for low-trust campaigns", wallets: 3, projects: 2 },
   { name: "Project Specific", description: "Wallets created for one project", wallets: 5, projects: 5 },
 ];
 
-export function AccountsPreview() {
+export function AccountsPreview({
+  initialAccounts,
+  initialWallets,
+  initialWalletGroups,
+  developmentPreview,
+}: {
+  initialAccounts: DbAccount[];
+  initialWallets: DbWallet[];
+  initialWalletGroups: DbWalletGroup[];
+  developmentPreview: boolean;
+}) {
+  const accountNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of initialAccounts) map.set(a.id, a.label);
+    return map;
+  }, [initialAccounts]);
+
+  const groupNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const g of initialWalletGroups) map.set(g.id, g.name);
+    return map;
+  }, [initialWalletGroups]);
+
   const [activeTab, setActiveTab] = useState<AccountTab>("Identities");
-  const [walletItems, setWalletItems] = useState<Wallet[]>(wallets);
+  const walletLabelsByAccountId = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const wallet of initialWallets) {
+      if (!wallet.ownerAccountId) continue;
+      const current = map.get(wallet.ownerAccountId) ?? [];
+      current.push(wallet.label);
+      map.set(wallet.ownerAccountId, current);
+    }
+    return map;
+  }, [initialWallets]);
+
+  const [accountItems, setAccountItems] = useState<Account[]>(() =>
+    developmentPreview
+      ? fallbackAccounts
+      : initialAccounts.map((account) => dbToUI(account, walletLabelsByAccountId.get(account.id) ?? [])),
+  );
+  const [walletItems, setWalletItems] = useState<Wallet[]>(() =>
+    developmentPreview
+      ? fallbackWallets
+      : initialWallets.map((w) => dbToUIWallet(w, accountNameMap, groupNameMap)),
+  );
+  const [groupItems, setGroupItems] = useState<UIGroup[]>(() =>
+    developmentPreview
+      ? fallbackGroups
+      : initialWalletGroups.map(dbToUIGroup),
+  );
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
+  const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
   const query = searchQuery.trim().toLowerCase();
 
   const filteredAccounts = useMemo(() => {
-    if (!query) return accounts;
-    return accounts.filter((account) => {
+    if (!query) return accountItems;
+    return accountItems.filter((account) => {
       const haystack = [account.name, account.handle, account.discord, account.email, ...account.activeProjects, ...account.wallets].join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [query]);
+  }, [query, accountItems]);
 
   const filteredWallets = useMemo(() => {
     if (!query) return walletItems;
@@ -112,15 +244,15 @@ export function AccountsPreview() {
   }, [query, walletItems]);
 
   const filteredGroups = useMemo(() => {
-    if (!query) return groups;
-    return groups.filter((group) => {
+    if (!query) return groupItems;
+    return groupItems.filter((group) => {
       const haystack = [group.name, group.description].join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [query]);
+  }, [query, groupItems]);
 
   function openAccountByName(name: string) {
-    const account = accounts.find((item) => item.name === name);
+    const account = accountItems.find((item) => item.name === name);
     if (account) {
       setSelectedWallet(null);
       setSelectedAccount(account);
@@ -132,20 +264,236 @@ export function AccountsPreview() {
     setSelectedWallet(wallet);
   }
 
-  function addWalletForAccount(accountName: string, input: { label: string; chain: string; type: string }) {
-    const newWallet: Wallet = {
-      label: input.label,
-      owner: accountName,
-      group: input.type === "project_wallet" ? "Project Specific" : "Main",
-      chain: input.chain,
-      type: input.type,
-      used: 0,
-      address: "Add address later",
-      usedIn: [],
-      recentActivity: ["Created from account detail"],
-    };
+  function bumpAccountWallet(accountId: string | undefined, accountName: string, walletLabel: string) {
+    setAccountItems((items) =>
+      items.map((account) => {
+        if (account.id !== accountId && account.name !== accountName) return account;
+        if (account.wallets.includes(walletLabel)) return account;
+        return { ...account, wallets: [...account.wallets, walletLabel] };
+      }),
+    );
+    setSelectedAccount((current) => {
+      if (!current) return current;
+      if (current.id !== accountId && current.name !== accountName) return current;
+      if (current.wallets.includes(walletLabel)) return current;
+      return { ...current, wallets: [...current.wallets, walletLabel] };
+    });
+  }
 
-    setWalletItems((items) => [newWallet, ...items]);
+  async function addWalletForAccount(accountName: string, input: { label: string; chain: string; type: string }) {
+    const account = accountItems.find((a) => a.name === accountName);
+    if (account?.id && !developmentPreview) {
+      const created = await createWallet({
+        label: input.label,
+        address: "pending",
+        chainType: input.chain,
+        walletType: input.type as "main" | "project_wallet" | "burner" | "l1" | "testnet" | "retro" | "nft" | "other",
+        ownerAccountId: account.id,
+      });
+      setWalletItems((items) => [
+        dbToUIWallet(created, accountNameMap, groupNameMap),
+        ...items,
+      ]);
+      bumpAccountWallet(account.id, accountName, created.label);
+    } else {
+      const newWallet: Wallet = {
+        label: input.label,
+        owner: accountName,
+        ownerId: account?.id,
+        group: input.type === "project_wallet" ? "Project Specific" : "Main",
+        chain: input.chain,
+        type: input.type,
+        used: 0,
+        address: "Add address later",
+        usedIn: [],
+        recentActivity: ["Created from account detail"],
+      };
+      setWalletItems((items) => [newWallet, ...items]);
+      bumpAccountWallet(account?.id, accountName, input.label);
+    }
+  }
+
+  async function handleCreateAccount(data: { label: string; xUsername: string; discordUsername: string; email: string }) {
+    if (!developmentPreview) {
+      const created = await createAccount({
+        label: data.label,
+        xUsername: data.xUsername || undefined,
+        discordUsername: data.discordUsername || undefined,
+        email: data.email || undefined,
+        avatarSource: "none",
+      });
+      setAccountItems((items) => [dbToUI(created), ...items]);
+    } else {
+      const newAccount: Account = {
+        name: data.label,
+        handle: data.xUsername || "not linked",
+        discord: data.discordUsername || "",
+        email: data.email || "tracking only",
+        avatar: data.label.slice(0, 1).toUpperCase(),
+        projects: 0,
+        tasks: 0,
+        wallets: [],
+        activeProjects: [],
+      };
+      setAccountItems((items) => [newAccount, ...items]);
+    }
+    setIsAddOpen(false);
+  }
+
+  async function handleCreateWallet(data: { label: string; address: string; chainType: string; walletType: string; ownerAccountId?: string }) {
+    if (!developmentPreview) {
+      const created = await createWallet({
+        label: data.label,
+        address: data.address,
+        chainType: data.chainType || undefined,
+        walletType: data.walletType as "main" | "project_wallet" | "burner" | "l1" | "testnet" | "retro" | "nft" | "other",
+        ownerAccountId: data.ownerAccountId || undefined,
+      });
+      setWalletItems((items) => [
+        dbToUIWallet(created, accountNameMap, groupNameMap),
+        ...items,
+      ]);
+    } else {
+      const newWallet: Wallet = {
+        label: data.label,
+        owner: data.ownerAccountId ? (accountNameMap.get(data.ownerAccountId) ?? "none") : "none",
+        group: "uncategorized",
+        chain: data.chainType || "EVM",
+        type: data.walletType || "main",
+        used: 0,
+        address: data.address,
+        usedIn: [],
+        recentActivity: [],
+      };
+      setWalletItems((items) => [newWallet, ...items]);
+    }
+    setIsAddWalletOpen(false);
+  }
+
+  async function handleDeleteAccount(id: string) {
+    if (!id || !confirm("Delete this account?")) return;
+    if (!developmentPreview) await deleteAccount(id);
+    setAccountItems((items) => items.filter((a) => a.id !== id));
+    setSelectedAccount(null);
+  }
+
+  function applyAccountUpdate(updated: DbAccount) {
+    const walletLabels = walletItems
+      .filter((wallet) => wallet.ownerId === updated.id)
+      .map((wallet) => wallet.label);
+    const mapped = dbToUI(updated, walletLabels);
+    setAccountItems((items) => items.map((a) => (a.id === updated.id ? mapped : a)));
+    setSelectedAccount((current) => (current?.id === updated.id ? mapped : current));
+    return mapped;
+  }
+
+  async function handleUpdateAccount(
+    id: string,
+    data: { label?: string; xUsername?: string; discordUsername?: string; email?: string },
+  ) {
+    if (developmentPreview) {
+      setAccountItems((items) =>
+        items.map((account) =>
+          account.id === id
+            ? {
+                ...account,
+                name: data.label ?? account.name,
+                handle: data.xUsername ?? account.handle,
+                discord: data.discordUsername ?? account.discord,
+                email: data.email ?? account.email,
+                avatar: (data.label ?? account.name).slice(0, 1).toUpperCase(),
+              }
+            : account,
+        ),
+      );
+      setSelectedAccount((current) =>
+        current?.id === id
+          ? {
+              ...current,
+              name: data.label ?? current.name,
+              handle: data.xUsername ?? current.handle,
+              discord: data.discordUsername ?? current.discord,
+              email: data.email ?? current.email,
+              avatar: (data.label ?? current.name).slice(0, 1).toUpperCase(),
+            }
+          : current,
+      );
+      return;
+    }
+
+    const updated = await updateAccount(id, data);
+    applyAccountUpdate(updated);
+  }
+
+  async function handleUploadAvatar(id: string, file: File) {
+    if (developmentPreview) {
+      const previewUrl = URL.createObjectURL(file);
+      setAccountItems((items) =>
+        items.map((account) => (account.id === id ? { ...account, avatarUrl: previewUrl } : account)),
+      );
+      setSelectedAccount((current) =>
+        current?.id === id ? { ...current, avatarUrl: previewUrl } : current,
+      );
+      return;
+    }
+    const updated = await uploadAccountAvatar(id, (() => {
+      const formData = new FormData();
+      formData.set("file", file);
+      return formData;
+    })());
+    applyAccountUpdate(updated);
+  }
+
+  async function handleSetAvatarUrl(id: string, url: string) {
+    const normalized = normalizeAvatarUrl(url);
+    if (developmentPreview) {
+      setAccountItems((items) =>
+        items.map((account) => (account.id === id ? { ...account, avatarUrl: normalized || undefined } : account)),
+      );
+      setSelectedAccount((current) =>
+        current?.id === id ? { ...current, avatarUrl: normalized || undefined } : current,
+      );
+      return;
+    }
+    const updated = await setAccountAvatarUrl(id, normalized);
+    applyAccountUpdate(updated);
+  }
+
+  async function handleDeleteWallet(id: string) {
+    if (!id || !confirm("Delete this wallet?")) return;
+    await deleteWallet(id);
+    setWalletItems((items) => items.filter((w) => w.id !== id));
+    setSelectedWallet(null);
+  }
+
+  async function handleUpdateWallet(id: string, data: Partial<Omit<typeof walletsSchema.$inferInsert, "workspaceId">>) {
+    const updated = await updateWallet(id, data);
+    setWalletItems((items) => items.map((w) => (w.id === id ? dbToUIWallet(updated, accountNameMap, groupNameMap) : w)));
+    if (selectedWallet?.id === id) {
+      setSelectedWallet(dbToUIWallet(updated, accountNameMap, groupNameMap));
+    }
+  }
+
+  async function handleDeleteGroup(id: string) {
+    if (!id || !confirm("Delete this group?")) return;
+    await deleteWalletGroup(id);
+    setGroupItems((items) => items.filter((g) => g.id !== id));
+  }
+
+  async function handleCreateGroup(data: { name: string; description: string }) {
+    if (!developmentPreview) {
+      const created = await createWalletGroup({
+        name: data.name,
+        description: data.description || undefined,
+      });
+      setGroupItems((items) => [dbToUIGroup(created), ...items]);
+    } else {
+      setGroupItems((items) => [
+        { name: data.name, description: data.description, wallets: 0, projects: 0 },
+        ...items,
+      ]);
+    }
+    setIsAddGroupOpen(false);
   }
 
   return (
@@ -154,7 +502,7 @@ export function AccountsPreview() {
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Accounts</h1>
         </div>
-        <Button variant="secondary" size="sm" disabled title="Preview only"><Plus />Add account</Button>
+        <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add account</Button>
       </header>
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
@@ -177,17 +525,46 @@ export function AccountsPreview() {
           />
         </label>
         <div className="flex flex-1 flex-wrap items-center gap-2">
-          <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><ShieldCheck className="size-3.5" />Workspace scoped</button>
-          <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><WalletCards className="size-3.5" />Wallet usage</button>
+          {activeTab === "Wallets" ? (
+            <Button variant="secondary" size="sm" onClick={() => setIsAddWalletOpen(true)}><Plus className="size-3.5" />Add wallet</Button>
+          ) : activeTab === "Groups" ? (
+            <Button variant="secondary" size="sm" onClick={() => setIsAddGroupOpen(true)}><Plus className="size-3.5" />Add group</Button>
+          ) : (
+            <>
+              <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><ShieldCheck className="size-3.5" />Workspace scoped</button>
+              <button type="button" disabled title="Preview only" className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.045] bg-transparent px-3 text-xs text-muted-foreground opacity-50"><WalletCards className="size-3.5" />Wallet usage</button>
+            </>
+          )}
         </div>
       </div>
 
-      {activeTab === "Identities" ? <IdentitiesView accounts={filteredAccounts} onOpenAccount={setSelectedAccount} /> : null}
-      {activeTab === "Wallets" ? <WalletsView walletItems={filteredWallets} onOpenWallet={openWallet} /> : null}
-      {activeTab === "Groups" ? <GroupsView groups={filteredGroups} /> : null}
+      {activeTab === "Identities" ? (
+        <IdentitiesView
+          accounts={filteredAccounts}
+          onOpenAccount={setSelectedAccount}
+          onDeleteAccount={handleDeleteAccount}
+          onUploadAvatar={handleUploadAvatar}
+          onSetAvatarUrl={handleSetAvatarUrl}
+        />
+      ) : null}
+      {activeTab === "Wallets" ? <WalletsView walletItems={filteredWallets} onOpenWallet={openWallet} onDeleteWallet={handleDeleteWallet} /> : null}
+      {activeTab === "Groups" ? <GroupsView groups={filteredGroups} onDeleteGroup={handleDeleteGroup} /> : null}
 
-      <AccountDetailPanel account={selectedAccount} walletItems={walletItems} onClose={() => setSelectedAccount(null)} onOpenWallet={openWallet} onAddWallet={addWalletForAccount} />
-      <WalletDetailPanel wallet={selectedWallet} onClose={() => setSelectedWallet(null)} onOpenAccount={openAccountByName} />
+      <AddAccountDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} onCreate={handleCreateAccount} />
+      <AddWalletDialog open={isAddWalletOpen} onClose={() => setIsAddWalletOpen(false)} onCreate={handleCreateWallet} accounts={accountItems} />
+      <AddGroupDialog open={isAddGroupOpen} onClose={() => setIsAddGroupOpen(false)} onCreate={handleCreateGroup} />
+      <AccountDetailPanel
+        account={selectedAccount}
+        walletItems={walletItems}
+        onClose={() => setSelectedAccount(null)}
+        onOpenWallet={openWallet}
+        onAddWallet={addWalletForAccount}
+        onUpdateAccount={handleUpdateAccount}
+        onDeleteAccount={handleDeleteAccount}
+        onUploadAvatar={handleUploadAvatar}
+        onSetAvatarUrl={handleSetAvatarUrl}
+      />
+      <WalletDetailPanel wallet={selectedWallet} onClose={() => setSelectedWallet(null)} onOpenAccount={openAccountByName} onUpdate={handleUpdateWallet} onDelete={handleDeleteWallet} accountItems={accountItems} groupItems={groupItems} />
     </div>
   );
 }
@@ -240,19 +617,46 @@ function TiltCard({ children, className, onClick }: { children: ReactNode; class
   );
 }
 
-function IdentitiesView({ accounts: accountItems, onOpenAccount }: { accounts: Account[]; onOpenAccount: (account: Account) => void }) {
+function IdentitiesView({
+  accounts: accountItems,
+  onOpenAccount,
+  onDeleteAccount,
+  onUploadAvatar,
+  onSetAvatarUrl,
+}: {
+  accounts: Account[];
+  onOpenAccount: (account: Account) => void;
+  onDeleteAccount: (id: string) => void;
+  onUploadAvatar: (id: string, file: File) => Promise<void>;
+  onSetAvatarUrl: (id: string, url: string) => Promise<void>;
+}) {
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
   return (
     <div className="identity-card-grid grid gap-3 px-4 py-4 sm:px-6 lg:px-8">
       {accountItems.map((account) => (
-        <TiltCard key={account.name} onClick={() => onOpenAccount(account)} className="identity-card min-h-[154px] w-full p-4">
+        <TiltCard key={account.id ?? account.name} onClick={() => onOpenAccount(account)} className="identity-card min-h-[154px] w-full p-4">
           <div className="relative z-10 flex h-full flex-col">
             <div className="flex items-start justify-between gap-3">
               <h2 className="truncate text-sm font-semibold tracking-[-0.01em] text-foreground">{account.name}</h2>
-              <button onClick={(event) => event.stopPropagation()} aria-label={"More options for " + account.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+              <div className="relative">
+                <button onClick={(event) => { event.stopPropagation(); setMenuOpen(menuOpen === account.name ? null : account.name); }} aria-label={"More options for " + account.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+                {menuOpen === account.name ? (
+                  <div className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
+                    <button onClick={(event) => { event.stopPropagation(); setMenuOpen(null); if (account.id) onDeleteAccount(account.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-4 flex flex-1 items-center justify-between gap-5">
-              <EditableAvatar label={account.avatar} size="lg" shape="square" />
+              <EditableAvatar
+                label={account.avatar}
+                imageUrl={account.avatarUrl}
+                size="lg"
+                shape="square"
+                onUploadFile={account.id ? (file) => onUploadAvatar(account.id!, file) : undefined}
+                onSetUrl={account.id ? (url) => onSetAvatarUrl(account.id!, url) : undefined}
+              />
               <div className="w-[154px] shrink-0 space-y-2 text-[11px] text-muted-foreground">
                 <IdentityMeta icon={<XLogoIcon className="size-3.5" />} value={account.handle} />
                 <IdentityMeta icon={<Mail className="size-3.5" />} value={account.email} />
@@ -270,7 +674,7 @@ function IdentitiesView({ accounts: accountItems, onOpenAccount }: { accounts: A
   );
 }
 
-function WalletsView({ walletItems, onOpenWallet }: { walletItems: Wallet[]; onOpenWallet: (wallet: Wallet) => void }) {
+function WalletsView({ walletItems, onOpenWallet, onDeleteWallet }: { walletItems: Wallet[]; onOpenWallet: (wallet: Wallet) => void; onDeleteWallet: (id: string) => void }) {
   return (
     <div className="hidden overflow-x-auto lg:block">
       <table className="w-full min-w-[920px] table-fixed border-collapse text-left">
@@ -294,13 +698,14 @@ function WalletsView({ walletItems, onOpenWallet }: { walletItems: Wallet[]; onO
             <th className="border-b border-white/[0.045] px-3 py-3"><span className="sr-only">Actions</span></th>
           </tr>
         </thead>
-        <tbody>{walletItems.map((wallet) => <WalletRow key={wallet.label} wallet={wallet} onOpen={() => onOpenWallet(wallet)} />)}</tbody>
+        <tbody>{walletItems.map((wallet) => <WalletRow key={wallet.label} wallet={wallet} onOpen={() => onOpenWallet(wallet)} onDelete={onDeleteWallet} />)}</tbody>
       </table>
     </div>
   );
 }
 
-function WalletRow({ wallet, onOpen }: { wallet: Wallet; onOpen: () => void }) {
+function WalletRow({ wallet, onOpen, onDelete }: { wallet: Wallet; onOpen: () => void; onDelete: (id: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <tr onClick={onOpen} className="h-[58px] cursor-pointer border-b border-white/[0.035] hover:bg-white/[0.025]">
       <td className="px-4 lg:px-8">
@@ -317,23 +722,62 @@ function WalletRow({ wallet, onOpen }: { wallet: Wallet; onOpen: () => void }) {
       <td className="px-3 text-xs text-muted-foreground">{wallet.chain}</td>
       <td className="px-3"><Badge variant="outline">{formatWalletType(wallet.type)}</Badge></td>
       <td className="px-3 text-xs tabular-nums text-muted-foreground">{wallet.used} projects</td>
-      <td className="px-3"><button onClick={(event) => event.stopPropagation()} aria-label={"More options for " + wallet.label} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button></td>
+      <td className="px-3">
+        <div className="relative">
+          <button onClick={(event) => { event.stopPropagation(); setMenuOpen(!menuOpen); }} aria-label={"More options for " + wallet.label} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+          {menuOpen ? (
+            <div className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
+              <button onClick={(event) => { event.stopPropagation(); setMenuOpen(false); if (wallet.id) onDelete(wallet.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+            </div>
+          ) : null}
+        </div>
+      </td>
     </tr>
   );
 }
 
-function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAddWallet }: { account: Account | null; walletItems: Wallet[]; onClose: () => void; onOpenWallet: (wallet: Wallet) => void; onAddWallet: (accountName: string, input: { label: string; chain: string; type: string }) => void }) {
+function AccountDetailPanel({
+  account,
+  walletItems,
+  onClose,
+  onOpenWallet,
+  onAddWallet,
+  onUpdateAccount,
+  onDeleteAccount,
+  onUploadAvatar,
+  onSetAvatarUrl,
+}: {
+  account: Account | null;
+  walletItems: Wallet[];
+  onClose: () => void;
+  onOpenWallet: (wallet: Wallet) => void;
+  onAddWallet: (accountName: string, input: { label: string; chain: string; type: string }) => void;
+  onUpdateAccount: (id: string, data: { label?: string; xUsername?: string; discordUsername?: string; email?: string }) => void;
+  onDeleteAccount: (id: string) => void;
+  onUploadAvatar: (id: string, file: File) => Promise<void>;
+  onSetAvatarUrl: (id: string, url: string) => Promise<void>;
+}) {
   const [isAddingWallet, setIsAddingWallet] = useState(false);
   const [walletLabel, setWalletLabel] = useState("");
   const [walletChain, setWalletChain] = useState("EVM");
   const [walletType, setWalletType] = useState("main");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editLabel, setEditLabel] = useState("");
+  const [editX, setEditX] = useState("");
+  const [editDiscord, setEditDiscord] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileError, setProfileError] = useState("");
 
   useDrawerDismiss(onClose, Boolean(account));
 
   if (!account) return null;
+  const current = account;
 
-  const accountName = account.name;
-  const ownedWallets = walletItems.filter((wallet) => wallet.owner === accountName);
+  const accountName = current.name;
+  const ownedWallets = walletItems.filter((wallet) =>
+    current.id ? wallet.ownerId === current.id : wallet.owner === accountName,
+  );
 
   function createWallet() {
     const trimmedLabel = walletLabel.trim();
@@ -344,6 +788,27 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
     setWalletChain("EVM");
     setWalletType("main");
     setIsAddingWallet(false);
+  }
+
+  async function saveProfile() {
+    if (!current.id) return;
+    const label = editLabel.trim();
+    if (!label) {
+      setProfileError("Account label is required");
+      return;
+    }
+    setProfileError("");
+    try {
+      await onUpdateAccount(current.id, {
+        label,
+        xUsername: editX || undefined,
+        discordUsername: editDiscord || undefined,
+        email: editEmail || undefined,
+      });
+      setIsEditingProfile(false);
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Unable to update account");
+    }
   }
 
   return (
@@ -360,27 +825,51 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <h2 id="account-detail-title" className="truncate text-base font-semibold">Account detail</h2>
-          <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close account detail"><X className="size-4" /></button>
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <button onClick={() => setMenuOpen((open) => !open)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="More options"><MoreHorizontal className="size-4" /></button>
+              {menuOpen ? (
+                <div className="absolute right-0 top-10 z-50 w-36 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false);
+                      if (current.id) onDeleteAccount(current.id);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close account detail"><X className="size-4" /></button>
+          </div>
         </div>
 
         <div className="px-5 py-5">
           <div className="flex items-start gap-3">
-            <EditableAvatar label={account.avatar} size="lg" />
+            <EditableAvatar
+              label={current.avatar}
+              imageUrl={current.avatarUrl}
+              size="lg"
+              onUploadFile={current.id ? (file) => onUploadAvatar(current.id!, file) : undefined}
+              onSetUrl={current.id ? (url) => onSetAvatarUrl(current.id!, url) : undefined}
+            />
             <div className="min-w-0 flex-1">
-              <h3 className="text-2xl font-semibold tracking-[-0.03em]">{account.name}</h3>
-              <p className="mt-1 text-xs text-muted-foreground">{account.handle}</p>
+              <h3 className="text-2xl font-semibold tracking-[-0.03em]">{current.name}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{current.handle}</p>
             </div>
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-2">
-            <Metric label="Projects" value={account.projects} />
-            <Metric label="Daily tasks" value={account.tasks} />
+            <Metric label="Projects" value={current.projects} />
+            <Metric label="Wallets" value={ownedWallets.length} />
           </div>
 
           <PanelSection title="Wallets" action={<button onClick={() => setIsAddingWallet((current) => !current)} className="text-[11px] text-muted-foreground hover:text-foreground">+ Add wallet</button>}>
             <div className="space-y-1.5">
               {ownedWallets.map((wallet) => (
-                <button key={wallet.label} onClick={() => onOpenWallet(wallet)} className="flex w-full items-center gap-3 rounded-lg bg-white/[0.025] px-3 py-2 text-left hover:bg-white/[0.045]">
+                <button key={wallet.id ?? wallet.label} onClick={() => onOpenWallet(wallet)} className="flex w-full items-center gap-3 rounded-lg bg-white/[0.025] px-3 py-2 text-left hover:bg-white/[0.045]">
                   <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/[0.055] text-muted-foreground"><CreditCard className="size-4" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-semibold">{wallet.label}</span>
@@ -388,6 +877,9 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
                   </span>
                 </button>
               ))}
+              {ownedWallets.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No wallets linked to this account yet.</p>
+              ) : null}
             </div>
 
             {isAddingWallet ? (
@@ -403,17 +895,60 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
           </PanelSection>
 
           <PanelSection title="Active projects">
-            <div className="flex flex-wrap gap-1.5">
-              {account.activeProjects.map((project) => <Badge key={project} variant="secondary">{project}</Badge>)}
-            </div>
+            {current.activeProjects.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {current.activeProjects.map((project) => <Badge key={project} variant="secondary">{project}</Badge>)}
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">No active project assignments.</p>
+            )}
           </PanelSection>
 
-          <PanelSection title="Profile">
-            <div className="space-y-2 text-xs">
-              <Meta icon={XLogoIcon} label="X" value={account.handle} />
-              <Meta icon={CircleUserRound} label="Discord" value={account.discord} />
-              <Meta icon={ShieldCheck} label="Email" value={account.email} />
-            </div>
+          <PanelSection title="Profile" action={
+            isEditingProfile ? (
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => { setIsEditingProfile(false); setProfileError(""); }} className="text-[11px] text-muted-foreground hover:text-foreground">Cancel</button>
+                <button onClick={saveProfile} className="text-[11px] font-medium text-foreground hover:text-muted-foreground">Save</button>
+              </div>
+            ) : (
+              <button onClick={() => {
+                setEditLabel(current.name);
+                setEditX(current.handle === "not linked" ? "" : current.handle);
+                setEditDiscord(current.discord);
+                setEditEmail(current.email === "tracking only" ? "" : current.email);
+                setProfileError("");
+                setIsEditingProfile(true);
+              }} className="text-[11px] text-muted-foreground hover:text-foreground">Edit</button>
+            )
+          }>
+            {isEditingProfile ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CircleUserRound className="size-3.5 shrink-0 text-muted-foreground" />
+                  <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="h-8 flex-1 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring" placeholder="Account label" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <XLogoIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <input value={editX} onChange={(e) => setEditX(e.target.value)} className="h-8 flex-1 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring" placeholder="@handle" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <DiscordIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <input value={editDiscord} onChange={(e) => setEditDiscord(e.target.value)} className="h-8 flex-1 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring" placeholder="user.name" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="size-3.5 shrink-0 text-muted-foreground" />
+                  <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-8 flex-1 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring" placeholder="email@example.com" />
+                </div>
+                {profileError ? <p className="text-xs text-danger">{profileError}</p> : null}
+              </div>
+            ) : (
+              <div className="space-y-2 text-xs">
+                <Meta icon={CircleUserRound} label="Label" value={current.name} />
+                <Meta icon={XLogoIcon} label="X" value={current.handle} />
+                <Meta icon={CircleUserRound} label="Discord" value={current.discord || "—"} />
+                <Meta icon={ShieldCheck} label="Email" value={current.email} />
+              </div>
+            )}
           </PanelSection>
         </div>
       </aside>
@@ -421,10 +956,51 @@ function AccountDetailPanel({ account, walletItems, onClose, onOpenWallet, onAdd
   );
 }
 
-function WalletDetailPanel({ wallet, onClose, onOpenAccount }: { wallet: Wallet | null; onClose: () => void; onOpenAccount: (name: string) => void }) {
+function WalletDetailPanel({ wallet, onClose, onOpenAccount, onUpdate, onDelete, accountItems, groupItems }: { wallet: Wallet | null; onClose: () => void; onOpenAccount: (name: string) => void; onUpdate: (id: string, data: Partial<Omit<typeof walletsSchema.$inferInsert, "workspaceId">>) => void; onDelete: (id: string) => void; accountItems: Account[]; groupItems: UIGroup[] }) {
   useDrawerDismiss(onClose, Boolean(wallet));
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editLabel, setEditLabel] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editChainType, setEditChainType] = useState("");
+  const [editWalletType, setEditWalletType] = useState("");
+  const [editWalletGroupId, setEditWalletGroupId] = useState("");
+  const [editOwnerAccountId, setEditOwnerAccountId] = useState("");
+
   if (!wallet) return null;
+  const w = wallet;
+
+  function enterEdit() {
+    setEditLabel(w.label);
+    setEditAddress(w.address);
+    setEditChainType(w.chain);
+    setEditWalletType(formatWalletType(w.type));
+    setEditWalletGroupId(w.groupId ?? "");
+    setEditOwnerAccountId(w.ownerId ?? "");
+    setIsEditing(true);
+    setMenuOpen(false);
+  }
+
+  function saveEdit() {
+    if (!w.id) return;
+    const walletTypeDb = (reverseWalletTypeLabels[editWalletType] ?? "main") as typeof walletsSchema.$inferInsert.walletType;
+    onUpdate(w.id, {
+      label: editLabel || undefined,
+      address: editAddress || undefined,
+      chainType: editChainType || undefined,
+      walletType: walletTypeDb,
+      walletGroupId: editWalletGroupId || undefined,
+      ownerAccountId: editOwnerAccountId || undefined,
+    });
+    setIsEditing(false);
+  }
+
+  function cancelEdit() {
+    setIsEditing(false);
+  }
+
+  const walletTypeOptions = ["Main", "Project wallet", "Burner", "L1", "Testnet", "Retro", "Nft", "Other"];
 
   return (
     <div
@@ -440,43 +1016,108 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount }: { wallet: Wallet 
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <h2 id="wallet-detail-title" className="truncate text-base font-semibold">Wallet detail</h2>
-          <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close wallet detail"><X className="size-4" /></button>
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <button onClick={() => setMenuOpen(!menuOpen)} aria-label="More options" className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+              {menuOpen ? (
+                <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
+                  <button onClick={enterEdit} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>
+                  <button onClick={() => { setMenuOpen(false); if (w.id) onDelete(w.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+                </div>
+              ) : null}
+            </div>
+            <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close wallet detail"><X className="size-4" /></button>
+          </div>
         </div>
 
         <div className="px-5 py-5">
           <div className="flex items-start gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/[0.065] text-muted-foreground shadow-sm"><CreditCard className="size-5" /></span>
             <div className="min-w-0 flex-1">
-              <h3 className="text-2xl font-semibold tracking-[-0.03em]">{wallet.label}</h3>
-              <button className="mt-1 inline-flex max-w-full items-center gap-1.5 truncate text-xs text-muted-foreground hover:text-foreground">
-                <span className="truncate font-mono">{wallet.address}</span>
-                <Copy className="size-3" />
-              </button>
+              {isEditing ? (
+                <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="h-9 w-full rounded-md bg-white/[0.05] px-2 text-2xl font-semibold tracking-[-0.03em] outline-none focus:ring-1 focus:ring-ring" />
+              ) : (
+                <h3 className="text-2xl font-semibold tracking-[-0.03em]">{w.label}</h3>
+              )}
+              {isEditing ? (
+                <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} className="mt-1 h-8 w-full rounded-md bg-white/[0.05] px-2 font-mono text-xs outline-none focus:ring-1 focus:ring-ring" placeholder="0x..." />
+              ) : (
+                <button className="mt-1 inline-flex max-w-full items-center gap-1.5 truncate text-xs text-muted-foreground hover:text-foreground">
+                  <span className="truncate font-mono">{w.address}</span>
+                  <Copy className="size-3" />
+                </button>
+              )}
             </div>
           </div>
 
+          {isEditing ? (
+            <div className="mt-4 flex gap-2">
+              <button onClick={saveEdit} className="h-8 rounded-lg bg-foreground/90 px-3 text-xs font-medium text-background hover:bg-foreground">Save</button>
+              <button onClick={cancelEdit} className="h-8 rounded-lg bg-white/[0.06] px-3 text-xs text-muted-foreground hover:bg-white/[0.09]">Cancel</button>
+            </div>
+          ) : null}
+
           <section className="mt-6 grid gap-x-6 gap-y-4 border-t border-white/[0.045] pt-4 sm:grid-cols-2">
-            <PanelProperty label="Chain">{wallet.chain}</PanelProperty>
-            <PanelProperty label="Type"><Badge variant="outline">{formatWalletType(wallet.type)}</Badge></PanelProperty>
-            <PanelProperty label="Group"><Badge variant="secondary">{wallet.group}</Badge></PanelProperty>
-            <PanelProperty label="Owner">
-              {wallet.owner !== "none" ? (
-                <button onClick={() => onOpenAccount(wallet.owner)} className="text-xs font-medium text-foreground hover:text-muted-foreground">{wallet.owner}</button>
-              ) : (
-                <span className="text-muted-foreground">No persona</span>
-              )}
-            </PanelProperty>
+            {isEditing ? (
+              <>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Label</p>
+                  <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Address</p>
+                  <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 font-mono text-xs outline-none focus:ring-1 focus:ring-ring" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Chain</p>
+                  <input value={editChainType} onChange={(e) => setEditChainType(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring" placeholder="EVM" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Type</p>
+                  <select value={editWalletType} onChange={(e) => setEditWalletType(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
+                    {walletTypeOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Group</p>
+                  <select value={editWalletGroupId} onChange={(e) => setEditWalletGroupId(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
+                    <option value="">None</option>
+                    {groupItems.filter((g) => g.id).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Owner</p>
+                  <select value={editOwnerAccountId} onChange={(e) => setEditOwnerAccountId(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
+                    <option value="">No persona</option>
+                    {accountItems.filter((a) => a.id).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+              </>
+            ) : (
+              <>
+                <PanelProperty label="Chain">{w.chain}</PanelProperty>
+                <PanelProperty label="Type"><Badge variant="outline">{formatWalletType(w.type)}</Badge></PanelProperty>
+                <PanelProperty label="Group"><Badge variant="secondary">{w.group}</Badge></PanelProperty>
+                <PanelProperty label="Owner">
+                  {w.owner !== "none" ? (
+                    <button onClick={() => onOpenAccount(w.owner)} className="text-xs font-medium text-foreground hover:text-muted-foreground">{w.owner}</button>
+                  ) : (
+                    <span className="text-muted-foreground">No persona</span>
+                  )}
+                </PanelProperty>
+              </>
+            )}
           </section>
 
           <PanelSection title="Used in">
             <div className="flex flex-wrap gap-1.5">
-              {wallet.usedIn.length > 0 ? wallet.usedIn.map((project) => <Badge key={project} variant="secondary">{project}</Badge>) : <span className="text-xs text-muted-foreground">No project usage yet</span>}
+              {w.usedIn.length > 0 ? w.usedIn.map((project) => <Badge key={project} variant="secondary">{project}</Badge>) : <span className="text-xs text-muted-foreground">No project usage yet</span>}
             </div>
           </PanelSection>
 
           <PanelSection title="Recent activity">
             <div className="space-y-1.5">
-              {wallet.recentActivity.map((item) => (
+              {w.recentActivity.map((item) => (
                 <div key={item} className="rounded-lg bg-white/[0.025] px-3 py-2 text-xs text-muted-foreground">{item}</div>
               ))}
             </div>
@@ -487,14 +1128,23 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount }: { wallet: Wallet 
   );
 }
 
-function GroupsView({ groups: groupItems }: { groups: typeof groups }) {
+function GroupsView({ groups: groupItems, onDeleteGroup }: { groups: UIGroup[]; onDeleteGroup: (id: string) => void }) {
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+
   return (
     <div className="grid gap-3 px-4 py-4 sm:px-6 lg:grid-cols-4 lg:px-8">
       {groupItems.map((group) => (
         <article key={group.name} className="rounded-xl bg-card/80 p-4 soft-panel">
           <div className="flex items-start justify-between gap-3">
             <span className="grid size-9 place-items-center rounded-lg bg-white/[0.055] text-muted-foreground"><FolderOpen className="size-4" /></span>
-            <button aria-label={"More options for " + group.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+            <div className="relative">
+              <button onClick={() => setMenuOpen(menuOpen === group.name ? null : group.name)} aria-label={"More options for " + group.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+              {menuOpen === group.name ? (
+                <div className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
+                  <button onClick={() => { setMenuOpen(null); if (group.id) onDeleteGroup(group.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+                </div>
+              ) : null}
+            </div>
           </div>
           <h2 className="mt-3 text-sm font-semibold">{group.name}</h2>
           <p className="mt-1 min-h-10 text-xs leading-5 text-muted-foreground">{group.description}</p>
@@ -508,36 +1158,122 @@ function GroupsView({ groups: groupItems }: { groups: typeof groups }) {
   );
 }
 
-function EditableAvatar({ label, size = "md", shape = "round" }: { label: string; size?: "md" | "lg"; shape?: "round" | "square" }) {
+function EditableAvatar({
+  label,
+  imageUrl,
+  size = "md",
+  shape = "round",
+  onUploadFile,
+  onSetUrl,
+}: {
+  label: string;
+  imageUrl?: string;
+  size?: "md" | "lg";
+  shape?: "round" | "square";
+  onUploadFile?: (file: File) => Promise<void>;
+  onSetUrl?: (url: string) => Promise<void>;
+}) {
   const [open, setOpen] = useState(false);
-  const [draftUrl, setDraftUrl] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [draftUrl, setDraftUrl] = useState(imageUrl ?? "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleFile(file: File | null) {
+    if (!file || !onUploadFile || isSaving) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      await onUploadFile(file);
+      setOpen(false);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Unable to upload avatar");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleSetUrl() {
+    if (!onSetUrl || isSaving) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      await onSetUrl(draftUrl);
+      setOpen(false);
+    } catch (urlError) {
+      setError(urlError instanceof Error ? urlError.message : "Unable to save avatar URL");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   return (
     <div className="relative shrink-0" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
-        className={cn("grid shrink-0 place-items-center overflow-hidden bg-white/[0.065] text-xs font-semibold text-foreground", size === "lg" ? "size-12" : "size-10", shape === "square" ? "rounded-xl" : "rounded-full")}
+        onClick={() => {
+          setDraftUrl(imageUrl ?? "");
+          setError("");
+          setOpen((current) => !current);
+        }}
+        className={cn(
+          "grid shrink-0 place-items-center overflow-hidden bg-white/[0.065] text-xs font-semibold text-foreground",
+          size === "lg" ? "size-12" : "size-10",
+          shape === "square" ? "rounded-xl" : "rounded-full",
+        )}
         aria-label="Edit account avatar"
       >
-        {imageUrl ? <Image src={imageUrl} alt="" width={size === "lg" ? 48 : 40} height={size === "lg" ? 48 : 40} className="size-full object-cover" unoptimized /> : label}
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt=""
+            width={size === "lg" ? 48 : 40}
+            height={size === "lg" ? 48 : 40}
+            className="size-full object-cover"
+            unoptimized
+          />
+        ) : (
+          label
+        )}
       </button>
 
       {open ? (
         <div className="absolute left-0 top-full z-[80] mt-2 w-64 rounded-xl border border-white/[0.08] bg-[#161618] p-2 shadow-2xl shadow-black/50">
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-muted-foreground hover:bg-white/[0.055] hover:text-foreground">
+          <label className={cn("flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-muted-foreground hover:bg-white/[0.055] hover:text-foreground", isSaving || !onUploadFile ? "pointer-events-none opacity-50" : "")}>
             <Upload className="size-3.5" />
-            Upload image
-            <input type="file" accept="image/*" className="sr-only" onChange={() => undefined} />
+            {isSaving ? "Uploading..." : "Upload image"}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              disabled={isSaving || !onUploadFile}
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                event.target.value = "";
+                void handleFile(file);
+              }}
+            />
           </label>
           <div className="mt-1 rounded-lg bg-white/[0.025] p-2">
-            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Paste image URL</p>
+            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Image URL</p>
             <div className="mt-1.5 flex gap-2">
-              <input value={draftUrl} onChange={(event) => setDraftUrl(event.target.value)} className="h-8 min-w-0 flex-1 rounded-lg bg-background px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring" placeholder="https://..." />
-              <button type="button" onClick={() => { setImageUrl(draftUrl); setOpen(false); }} className="h-8 rounded-lg bg-white/[0.075] px-2 text-xs font-medium hover:bg-white/[0.11]">Set</button>
+              <input
+                value={draftUrl}
+                onChange={(event) => setDraftUrl(event.target.value)}
+                disabled={isSaving || !onSetUrl}
+                className="h-8 min-w-0 flex-1 rounded-lg bg-background px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
+                placeholder="https://..."
+              />
+              <button
+                type="button"
+                disabled={isSaving || !onSetUrl}
+                onClick={() => void handleSetUrl()}
+                className="h-8 rounded-lg bg-white/[0.075] px-2 text-xs font-medium hover:bg-white/[0.11] disabled:opacity-50"
+              >
+                Set
+              </button>
             </div>
           </div>
+          {error ? <p className="mt-2 px-1 text-[11px] text-danger">{error}</p> : null}
         </div>
       ) : null}
     </div>
@@ -565,7 +1301,140 @@ function PanelProperty({ label, children }: { label: string; children: ReactNode
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function AddWalletDialog({
+  open,
+  onClose,
+  onCreate,
+  accounts,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreate: (data: { label: string; address: string; chainType: string; walletType: string; ownerAccountId?: string }) => void;
+  accounts: Account[];
+}) {
+  const [label, setLabel] = useState("");
+  const [address, setAddress] = useState("");
+  const [chainType, setChainType] = useState("EVM");
+  const [walletType, setWalletType] = useState("main");
+  const [ownerAccountId, setOwnerAccountId] = useState("");
+
+  if (!open) return null;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!label.trim() || !address.trim()) return;
+    onCreate({
+label: label.trim(),
+address: address.trim(),
+chainType,
+walletType,
+ownerAccountId: ownerAccountId || undefined,
+    });
+    setLabel("");
+    setAddress("");
+    setChainType("EVM");
+    setWalletType("main");
+    setOwnerAccountId("");
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+<div className="absolute inset-0 bg-black/50" onClick={onClose} />
+<div className="relative z-10 w-full max-w-sm rounded-lg bg-popover shadow-[0_0_0_1px_rgb(255_255_255/0.06),0_24px_48px_-8px_rgb(0_0_0/0.45)]">
+  <form onSubmit={handleSubmit}>
+    <div className="flex items-center justify-between px-4 py-3 border-b soft-divider">
+      <h3 className="text-sm font-semibold">New Wallet</h3>
+      <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"><X className="size-4" /></button>
+    </div>
+    <div className="flex flex-col gap-3 px-4 py-3">
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Label *</span>
+        <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Moree EVM Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Address *</span>
+        <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x..." className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Chain</span>
+        <select value={chainType} onChange={(e) => setChainType(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20">
+          {["EVM", "Solana", "Bitcoin", "Sui", "Aptos", "Other"].map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Type</span>
+        <select value={walletType} onChange={(e) => setWalletType(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20">
+          {["main", "project_wallet", "burner", "l1", "testnet", "retro", "nft", "other"].map((t) => <option key={t} value={t}>{t.replace("_", " ")}</option>)}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Owner Account</span>
+        <select value={ownerAccountId} onChange={(e) => setOwnerAccountId(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20">
+          <option value="">None</option>
+          {accounts.filter((a) => a.id).map((a) => <option key={a.id!} value={a.id!}>{a.name}</option>)}
+        </select>
+      </label>
+    </div>
+    <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
+      <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+      <Button size="sm" type="submit" disabled={!label.trim() || !address.trim()}>Create</Button>
+    </div>
+  </form>
+</div>
+    </div>
+  );
+}
+
+function AddGroupDialog({
+  open,
+  onClose,
+  onCreate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreate: (data: { name: string; description: string }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  if (!open) return null;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onCreate({ name: name.trim(), description: description.trim() });
+    setName("");
+    setDescription("");
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+<div className="absolute inset-0 bg-black/50" onClick={onClose} />
+<div className="relative z-10 w-full max-w-sm rounded-lg bg-popover shadow-[0_0_0_1px_rgb(255_255_255/0.06),0_24px_48px_-8px_rgb(0_0_0/0.45)]">
+  <form onSubmit={handleSubmit}>
+    <div className="flex items-center justify-between px-4 py-3 border-b soft-divider">
+      <h3 className="text-sm font-semibold">New Group</h3>
+      <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"><X className="size-4" /></button>
+    </div>
+    <div className="flex flex-col gap-3 px-4 py-3">
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Name *</span>
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Description</span>
+        <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Primary wallets owned by personas" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+      </label>
+    </div>
+    <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
+      <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+      <Button size="sm" type="submit" disabled={!name.trim()}>Create</Button>
+    </div>
+  </form>
+</div>
+    </div>
+  );
+}function Metric({ label, value }: { label: string; value: number }) {
   return <div className="rounded-lg border border-white/[0.045] bg-white/[0.02] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{value}</p></div>;
 }
 
@@ -603,6 +1472,74 @@ function formatWalletType(value: string) {
     .join(" ");
 }
 
+const reverseWalletTypeLabels: Record<string, string> = {
+  "L1": "l1",
+  "Main": "main",
+  "Project wallet": "project_wallet",
+  "Burner": "burner",
+  "Testnet": "testnet",
+  "Retro": "retro",
+  "Nft": "nft",
+  "Other": "other",
+};
+
 function formatOwner(value: string) {
   return value === "none" ? "No persona" : value;
+}
+
+// ─── Add Account Dialog ──────────────────────────────────────────────────────
+
+function AddAccountDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (data: { label: string; xUsername: string; discordUsername: string; email: string }) => void }) {
+  const [label, setLabel] = useState("");
+  const [xUsername, setXUsername] = useState("");
+  const [discordUsername, setDiscordUsername] = useState("");
+  const [email, setEmail] = useState("");
+
+  if (!open) return null;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!label.trim()) return;
+    onCreate({ label: label.trim(), xUsername: xUsername.trim(), discordUsername: discordUsername.trim(), email: email.trim() });
+    setLabel("");
+    setXUsername("");
+    setDiscordUsername("");
+    setEmail("");
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-sm rounded-lg bg-popover shadow-[0_0_0_1px_rgb(255_255_255/0.06),0_24px_48px_-8px_rgb(0_0_0/0.45)]">
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center justify-between px-4 py-3 border-b soft-divider">
+            <h3 className="text-sm font-semibold">New Account</h3>
+            <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"><X className="size-4" /></button>
+          </div>
+          <div className="flex flex-col gap-3 px-4 py-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Label *</span>
+              <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Moree" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">X Username</span>
+              <input type="text" value={xUsername} onChange={(e) => setXUsername(e.target.value)} placeholder="@handle" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Discord Username</span>
+              <input type="text" value={discordUsername} onChange={(e) => setDiscordUsername(e.target.value)} placeholder="user.name" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Email</span>
+              <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+            </label>
+          </div>
+          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
+            <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+            <Button size="sm" type="submit" disabled={!label.trim()}>Create</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }

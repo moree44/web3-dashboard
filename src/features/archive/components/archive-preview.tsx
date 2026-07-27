@@ -1,13 +1,16 @@
 "use client";
 
-import { Archive, CalendarClock, MoreHorizontal, RotateCcw, Search, ShieldAlert } from "lucide-react";
+import { Archive, CalendarClock, RotateCcw, Search, ShieldAlert, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+
+import { deleteProject, restoreProject, type ProjectWithAccounts } from "@/features/projects/actions";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ArchivedProject = {
+  id?: string;
   name: string;
   mark: string;
   hunt: string;
@@ -20,18 +23,39 @@ type ArchivedProject = {
 
 const initialArchivedProjects: ArchivedProject[] = [
   { name: "Old Mint Pass", mark: "O", hunt: "NFT", reason: "claimed", status: "Archived", result: "Mint completed", account: "Moree", archived: "Jul 08" },
-  { name: "Beta Exchange Quest", mark: "B", hunt: "Retro", reason: "not worth", status: "Archived", result: "Low reward", account: "Wdym", archived: "Jul 04" },
+  { name: "Beta Exchange Quest", mark: "B", hunt: "Retro", reason: "not_worth", status: "Archived", result: "Low reward", account: "Wdym", archived: "Jul 04" },
   { name: "Retro Bridge Alpha", mark: "R", hunt: "Retro", reason: "completed", status: "Archived", result: "Interaction saved", account: "Moree", archived: "Jun 28" },
-  { name: "Unknown Faucet Campaign", mark: "U", hunt: "Free Hunts", reason: "scam risk", status: "Archived", result: "Stopped before wallet use", account: "Wayss", archived: "Jun 24" },
+  { name: "Unknown Faucet Campaign", mark: "U", hunt: "Free Hunts", reason: "scam_risk", status: "Archived", result: "Stopped before wallet use", account: "Wayss", archived: "Jun 24" },
   { name: "Expired Waitlist Form", mark: "E", hunt: "Waitlist", reason: "expired", status: "Archived", result: "Deadline passed", account: "Wdym", archived: "Jun 19" },
   { name: "Testnet Season 1", mark: "T", hunt: "Free Hunts", reason: "claimed", status: "Archived", result: "Airdrop claimed", account: "Moree", archived: "May 30" },
   { name: "Duplicate Soundness Note", mark: "D", hunt: "Free Hunts", reason: "duplicate", status: "Archived", result: "Merged into active project", account: "Moree", archived: "May 18" },
 ];
 
-type ReasonFilter = "all" | "claimed" | "not worth" | "scam risk" | "expired" | "completed" | "duplicate";
+type ReasonFilter = "all" | "claimed" | "dropped" | "scam_risk" | "expired" | "not_worth" | "duplicate" | "completed" | "other";
 
-export function ArchivePreview() {
-  const [items, setItems] = useState<ArchivedProject[]>(initialArchivedProjects);
+function mapArchivedProject(project: ProjectWithAccounts): ArchivedProject {
+  return {
+    id: project.id,
+    name: project.name,
+    mark: project.name.slice(0, 1).toUpperCase(),
+    hunt: toTitleCase(project.huntType ?? "free_hunts"),
+    reason: project.archiveReason ?? "other",
+    status: "Archived",
+    result: project.notes?.trim() || toTitleCase(project.archiveReason ?? "other"),
+    account: project.assignedAccounts[0]?.label ?? "Unassigned",
+    archived: project.archivedAt
+      ? new Intl.DateTimeFormat("en-US", {
+          month: "short",
+          day: "2-digit",
+          timeZone: "Asia/Jakarta",
+        }).format(project.archivedAt)
+      : "Unknown",
+  };
+}
+
+export function ArchivePreview({ initialProjects = [], developmentPreview = false }: { initialProjects?: ProjectWithAccounts[]; developmentPreview?: boolean }) {
+  const [items, setItems] = useState<ArchivedProject[]>(() => developmentPreview ? initialArchivedProjects : initialProjects.map(mapArchivedProject));
+  const [actionError, setActionError] = useState("");
   const [activeFilter, setActiveFilter] = useState<ReasonFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(() => new Set());
@@ -41,20 +65,26 @@ export function ArchivePreview() {
     return {
       all: items.length,
       claimed: items.filter((item) => item.reason === "claimed").length,
-      dropped: items.filter((item) => item.reason === "not worth").length,
-      scam: items.filter((item) => item.reason === "scam risk").length,
+      dropped: items.filter((item) => item.reason === "dropped").length,
+      notWorth: items.filter((item) => item.reason === "not_worth").length,
+      scam: items.filter((item) => item.reason === "scam_risk").length,
       expired: items.filter((item) => item.reason === "expired").length,
       completed: items.filter((item) => item.reason === "completed").length,
+      duplicate: items.filter((item) => item.reason === "duplicate").length,
+      other: items.filter((item) => item.reason === "other").length,
     };
   }, [items]);
 
   const filters: { id: ReasonFilter; label: string }[] = [
     { id: "all", label: `All ${reasonCounts.all}` },
     { id: "claimed", label: `Claimed ${reasonCounts.claimed}` },
-    { id: "not worth", label: `Dropped ${reasonCounts.dropped}` },
-    { id: "scam risk", label: `Scam Risk ${reasonCounts.scam}` },
+    { id: "dropped", label: `Dropped ${reasonCounts.dropped}` },
+    { id: "scam_risk", label: `Scam Risk ${reasonCounts.scam}` },
+    { id: "not_worth", label: `Not Worth ${reasonCounts.notWorth}` },
     { id: "expired", label: `Expired ${reasonCounts.expired}` },
     { id: "completed", label: `Completed ${reasonCounts.completed}` },
+    { id: "duplicate", label: `Duplicate ${reasonCounts.duplicate}` },
+    { id: "other", label: `Other ${reasonCounts.other}` },
   ];
 
   const filtered = useMemo(() => {
@@ -68,19 +98,37 @@ export function ArchivePreview() {
 
   const selectedCount = selectedProjects.size;
 
-  function toggleSelected(projectName: string) {
+  function toggleSelected(projectId: string) {
     setSelectedProjects((current) => {
       const next = new Set(current);
-      if (next.has(projectName)) next.delete(projectName);
-      else next.add(projectName);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
       return next;
     });
   }
 
-  function restoreSelected() {
+  async function restoreSelected() {
     if (selectedCount === 0) return;
-    setItems((current) => current.filter((project) => !selectedProjects.has(project.name)));
-    setSelectedProjects(new Set());
+    setActionError("");
+    try {
+      if (!developmentPreview) await Promise.all([...selectedProjects].map((id) => restoreProject(id)));
+      setItems((current) => current.filter((project) => !selectedProjects.has(project.id ?? project.name)));
+      setSelectedProjects(new Set());
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to restore selected projects");
+    }
+  }
+
+  async function permanentlyDelete(project: ArchivedProject) {
+    if (!confirm("Permanently delete this archived project? This cannot be undone.")) return;
+    setActionError("");
+    try {
+      if (!developmentPreview && project.id) await deleteProject(project.id);
+      setItems((current) => current.filter((item) => (item.id ?? item.name) !== (project.id ?? project.name)));
+      setSelectedProjects((current) => { const next = new Set(current); next.delete(project.id ?? project.name); return next; });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to delete project");
+    }
   }
 
   return (
@@ -111,6 +159,8 @@ export function ArchivePreview() {
           ))}
         </div>
       </div>
+
+      {actionError ? <p className="px-4 pt-3 text-xs text-danger sm:px-6 lg:px-8">{actionError}</p> : null}
 
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
@@ -149,11 +199,11 @@ export function ArchivePreview() {
               <th className="border-b border-white/[0.045] px-3 py-3"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody>{filtered.map((project) => <ArchiveRow key={project.name} project={project} selected={selectedProjects.has(project.name)} onSelect={() => toggleSelected(project.name)} />)}</tbody>
+          <tbody>{filtered.map((project) => { const key = project.id ?? project.name; return <ArchiveRow key={key} project={project} selected={selectedProjects.has(key)} onSelect={() => toggleSelected(key)} onDelete={() => permanentlyDelete(project)} />; })}</tbody>
         </table>
       </div>
 
-      <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => <ArchiveMobileCard key={project.name} project={project} selected={selectedProjects.has(project.name)} onSelect={() => toggleSelected(project.name)} />)}</div>
+      <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => { const key = project.id ?? project.name; return <ArchiveMobileCard key={key} project={project} selected={selectedProjects.has(key)} onSelect={() => toggleSelected(key)} onDelete={() => permanentlyDelete(project)} />; })}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
         <span>Showing {filtered.length} archived projects</span>
         <span />
@@ -162,7 +212,7 @@ export function ArchivePreview() {
   );
 }
 
-function ArchiveRow({ project, selected, onSelect }: { project: ArchivedProject; selected: boolean; onSelect: () => void }) {
+function ArchiveRow({ project, selected, onSelect, onDelete }: { project: ArchivedProject; selected: boolean; onSelect: () => void; onDelete: () => void }) {
   return (
     <tr className="h-[58px] border-b border-white/[0.035] hover:bg-white/[0.025]">
       <td className="px-4 lg:px-8">
@@ -176,19 +226,19 @@ function ArchiveRow({ project, selected, onSelect }: { project: ArchivedProject;
       <td className="px-3 text-xs text-muted-foreground">{project.result}</td>
       <td className="px-3"><span className="grid size-7 place-items-center rounded-full bg-white/[0.055] text-[10px] font-semibold">{project.account[0]}</span></td>
       <td className="px-3 text-xs text-muted-foreground">{project.archived}</td>
-      <td className="px-3"><button aria-label={"More options for " + project.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button></td>
+      <td className="px-3"><button type="button" onClick={onDelete} aria-label={"Delete " + project.name + " permanently"} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-red-400"><Trash2 className="size-4" /></button></td>
     </tr>
   );
 }
 
-function ArchiveMobileCard({ project, selected, onSelect }: { project: ArchivedProject; selected: boolean; onSelect: () => void }) {
+function ArchiveMobileCard({ project, selected, onSelect, onDelete }: { project: ArchivedProject; selected: boolean; onSelect: () => void; onDelete: () => void }) {
   return (
     <article className="px-4 py-4 sm:px-6">
       <div className="flex items-center gap-3">
         <ArchiveCheckbox project={project} selected={selected} onSelect={onSelect} />
         <ArchiveIdentity project={project} />
       </div>
-      <div className="mt-3 flex flex-wrap gap-2"><Reason reason={project.reason} /><Badge variant="secondary">{project.hunt}</Badge><Badge variant="outline">{project.archived}</Badge></div>
+      <div className="mt-3 flex items-center justify-between gap-2"><div className="flex flex-wrap gap-2"><Reason reason={project.reason} /><Badge variant="secondary">{project.hunt}</Badge><Badge variant="outline">{project.archived}</Badge></div><button type="button" onClick={onDelete} aria-label={"Delete " + project.name + " permanently"} className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-red-400"><Trash2 className="size-4" /></button></div>
     </article>
   );
 }
@@ -218,10 +268,10 @@ function ArchiveIdentity({ project }: { project: ArchivedProject }) {
 }
 
 function Reason({ reason }: { reason: string }) {
-  const variant = reason === "claimed" || reason === "completed" ? "success" : reason === "scam risk" ? "destructive" : reason === "expired" ? "warning" : "secondary";
+  const variant = reason === "claimed" || reason === "completed" ? "success" : reason === "scam_risk" ? "destructive" : reason === "expired" ? "warning" : "secondary";
   return <Badge variant={variant}>{toTitleCase(reason)}</Badge>;
 }
 
 function toTitleCase(value: string) {
-  return value.split(" ").map((word) => word.slice(0, 1).toUpperCase() + word.slice(1)).join(" ");
+  return value.split(/[ _]+/).map((word) => word.slice(0, 1).toUpperCase() + word.slice(1)).join(" ");
 }
