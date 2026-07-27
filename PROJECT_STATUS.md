@@ -1,16 +1,16 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-07-23
+Last updated: 2026-07-27
 
 ## Current Position
 
-Web3 Hunting OS is in **Phase 1 Core, data foundation laid, CRUD pending**.
+Web3 Hunting OS is in **Phase 1 Core, CRUD partially wired**.
 
-The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Inbox, Docs, Projects, Watchlist, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is mostly locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
+The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Inbox, Docs, Projects, Watchlist, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
 
-**Data foundation is now in place:** Drizzle ORM schema (14 tables), RLS policies, workspace helpers, and auto-workspace creation on signup are implemented. Supabase Auth adapter is wired (username → internal email). The remaining gap is real CRUD server actions and replacing static preview data with database reads.
+**Data foundation is in place:** Drizzle ORM schema (15 tables), 7 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migration `0007_enable_rls_and_fix_storage_policies.sql` supersedes the unsuccessful `0001` rollout and has been applied to the live database. RLS is verified active on all 15 application tables. **CRUD server actions now exist for Projects, Accounts, Wallets, Wallet Groups, and Archive**, with create, update, and delete flows wired where noted below. **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern.
 
-Product is **not daily-usable yet**. It is a high-fidelity prototype with a database schema ready for CRUD.
+**Remaining gap:** Tasks, Inbox, Docs, and Daily generation are still static previews with no persistence. Activity logs are not yet implemented. Wallet Group update UI is pending.
 
 ## Active Source of Truth
 
@@ -23,43 +23,20 @@ Read these before major work:
 
 PRD v3.0 supersedes older v2.8 decisions.
 
-## Handoff Notes (Codex → current)
-
-Recent long work was done with Codex CLI/VS Code from `/home/moree`, focused on Web3 Hunting OS UI.
-
-### What Codex recently finished
-
-- Daily preview rewrite (collapsible groups, Asia/Jakarta date, softer dividers)
-- Task detail panel and related Tasks preview work
-- Account and wallet detail panels
-- Accounts identity-card visual direction (compact charcoal persona cards, desktop hover tilt, Discord SVG, tighter card width)
-- UI audit artifact: `audits/UI_AUDIT_SRC_2026-07-17.md`
-- Dashboard layout experiment that was **rolled back** after rendered result looked wrong
-- Scoped local commit for audit/motion tokens: `dc902a9 Add UI audit and motion polish tokens`
-- Later commits include account/wallet panels and other UI polish (latest commit on branch tip: `c4a5554 Add account and wallet detail panels`)
-
-### Agent lessons from that work
+## Agent Lessons and Project Conventions
 
 - Prefer small approved batches; propose plan before large edits
 - `/projects` is the visual baseline for density and polish
-- Validate **rendered layout**, not only “code is valid” (dashboard stretch regression)
+- Validate **rendered layout**, not only "code is valid"
 - Do not make large Dashboard rewrites without clear approval
 - Daily is an execution surface; primary task creation belongs on `/tasks` or project detail
-- Personal Items UI scaffolding may exist, but backend work for Personal Items is Phase 1.5
-- Login/auth page polish can wait until core workflow pages are stable
-- GitHub push from agent shell previously failed (auth/SSH); push from an authenticated terminal if needed
-
-### Current working tree (as of this update)
-
-There is a **dirty working tree** with uncommitted polish/docs across many files, including:
-
-- `AGENTS.md`, `DESIGN.md`, `PROJECT_STATUS.md`
-- `src/app/globals.css`
-- shared UI primitives and mobile nav
-- `accounts-preview.tsx` (main recent polish target)
-- smaller touch-ups across archive, auth, daily, dashboard helpers, docs, projects, settings
-
-Before starting data-foundation work, **stabilize**: commit intentional WIP, or explicitly discard accidental leftovers. Do not stack backend work on a vague dirty tree.
+- Server actions pattern: `Omit<typeof schema.$inferInsert, "workspaceId">` — workspaceId supplied from auth via `requireWorkspace()`
+- dbToUI mapper pattern: Converts DB records to UI types, carrying through `id`, foreign keys
+- Inline edit pattern: Edit button → toggle inputs/dropdowns → Save/Cancel → server action + local state update
+- Use reverse label maps (e.g. `reverseWalletTypeLabels`) to convert display labels back to DB enum values
+- TypeScript narrowing fix: `const p = project;` after early `if (!project) return null;` for closures
+- Verify database migrations against the live database, not only by checking that a SQL file exists
+- In Storage policies, qualify the file path as `storage.objects.name`; unqualified `name` can bind to `workspaces.name` inside a subquery
 
 ## PRD v3.0 Alignment Notes
 
@@ -87,26 +64,103 @@ Current implementation should align with:
 - Projects parent links to `/projects`; Watchlist, Daily, Tasks nested below
 - Mobile nav exists but is secondary
 
+### Data Foundation
+
+- **Drizzle ORM** installed and configured (`drizzle-orm`, `drizzle-kit`, `pg`)
+- **Schema** (`src/lib/db/schema.ts`): 15 tables matching PRD v3.0 Section 41
+  - `workspaces`, `workspace_members`
+  - `accounts`, `wallet_groups`, `wallets`
+  - `projects`, `project_accounts`, `project_wallets`
+  - `tasks`, `task_accounts`, `task_wallets`, `task_logs`
+  - `inbox_items`, `notes`, `activity_logs`
+- **RLS hardening** (`src/lib/db/migrations/0007_enable_rls_and_fix_storage_policies.sql`):
+  - Supersedes `0001_rls_policies.sql`, which was not successfully applied and contained a recursive `workspace_members` policy
+  - Enables RLS on all 15 application tables
+  - Uses `public.user_workspace_ids()` as a `SECURITY DEFINER` membership helper with `search_path=public`
+  - Restores workspace ownership checks for `project-logos`
+  - Live verification: owner sees 1 workspace; an unrelated authenticated user sees 0
+- **Storage policies**:
+  - `project-logos` and `account-avatars` upload paths are scoped by workspace ownership
+  - Both upload policies explicitly inspect `storage.objects.name`
+- **DB client** (`src/lib/db/client.ts`): Drizzle + pg Pool with dev singleton
+- **Workspace helpers** (`src/lib/db/workspace.ts`): `getUserWorkspace()`, `ensureDefaultWorkspace()`
+- **Auth wiring**: signup server action auto-creates default "My Workspace" with owner membership
+- **DB scripts**: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`
+
+### Auth
+
+- Login and Signup screens with Supabase Auth
+- Username + password UI; internal Supabase email adapter (`{username}@web3-hunting.local`)
+- Dev preview auth bypass when Supabase env missing (production fail-closed)
+- Default personal workspace creation on first signup
+
+### Server Actions (CRUD)
+
+Server actions exist for three surfaces, following the workspace-scoped pattern:
+
+| Surface | File | Queries | Mutations |
+| --- | --- | --- | --- |
+| Auth | `src/features/auth/actions.ts` | — | signup, login |
+| Projects | `src/features/projects/actions.ts` | `getProjects`, `getArchivedProjects`, `getProjectAccountOptions` | `createProject`, `updateProject`, `archiveProject`, `restoreProject`, `deleteProject`, `uploadProjectLogo` |
+| Accounts | `src/features/accounts/actions.ts` | `getAccounts` (with stats), `getWallets`, `getWalletGroups` | `createAccount`, `updateAccount`, `deleteAccount`, `uploadAccountAvatar`, `setAccountAvatarUrl`, `createWallet`, `updateWallet`, `deleteWallet`, `createWalletGroup`, `updateWalletGroup`, `deleteWalletGroup` |
+
+All mutations call `revalidatePath()` to refresh Next.js cache.
+
+### Projects and Watchlist — CRUD wired + logo upload
+
+- Server actions fully wired to UI:
+  - **Create**: Add Project modal → `createProject` → local state insert, with logo file upload to Supabase Storage
+  - **Update**: Inline edit in ProjectDetailPanel (Name, Hunt type, Status, Priority, Stage, Progress, Date, multiple Work Types, multiple Project Types, and assigned Accounts) with Edit/Save/Cancel toggle. Logo can be uploaded or pasted (Ctrl+V) in edit mode and uploads immediately.
+  - **Delete**: Dropdown on ProjectRow (table), ProjectCard (mobile), and ProjectDetailPanel header → `deleteProject` → local state remove
+- **Archive**: ProjectRow/ProjectCard/ProjectDetailPanel → `archiveProject` → local state remove
+- **Logo upload**: Supabase Storage bucket `project-logos` with RLS policies, file picker, and clipboard paste (Ctrl+V) in both Add Project dialog and Edit mode of ProjectDetailPanel
+- Page route (`/projects`) fetches real projects via `getProjects()` + `getProjectAccountOptions()` when not in dev preview
+- Project create and edit persist multiple selected account assignments through `project_accounts`
+- Project reads include assigned account labels, and rows without an assignment show `Unassigned` instead of a blank cell
+- The Add Project date picker persists `date_start`; Work Type and Project Type support multiple values during create and edit
+- Watchlist = filtered Projects preview (by status/stage); logic lives in `project-query.ts`
+- Preview fixtures are used only when the Supabase environment is not configured
+- `projects-preview.tsx` (~1640 lines): table, cards, detail panel, add dialog, inline edit, logo upload with paste
+
+### Accounts (Identities) — CRUD wired + avatar upload
+
+- Server actions fully wired to UI:
+  - **Create**: Add Account dialog → `createAccount` → local state insert
+  - **Update**: Inline edit in AccountDetailPanel (label, X, Discord, email) with Edit/Save/Cancel toggle
+  - **Delete**: Dropdown on identity cards and AccountDetailPanel header → `deleteAccount` → local state remove
+  - **Avatar**: file upload to Supabase Storage (`account-avatars`) + external image URL persist (`avatar_url` / `avatar_source`)
+- `getAccounts()` returns wallet counts and active project names from `project_accounts`
+- Page route (`/accounts`) fetches real accounts via `getAccounts()` when not in dev preview
+- Identity cards: compact charcoal persona cards, desktop hover tilt, Discord/X/email metadata, real avatar when set
+
+### Wallets — CRUD wired
+
+- Server actions fully wired to UI:
+  - **Create**: Add Wallet dialog → `createWallet` → local state insert
+  - **Update**: Inline edit in WalletDetailPanel (label, address, chainType, walletType, walletGroupId, ownerAccountId) with Edit/Save/Cancel toggle
+  - **Delete**: Dropdown on WalletRow and WalletDetailPanel header → `deleteWallet` → local state remove
+- Uses `reverseWalletTypeLabels` to map display labels back to DB enum values in `saveEdit()`
+- Owner and Group edit fields use live account/group lists as dropdown options
+
+### Wallet Groups — CRUD partially wired
+
+- **Create**: wired via Add Group inline
+- **Delete**: Dropdown on each group card's MoreHorizontal button → `deleteWalletGroup` → local state remove
+- **Update** (edit group name/description): server action exists (`updateWalletGroup`) but not yet wired to UI
+- Page route fetches real groups via `getWalletGroups()` when not in dev preview
+
 ### Dashboard Preview
 
-- Layout accepted for now after rollback of a failed layout experiment
 - Greeting, WIB date, motivation line, Quick Capture, notes/inbox/pulse-style desk content, static counts
 - Quick Capture visual only
 - Data is static preview
-
-### Projects and Watchlist Preview
-
-- `/projects` is the most mature UI baseline
-- Compact table, Add Project modal, custom-capable combobox previews, Project Detail panel
-- Watchlist = filtered Projects preview
-- No real project CRUD or persistence
 
 ### Tasks Preview
 
 - List, Board, Running, Recheck views
 - Add Task modal; Task Detail Panel shared with Daily
 - Board grouping: By Project / By Status
-- Personal Item creation UI exists as preview scaffolding only (Phase 1.5 product)
+- Personal Item creation UI exists as preview scaffolding only (Phase 1.5)
 - Large monolithic client file (`tasks-preview.tsx` ~1100+ lines) with mock data inline
 - No real task CRUD, assignments, or task logs
 
@@ -117,7 +171,6 @@ Current implementation should align with:
 - Running/Recheck as non-checkbox rows
 - Date defaults to Asia/Jakarta today in preview
 - Static tasks + local UI state only
-- Product note: Daily should not be the primary “Add task” surface for Phase 1 Core
 
 ### Inbox Preview
 
@@ -131,19 +184,14 @@ Current implementation should align with:
 - Search and new-doc actions visual/preview only
 - No real docs CRUD, project links, folders, or markdown editor
 
-### Accounts and Wallets Preview
+### Archive — CRUD wired
 
-- Tabs: Identities, Wallets, Groups
-- Account Detail Panel and Wallet Detail Panel (preview)
-- Identity cards: compact charcoal persona cards, desktop-only hover tilt, Discord/X/email metadata direction, tighter card width
-- Avatar upload / image URL controls scaffolded visually only
-- Still tuning card positioning and denser layout feel
-- No real account/wallet CRUD, upload, or relations
-
-### Archive Preview
-
-- Project-only archived rows, reason filters, restore selection UI
-- No real archive/restore persistence
+- **Restore**: Select checkboxes → Restore selected button → `restoreProject` → local state remove
+- **Permanent delete**: Per-row trash button → `deleteProject` → local state remove
+- Page route (`/archive`) fetches real archived projects via `getArchivedProjects()` when not in dev preview
+- Reason-filter tabs (Claimed, Dropped, Scam Risk, Expired, Not Worth, Duplicate, Completed, Other) with counts
+- Mobile card layout with restore/delete parity
+- Server actions revalidate `/projects`, `/archive`, `/daily`, and `/tasks` on every mutation
 
 ### Settings Preview
 
@@ -151,106 +199,50 @@ Current implementation should align with:
 - Save disabled until real editing exists
 - Integrations are Phase 1.5
 
-### Auth Preview
-
-- Login and Signup screens exist
-- Username + password UI direction; internal Supabase email adapter implemented (`{username}@web3-hunting.local`)
-- Dev preview auth bypass when Supabase env missing (production fail-closed)
-- Real auth hardening, workspace bootstrap, and production verification still needed
-
-### Data Foundation (new in this session)
-
-- **Drizzle ORM** installed and configured (`drizzle-orm`, `drizzle-kit`, `pg`)
-- **Schema** (`src/lib/db/schema.ts`): 14 tables matching PRD v3.0 Section 41
-  - `workspaces`, `workspace_members`
-  - `accounts`, `wallet_groups`, `wallets`
-  - `projects`, `project_accounts`, `project_wallets`
-  - `tasks`, `task_accounts`, `task_wallets`, `task_logs`
-  - `inbox_items`, `notes`, `activity_logs`
-- **RLS policies** (`src/lib/db/migrations/0001_rls_policies.sql`): workspace-scoped access on all tables
-- **DB client** (`src/lib/db/client.ts`): Drizzle + pg Pool with dev singleton
-- **Workspace helpers** (`src/lib/db/workspace.ts`): `getUserWorkspace()`, `ensureDefaultWorkspace()`
-- **Auth wiring**: signup server action auto-creates default "My Workspace" with owner membership
-- **DB scripts**: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`
-
-Database is not yet provisioned — tables and RLS need a real Supabase project with `DATABASE_URL` set.
-
 ## Maintainability Snapshot
 
 Folder architecture is sound (`app` / `features` / `components` / `lib`), but several feature previews are hard to read because UI + mock data + local state live in one large client file:
 
-| Area | Rough size | Note |
+| Area | Rough size | CRUD Status |
 | --- | --- | --- |
-| `tasks-preview.tsx` | ~1100+ lines | Highest complexity |
-| `projects-preview.tsx` | ~800+ lines | Visual baseline, still heavy |
-| `accounts-preview.tsx` | ~500+ lines | Recent polish target |
-| `daily-preview.tsx` | ~300+ lines | Manageable but mixed concerns |
+| `tasks-preview.tsx` | ~1100+ lines | Static preview |
+| `accounts-preview.tsx` | ~1600+ lines | CRUD wired (identities, wallets, groups) |
+| `projects-preview.tsx` | ~1640+ lines | CRUD wired + logo upload + paste |
+| `archive-preview.tsx` | ~278 lines | CRUD wired (restore, delete) |
+| `daily-preview.tsx` | ~300+ lines | Static preview |
 
-This is expected for preview-first work. Before or while starting CRUD, prefer extracting mock data, types, and subcomponents rather than growing these files further.
+Unit tests: 2 files, 20 tests total (project-query: 12, username/auth: 8).
 
-Tests: tooling exists (Vitest, Playwright). Coverage is still thin (mainly username helpers). No meaningful e2e suite yet.
+E2E diagnostics now include focused Accounts/Projects coverage and a full application smoke suite. The latest full smoke run after RLS activation completed 37 checks successfully, found 1 known product gap (Wallet Group rename is not reachable from the UI), and captured no console errors.
 
-Stack gap vs PRD: Drizzle schema, migrations, and RLS are now in place. Remaining gap is CRUD server actions and replacing static preview data.
+## Latest Change Batch
 
-## Last Work Done
+The 2026-07-27 Phase 1 Core batch includes:
 
-### Latest product/code work (Codex, recent)
+- Auth and default-workspace hardening
+- Database migrations `0002` through `0007`
+- Live RLS activation and Storage ownership policy fixes
+- Projects, Accounts, Wallets, Wallet Groups, and Archive CRUD wiring
+- Project logo and Account avatar Storage flows
+- Project query unit coverage and CRUD smoke diagnostics
+- Updated implementation and validation status
 
-- Accounts identity card direction and iterative layout polish
-- Account/wallet detail panels
-- Daily checklist layout and interaction polish
-- Task detail panel wiring
-- UI audit + motion tokens commit (`dc902a9`)
-- Dashboard layout attempt rolled back after visual rejection
-
-### Latest documentation work
-
-- `AGENTS.md` rewritten as concise repository guidelines
-- `PROJECT_STATUS.md` refreshed (this update) with Codex handoff, dirty-tree note, maintainability snapshot, and revised next sequence
-- `DESIGN.md` has local uncommitted polish edits
-
-### Latest review work (outside Codex)
-
-- Full folder review confirmed preview-first stage and data foundation as the main value gap
-- Validation re-run: `pnpm typecheck`, `pnpm lint`, `pnpm test` passed (2026-07-22)
-
-### Latest data foundation work (OpenClaude, 2026-07-22)
-
-- Installed Drizzle ORM + drizzle-kit + pg
-- Created full Phase 1 Core schema (14 tables) matching PRD v3.0 Section 41
-- Created RLS policy migration for workspace-scoped access
-- Created workspace helpers (`getUserWorkspace`, `ensureDefaultWorkspace`)
-- Wired auto-workspace creation into signup server action
-- Added `DATABASE_URL` server env validation
-- Fixed Vitest config to exclude Playwright e2e tests
-- All checks pass: `pnpm typecheck`, `pnpm lint`, `pnpm test` (5/5), `pnpm build`
-
-### Latest env setup work (OpenClaude, 2026-07-23)
-
-- Renamed `NEXT_PUBLIC_SUPABASE_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` across 12 files to match Supabase dashboard naming
-- Added Supabase dashboard mapping comments in `.env` and `.env.example`
-- User is currently filling in real Supabase project credentials
+Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the source release.
 
 ## What Is Not Implemented Yet
 
-### Phase 1 Core blockers (app is not “real” until these exist)
+### Phase 1 Core remaining (ordered by priority)
 
-- ~~Drizzle schema + migrations aligned to PRD v3.0~~ done
-- ~~RLS for workspace-based access~~ done
-- ~~Default personal workspace creation after signup/login~~ done
-- ~~Env variable naming aligned with Supabase dashboard~~ done
-- Supabase env filling (user is entering credentials now)
-- `pnpm db:push` to provision database tables to Supabase (next after env filled)
-- Real CRUD: Projects, Accounts, Wallet Groups, Wallets, Tasks, Inbox, Docs, Archive
-- Task account assignment persistence
-- Task logs with Asia/Jakarta `logged_date`
-- Daily checklist generated from real tasks / assignments / logs
-- Project logo upload + Storage
-- Activity logs
-- Real search/filter/sort and durable URL query state
-- Real detail-panel edit + save flows
+1. **Tasks CRUD** — server actions + UI wiring (create, update, delete, assign accounts/wallets)
+2. **Task logs** — with Asia/Jakarta `logged_date`
+3. **Daily generation** — from real tasks / assignments / logs (replaces static preview)
+4. **Inbox CRUD** — server actions + UI wiring + conversion flow to tasks/notes
+5. **Docs CRUD** — server actions + markdown editor + project links + folders
+6. **Activity logs** — auto-generated from mutations
+7. **Wallet Group edit UI** — `updateWalletGroup` action exists but not wired to UI
+8. **Project wallet assignment** — wallets still pending in project create/edit
 
-### Phase 1.5 (do not treat as current Core backend work)
+### Phase 1.5 (do not treat as current Core work)
 
 - Trading page
 - Trade Log + FIFO realized PnL
@@ -270,81 +262,59 @@ Stack gap vs PRD: Drizzle schema, migrations, and RLS are now in place. Remainin
 
 ## Known UI Caveats
 
-- Accounts identity cards still being tuned for density, alignment, and card feel
-- Some pages still need a light pass against `/projects` baseline
-- Many action buttons intentionally visual-only until CRUD
-- Search/filters inconsistent because data is static
+- Some preview-only pages (tasks, inbox, docs, daily) still have many visual-only action buttons
+- Search/filters inconsistent because data is static on non-wired pages
 - Settings shallow vs future PRD role
 - Trading inactive in sidebar
-- Working tree has uncommitted polish; treat visual baseline as “mostly locked” but not fully committed/clean
 - Large preview files make the repo harder to read than the route list suggests
 
-## Recommended Next Sequence
+## CRUD Implementation Order (PRD v3.0)
 
-Agreed direction after review + Codex handoff:
-
-### 0. Stabilize (do first)
-
-1. Review uncommitted diff and commit intentional UI/docs WIP, or discard accidental leftovers
-2. Stop adding new preview pages/features
-3. Only touch UI if user still sees a specific roughness
-
-### 1. Optional readability pass (recommended before backend if folder feels hard to navigate)
-
-- Extract mock data and domain types out of large `*-preview.tsx` files
-- Split panels/modals/tables into smaller components
-- Do not change product behavior; structure only
-
-### 2. Phase 1 Core data foundation ✅
-
-- ~~Supabase connection~~
-- ~~Drizzle schema aligned to PRD v3.0~~
-- ~~Migrations~~
-- ~~RLS policies~~
-- ~~Workspace helpers~~
-
-### 3. Real auth + default workspace ✅
-
-- ~~Username signup/login/logout end-to-end~~
-- ~~Default personal workspace on first auth~~
-- ~~Remove reliance on dev bypass for real usage~~
-
-### 4. CRUD order ← next
-
-1. Projects
-2. Accounts
-3. Wallet Groups and Wallets
-4. Tasks and task assignments
-5. Task logs and Daily generation
-6. Inbox
-7. Docs
-8. Archive
-9. Activity logs
-
-### 5. Hold for Phase 1.5
-
-- Trading
-- Personal Items backend
-- Settings Integrations
-
-Unless the user explicitly pulls them forward.
+```
+DONE     1. Projects: create, update, delete, archive, logo upload wired
+DONE     2. Accounts: create, update, delete wired
+DONE     3. Wallets: create, update, delete wired
+PARTIAL  3b. Wallet Groups: create and delete wired; update action exists but UI pending
+DONE     4. Archive: restore and permanent delete wired
+NEXT     5. Tasks
+PENDING  6. Task logs / Daily generation
+PENDING  7. Inbox
+PENDING  8. Docs
+PENDING  9. Activity logs
+```
 
 ## Validation Status
 
-Checked 2026-07-22 after data foundation implementation, re-verified 2026-07-23 after env rename:
+Checked 2026-07-27 after closing the RLS and Storage policy work from the previous session:
 
 ```txt
 pnpm typecheck  # pass
-pnpm lint       # pass (0 warnings)
-pnpm test       # pass (5 username unit tests)
-pnpm build      # pass (compiled successfully, all 14 routes)
+pnpm lint       # pass, 0 warnings
+pnpm test       # pass, 2 files and 20 tests
 ```
 
-```bash
-pnpm -C Web3-Hunting-OS lint
-pnpm -C Web3-Hunting-OS typecheck
-pnpm -C Web3-Hunting-OS test
-pnpm -C Web3-Hunting-OS build
+Live database metadata verification:
+
+```txt
+Application tables found             15
+Tables with RLS enabled              15
+Application policies                17
+user_workspace_ids SECURITY DEFINER true
+user_workspace_ids search_path      public
+Owner-visible workspaces             1
+Unrelated-user-visible workspaces    0
+Avatar upload ownership policy       present
+Project logo ownership policy        present
+```
+
+Latest full smoke run after migration `0007`:
+
+```txt
+37 checks passed
+1 known product gap: Wallet Group rename/edit option is missing in the UI
+0 console errors
+Project logo upload and persistence passed
+Account avatar upload, persistence, and fetchability passed
 ```
 
 ## Current Routes

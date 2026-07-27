@@ -30,3 +30,6 @@ next-env.d.ts
 .DS_Store
 *.pem
 *.swp
+
+# local diagnostic artifacts
+/tmp-*-report.txt
