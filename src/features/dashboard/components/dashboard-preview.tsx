@@ -12,6 +12,9 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import type { DeadlineOptions, UpcomingDeadlineItem } from "@/features/deadlines/actions";
+import { DeadlineCreateButton } from "@/features/deadlines/components/deadline-create-button";
+import { formatDeadlineDueLabel, formatDeadlineTime, getDeadlineDayDifference, getJakartaDateValue, shiftDateValue } from "@/features/deadlines/deadline-utils";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -51,20 +54,30 @@ const recentNotes = [
   { title: "Retro farming notes", meta: "Updated yesterday" },
 ];
 
-const deadlines = [
-  { title: "Project Alpha proof", meta: "Submit before reset", due: "Today", tone: "text-destructive" },
-  { title: "Project Beta result check", meta: "Waitlist eligibility", due: "Tomorrow", tone: "text-warning" },
-  { title: "Project Gamma campaign", meta: "Interaction window", due: "Jul 18", tone: "text-muted-foreground" },
-];
-
 const recentActivity = [
   { text: "Saved Project Alpha command note", time: "8m" },
   { text: "Processed Project Beta reminder", time: "24m" },
   { text: "Moved Project Gamma to Running", time: "1h" },
 ];
 
-export function DashboardPreview() {
+const emptyDeadlineOptions: DeadlineOptions = { projects: [], tasks: [] };
+
+export function DashboardPreview({
+  deadlineItems,
+  deadlineOptions = emptyDeadlineOptions,
+  deadlineDueCount,
+  canManageDeadlines = false,
+}: {
+  deadlineItems?: UpcomingDeadlineItem[];
+  deadlineOptions?: DeadlineOptions;
+  deadlineDueCount?: number;
+  canManageDeadlines?: boolean;
+} = {}) {
   const { dateLabel, headline, motivation } = getDashboardGreeting();
+  const deadlines = deadlineItems ?? getFallbackDeadlines();
+  const metrics = overviewMetrics.map((metric) => metric.label === "Due" && deadlineDueCount !== undefined
+    ? { ...metric, value: String(deadlineDueCount) }
+    : metric);
 
   return (
     <div className="px-4 py-3 sm:px-5 lg:px-6 lg:py-4">
@@ -101,16 +114,29 @@ export function DashboardPreview() {
           </div>
         </DashboardPanel>
 
-        <DashboardPanel icon={CalendarClock} title="Upcoming deadlines" href="/daily">
+        <DashboardPanel
+          icon={CalendarClock}
+          title="Upcoming deadlines"
+          href="/deadlines"
+          headerAction={<DeadlineCreateButton options={deadlineOptions} disabled={!canManageDeadlines} />}
+        >
           <div className="divide-y divide-white/[0.045]">
-            {deadlines.map((item) => <DeadlineRow key={item.title} item={item} />)}
+            {deadlines.length > 0
+              ? deadlines.map((item, index) => <DeadlineRow key={item.id} item={item} className={index >= 5 ? "hidden sm:grid" : undefined} />)
+              : <p className="py-6 text-center text-xs text-muted-foreground">No upcoming deadlines</p>}
           </div>
+          {deadlineDueCount && deadlineDueCount > 5 ? (
+            <Link href="/deadlines" className={cn("mt-2 inline-flex text-[11px] font-medium text-muted-foreground hover:text-foreground", deadlineDueCount <= deadlines.length ? "sm:hidden" : "")}>
+              <span className="sm:hidden">View {deadlineDueCount - Math.min(deadlines.length, 5)} more</span>
+              <span className="hidden sm:inline">View {deadlineDueCount - deadlines.length} more</span>
+            </Link>
+          ) : null}
         </DashboardPanel>
 
         <DashboardPanel icon={RadioTower} title="Hunting pulse" href="/projects" className="xl:row-span-2">
           <SectionLabel label="Overview" />
           <div className="grid grid-cols-2 gap-2">
-            {overviewMetrics.map((metric) => <MetricTile key={metric.label} item={metric} />)}
+            {metrics.map((metric) => <MetricTile key={metric.label} item={metric} />)}
           </div>
 
           <SectionLabel label="Categories" className="mt-2.5" />
@@ -136,7 +162,7 @@ export function DashboardPreview() {
   );
 }
 
-function DashboardPanel({ icon: Icon, title, href, className = "", children }: { icon: typeof Inbox; title: string; href: string; className?: string; children: ReactNode }) {
+function DashboardPanel({ icon: Icon, title, href, className = "", headerAction, children }: { icon: typeof Inbox; title: string; href: string; className?: string; headerAction?: ReactNode; children: ReactNode }) {
   return (
     <section className={"soft-panel overflow-hidden rounded-xl bg-card " + className}>
       <div className="flex items-center justify-between gap-3 px-3 py-2.5">
@@ -146,7 +172,10 @@ function DashboardPanel({ icon: Icon, title, href, className = "", children }: {
             <h2 className="truncate text-sm font-semibold">{title}</h2>
           </div>
         </div>
-        <Link href={href} className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground">Open</Link>
+        <div className="flex shrink-0 items-center gap-1">
+          {headerAction}
+          <Link href={href} className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground">Open</Link>
+        </div>
       </div>
       <div className="p-3 pt-2.5">{children}</div>
     </section>
@@ -210,16 +239,32 @@ function PulsePill({ item }: { item: (typeof pulseItems)[number] }) {
 }
 
 
-function DeadlineRow({ item }: { item: (typeof deadlines)[number] }) {
+function DeadlineRow({ item, className }: { item: UpcomingDeadlineItem; className?: string }) {
+  const dueLabel = formatDeadlineDueLabel(item.dueDate);
+  const dueTime = formatDeadlineTime(item.dueTime);
+  const overdue = getDeadlineDayDifference(item.dueDate) < 0;
+
   return (
-    <button className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-1.5 text-left hover:bg-white/[0.025]">
+    <Link href="/deadlines" className={cn("grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-1.5 text-left hover:bg-white/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", className)}>
       <span className="min-w-0">
         <span className="block truncate text-[13px] font-medium">{item.title}</span>
-        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{item.meta}</span>
+        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{item.context}</span>
       </span>
-      <span className={"text-[11px] font-medium tabular-nums " + item.tone}>{item.due}</span>
-    </button>
+      <span className="text-right">
+        <span className={"block text-[11px] font-medium tabular-nums " + (overdue ? "text-destructive" : dueLabel === "Today" ? "text-warning" : "text-muted-foreground")}>{dueLabel}</span>
+        {dueTime ? <span className="block text-[10px] text-muted-foreground">{dueTime}</span> : null}
+      </span>
+    </Link>
   );
+}
+
+function getFallbackDeadlines(): UpcomingDeadlineItem[] {
+  const today = getJakartaDateValue();
+  return [
+    { id: "preview-proof", source: "deadline", title: "Project Alpha proof", context: "Submit before reset", dueDate: today, dueTime: null, url: null, linkedProjectId: null, linkedTaskId: "preview-proof" },
+    { id: "preview-billing", source: "deadline", title: "Cancel Website A billing", context: "Standalone deadline", dueDate: shiftDateValue(today, 1), dueTime: null, url: null, linkedProjectId: null, linkedTaskId: null },
+    { id: "preview-proxy", source: "deadline", title: "Proxy Website B expires", context: "Renew if farming stays active", dueDate: shiftDateValue(today, 7), dueTime: "20:00", url: null, linkedProjectId: null, linkedTaskId: null },
+  ];
 }
 
 function Activity({ text, time }: { text: string; time: string }) {

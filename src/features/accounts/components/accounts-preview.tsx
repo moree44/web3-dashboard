@@ -6,8 +6,10 @@ import { useMemo, useRef, useState, type PointerEvent, type ReactNode } from "re
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AppSelect } from "@/components/ui/app-select";
 import { cn } from "@/lib/utils";
 import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
+import { normalizeHttpUrl } from "@/lib/url";
 import {
   createAccount,
   createWallet,
@@ -43,13 +45,6 @@ type Account = {
   wallets: string[];
   activeProjects: string[];
 };
-
-function normalizeAvatarUrl(url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return trimmed;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
-}
 
 type Wallet = {
   id?: string;
@@ -445,7 +440,7 @@ export function AccountsPreview({
   }
 
   async function handleSetAvatarUrl(id: string, url: string) {
-    const normalized = normalizeAvatarUrl(url);
+    const normalized = normalizeHttpUrl(url);
     if (developmentPreview) {
       setAccountItems((items) =>
         items.map((account) => (account.id === id ? { ...account, avatarUrl: normalized || undefined } : account)),
@@ -1072,26 +1067,24 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount, onUpdate, onDelete,
                   <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Chain</p>
                   <input value={editChainType} onChange={(e) => setEditChainType(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring" placeholder="EVM" />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Type</p>
-                  <select value={editWalletType} onChange={(e) => setEditWalletType(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
-                    {walletTypeOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Group</p>
-                  <select value={editWalletGroupId} onChange={(e) => setEditWalletGroupId(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
-                    <option value="">None</option>
-                    {groupItems.filter((g) => g.id).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                  </select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Owner</p>
-                  <select value={editOwnerAccountId} onChange={(e) => setEditOwnerAccountId(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
-                    <option value="">No persona</option>
-                    {accountItems.filter((a) => a.id).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  </select>
-                </div>
+                <AppSelect
+                  label="Type"
+                  value={editWalletType}
+                  options={walletTypeOptions.map((option) => ({ value: option, label: option }))}
+                  onChange={setEditWalletType}
+                />
+                <AppSelect
+                  label="Group"
+                  value={editWalletGroupId}
+                  options={[{ value: "", label: "None" }, ...groupItems.filter((group) => group.id).map((group) => ({ value: group.id!, label: group.name }))]}
+                  onChange={setEditWalletGroupId}
+                />
+                <AppSelect
+                  label="Owner"
+                  value={editOwnerAccountId}
+                  options={[{ value: "", label: "No persona" }, ...accountItems.filter((account) => account.id).map((account) => ({ value: account.id!, label: account.name }))]}
+                  onChange={setEditOwnerAccountId}
+                />
               </>
             ) : (
               <>
@@ -1197,7 +1190,9 @@ function EditableAvatar({
     setIsSaving(true);
     setError("");
     try {
-      await onSetUrl(draftUrl);
+      const normalized = normalizeHttpUrl(draftUrl);
+      setDraftUrl(normalized);
+      await onSetUrl(normalized);
       setOpen(false);
     } catch (urlError) {
       setError(urlError instanceof Error ? urlError.message : "Unable to save avatar URL");
@@ -1257,11 +1252,16 @@ function EditableAvatar({
             <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Image URL</p>
             <div className="mt-1.5 flex gap-2">
               <input
+                type="text"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
                 value={draftUrl}
                 onChange={(event) => setDraftUrl(event.target.value)}
+                onBlur={() => setDraftUrl((value) => normalizeHttpUrl(value))}
                 disabled={isSaving || !onSetUrl}
                 className="h-8 min-w-0 flex-1 rounded-lg bg-background px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
-                placeholder="https://..."
+                placeholder="image.example.com/avatar.png"
               />
               <button
                 type="button"
@@ -1355,25 +1355,24 @@ ownerAccountId: ownerAccountId || undefined,
         <span className="text-xs font-medium text-muted-foreground">Address *</span>
         <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x..." className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
       </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Chain</span>
-        <select value={chainType} onChange={(e) => setChainType(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20">
-          {["EVM", "Solana", "Bitcoin", "Sui", "Aptos", "Other"].map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Type</span>
-        <select value={walletType} onChange={(e) => setWalletType(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20">
-          {["main", "project_wallet", "burner", "l1", "testnet", "retro", "nft", "other"].map((t) => <option key={t} value={t}>{t.replace("_", " ")}</option>)}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Owner Account</span>
-        <select value={ownerAccountId} onChange={(e) => setOwnerAccountId(e.target.value)} className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-white/20">
-          <option value="">None</option>
-          {accounts.filter((a) => a.id).map((a) => <option key={a.id!} value={a.id!}>{a.name}</option>)}
-        </select>
-      </label>
+      <AppSelect
+        label="Chain"
+        value={chainType}
+        options={["EVM", "Solana", "Bitcoin", "Sui", "Aptos", "Other"].map((chain) => ({ value: chain, label: chain }))}
+        onChange={setChainType}
+      />
+      <AppSelect
+        label="Type"
+        value={walletType}
+        options={["main", "project_wallet", "burner", "l1", "testnet", "retro", "nft", "other"].map((type) => ({ value: type, label: formatWalletType(type) }))}
+        onChange={setWalletType}
+      />
+      <AppSelect
+        label="Owner Account"
+        value={ownerAccountId}
+        options={[{ value: "", label: "None" }, ...accounts.filter((account) => account.id).map((account) => ({ value: account.id!, label: account.name }))]}
+        onChange={setOwnerAccountId}
+      />
     </div>
     <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
       <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>

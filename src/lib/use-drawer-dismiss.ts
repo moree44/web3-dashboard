@@ -8,7 +8,9 @@ export function useDrawerDismiss(onClose: () => void, open = true) {
     if (!open) return;
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (document.querySelector('[data-app-floating-menu="true"]')) return;
+      onClose();
     }
 
     window.addEventListener("keydown", onKeyDown);

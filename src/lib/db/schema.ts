@@ -11,8 +11,10 @@ import {
   timestamp,
   integer,
   primaryKey,
+  index,
   uniqueIndex,
   pgSchema,
+  time,
 } from "drizzle-orm/pg-core";
 
 // Supabase owns this schema and table. The declaration exists only so
@@ -215,10 +217,49 @@ export const tasks = pgTable("tasks", {
   priority: text("priority", { enum: ["high", "medium", "low"] }),
   url: text("url"),
   sortOrder: integer("sort_order").default(0),
-  dueDate: date("due_date"),
+  startDate: date("start_date"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
+
+// ─── Deadlines ────────────────────────────────────────────────────────────────
+
+export const deadlines = pgTable(
+  "deadlines",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id),
+    title: text("title").notNull(),
+    notes: text("notes"),
+    url: text("url"),
+    dueDate: date("due_date").notNull(),
+    dueTime: time("due_time", { precision: 0 }),
+    status: text("status", {
+      enum: ["upcoming", "done", "cancelled"],
+    })
+      .notNull()
+      .default("upcoming"),
+    linkedProjectId: uuid("linked_project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    linkedTaskId: uuid("linked_task_id").references(() => tasks.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("deadlines_workspace_due_idx").on(
+      table.workspaceId,
+      table.status,
+      table.dueDate,
+    ),
+    index("deadlines_linked_task_idx").on(table.linkedTaskId),
+  ],
+);
 
 // ─── Task Accounts ────────────────────────────────────────────────────────────
 

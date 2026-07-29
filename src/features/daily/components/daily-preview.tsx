@@ -3,7 +3,7 @@
 import { CalendarDays, ChevronDown, ChevronRight, Circle, ExternalLink, MoreHorizontal, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
-import { TaskDetailPanel, type TaskDetailPanelTask } from "@/features/tasks/components/task-detail-panel";
+import { TaskPreviewDetailPanel, type TaskPreviewDetail } from "@/features/tasks/components/task-preview-detail-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -48,7 +48,7 @@ type ProjectGroupData = {
 
 export function DailyPreview() {
   const [activeView, setActiveView] = useState<ViewMode>("account");
-  const [selectedTaskDetail, setSelectedTaskDetail] = useState<TaskDetailPanelTask | null>(null);
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<TaskPreviewDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [hideDone, setHideDone] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set([sectionKey("account", accountGroups[0]?.name ?? "")]));
@@ -169,7 +169,7 @@ export function DailyPreview() {
         </div>
       )}
 
-      <TaskDetailPanel task={selectedTaskDetail} onClose={() => setSelectedTaskDetail(null)} />
+      <TaskPreviewDetailPanel task={selectedTaskDetail} onClose={() => setSelectedTaskDetail(null)} />
     </div>
   );
 }
@@ -331,7 +331,7 @@ function PersonalDailyList({
   );
 }
 
-function toDailyTaskDetail(task: AccountTask | (AccountTask & { account: string; accountInitials: string }), accountName: string): TaskDetailPanelTask {
+function toDailyTaskDetail(task: AccountTask | (AccountTask & { account: string; accountInitials: string }), accountName: string): TaskPreviewDetail {
   const frequency = "frequency" in task && task.frequency ? task.frequency : task.meta.split(" · ")[0] ?? "Once";
 
   return {
@@ -348,7 +348,7 @@ function toDailyTaskDetail(task: AccountTask | (AccountTask & { account: string;
   };
 }
 
-function toPersonalDailyDetail(item: PersonalDailyItem, checked: boolean): TaskDetailPanelTask {
+function toPersonalDailyDetail(item: PersonalDailyItem, checked: boolean): TaskPreviewDetail {
   return {
     title: item.title,
     project: "Personal",

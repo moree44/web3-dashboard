@@ -9,6 +9,7 @@ import { accounts, projectAccounts, projects } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { isHttpUrl, normalizeHttpUrl } from "@/lib/url";
 import { ARCHIVE_REASONS, HUNT_TYPES, PROJECT_PRIORITIES, PROJECT_STATUSES } from "@/features/projects/project-query";
 
 export type ProjectAccountOption = Pick<
@@ -20,6 +21,14 @@ export type ProjectWithAccounts = typeof projects.$inferSelect & {
   assignedAccounts: ProjectAccountOption[];
 };
 
+const optionalHttpUrl = z.preprocess(
+  (value) => typeof value === "string" ? normalizeHttpUrl(value) : value,
+  z.union([
+    z.literal(""),
+    z.string().trim().url().refine(isHttpUrl, "Only http or https URLs are supported"),
+  ]).nullable().optional(),
+);
+
 const projectInputSchema = z.object({
   name: z.string().trim().min(1, "Project name is required").max(120),
   huntType: z.enum(HUNT_TYPES).default("free_hunts"),
@@ -30,13 +39,33 @@ const projectInputSchema = z.object({
   stageResult: z.string().trim().min(1).max(100).default("Not applicable"),
   progressEstimate: z.union([z.string(), z.number()]).optional(),
   dateStart: z.union([z.literal(""), z.string().date()]).nullable().optional(),
-  websiteUrl: z.union([z.literal(""), z.string().trim().url()]).nullable().optional(),
+  websiteUrl: optionalHttpUrl,
   notes: z.string().trim().max(5000).nullable().optional(),
-  logoUrl: z.union([z.literal(""), z.string().trim().url()]).nullable().optional(),
+  logoUrl: optionalHttpUrl,
   logoPath: z.string().trim().max(500).nullable().optional(),
   logoSource: z.enum(["uploaded", "external_url", "favicon", "manual", "none"]).nullable().optional(),
 });
 const projectUpdateSchema = projectInputSchema.partial();
+
+function projectValidationError(error: z.ZodError) {
+  const issue = error.issues[0];
+  if (issue?.path[0] === "websiteUrl" || issue?.path[0] === "logoUrl") {
+    return new Error("Enter a valid URL, for example project.com");
+  }
+  return new Error(issue?.message ?? "Project details are invalid");
+}
+
+function parseProjectInput(data: unknown) {
+  const result = projectInputSchema.safeParse(data);
+  if (!result.success) throw projectValidationError(result.error);
+  return result.data;
+}
+
+function parseProjectUpdate(data: unknown) {
+  const result = projectUpdateSchema.safeParse(data);
+  if (!result.success) throw projectValidationError(result.error);
+  return result.data;
+}
 
 const archiveReasonSchema = z.enum(ARCHIVE_REASONS);
 
@@ -181,7 +210,7 @@ export async function createProject(
   accountIds: string[] = [],
 ): Promise<ProjectWithAccounts> {
   const { workspaceId } = await requireWorkspace();
-  const parsed = projectInputSchema.parse(data);
+  const parsed = parseProjectInput(data);
   await assertUniqueName(workspaceId, parsed.name);
   const uniqueAccountIds = [...new Set(accountIds)];
 
@@ -234,7 +263,7 @@ export async function updateProject(
   accountIds?: string[],
 ): Promise<ProjectWithAccounts> {
   const { workspaceId } = await requireWorkspace();
-  const parsed = projectUpdateSchema.parse(data);
+  const parsed = parseProjectUpdate(data);
   if (parsed.name) await assertUniqueName(workspaceId, parsed.name, id);
   const uniqueAccountIds = accountIds ? [...new Set(accountIds)] : undefined;
 

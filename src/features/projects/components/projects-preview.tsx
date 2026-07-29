@@ -1,15 +1,18 @@
 "use client";
 
-import { Archive, CalendarClock, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { Archive, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { Badge } from "@/components/ui/badge";
+import { AppDatePicker } from "@/components/ui/app-date-picker";
 import { Button } from "@/components/ui/button";
+import { AppSelect } from "@/components/ui/app-select";
 import { cn } from "@/lib/utils";
 import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
+import { normalizeHttpUrl } from "@/lib/url";
 import {
   archiveProject,
   createProject,
@@ -69,13 +72,6 @@ const reversePriorityLabels: Record<string, string> = {
   Low: "low",
 };
 
-function normalizeUrl(url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return trimmed;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
-}
-
 function dbToUIProject(record: DbProject): Project {
   const dateValue = record.dateStart ?? "";
 
@@ -91,6 +87,7 @@ function dbToUIProject(record: DbProject): Project {
     work: record.workTypes ?? [],
     type: record.projectTypes ?? [],
     accounts: record.assignedAccounts.map((account) => account.label),
+    accountDetails: record.assignedAccounts,
     accountIds: record.assignedAccounts.map((account) => account.id),
     progress: Number(record.progressEstimate) || 0,
     date: dateValue
@@ -119,6 +116,7 @@ type Project = {
   work: string[];
   type: string[];
   accounts: string[];
+  accountDetails?: ProjectAccountOption[];
   accountIds?: string[];
   progress: number;
   date: string;
@@ -310,7 +308,7 @@ export function ProjectsPreview({
         projectTypes: project.type,
         stageResult: project.stage,
         dateStart: project.dateValue || undefined,
-        websiteUrl: project.websiteUrl ? normalizeUrl(project.websiteUrl) : undefined,
+        websiteUrl: project.websiteUrl ? normalizeHttpUrl(project.websiteUrl) : undefined,
         notes: project.notes || undefined,
         logoUrl: externalLogoUrl,
         logoSource: externalLogoUrl ? "external_url" : "none",
@@ -390,16 +388,53 @@ export function ProjectsPreview({
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72"><Search className="size-4 text-muted-foreground" /><input aria-label="Search projects" value={queryState.query} onChange={(event) => updateUrl({ q: event.target.value })} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search projects..." /></label>
         <div className="flex flex-1 flex-wrap items-center gap-2">
-          <select aria-label="Filter by status" value={queryState.status} onChange={(event) => updateUrl({ status: event.target.value })} className="h-8 rounded-lg border border-white/[0.055] bg-background px-3 text-xs text-muted-foreground outline-none"><option value="">All statuses</option>{PROJECT_STATUSES.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}</select>
-          <select aria-label="Filter by stage" value={queryState.stage} onChange={(event) => updateUrl({ stage: event.target.value })} className="h-8 rounded-lg border border-white/[0.055] bg-background px-3 text-xs text-muted-foreground outline-none"><option value="">All stages</option>{stageOptions.map((value) => <option key={value}>{value}</option>)}</select>
+          <AppSelect
+            ariaLabel="Filter by status"
+            value={queryState.status}
+            options={[{ value: "", label: "All statuses" }, ...PROJECT_STATUSES.map((value) => ({ value, label: statusLabels[value] }))]}
+            onChange={(status) => updateUrl({ status })}
+            className="w-[138px] shrink-0"
+          />
+          <AppSelect
+            ariaLabel="Filter by stage"
+            value={queryState.stage}
+            options={[{ value: "", label: "All stages" }, ...stageOptions.map((value) => ({ value, label: value }))]}
+            onChange={(stage) => updateUrl({ stage })}
+            className="w-[150px] shrink-0"
+          />
           <div className="relative"><button type="button" onClick={() => setFiltersOpen((open) => !open)} className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.055] px-3 text-xs text-muted-foreground"><SlidersHorizontal className="size-3.5" />More filters</button>{filtersOpen ? <div className="absolute left-0 top-10 z-40 grid w-64 gap-3 rounded-xl border border-white/[0.08] bg-[#18181a] p-3 shadow-2xl">
-            <label className="text-[10px] uppercase text-muted-foreground">Priority<select value={queryState.priority} onChange={(event) => updateUrl({ priority: event.target.value })} className="mt-1 h-8 w-full rounded-lg bg-background px-2 text-xs normal-case text-foreground"><option value="">All priorities</option>{PROJECT_PRIORITIES.map((value) => <option key={value} value={value}>{priorityLabels[value]}</option>)}</select></label>
-            <label className="text-[10px] uppercase text-muted-foreground">Account<select value={queryState.account} onChange={(event) => updateUrl({ account: event.target.value })} className="mt-1 h-8 w-full rounded-lg bg-background px-2 text-xs normal-case text-foreground"><option value="">All accounts</option>{availableAccountOptions.map((account) => <option key={account.id} value={account.label}>{account.label}</option>)}</select></label>
-            <div className="grid grid-cols-2 gap-2"><label className="text-[10px] uppercase text-muted-foreground">From<input type="date" value={queryState.dateFrom} onChange={(event) => updateUrl({ dateFrom: event.target.value })} className="mt-1 h-8 w-full rounded-lg bg-background px-1 text-[11px]" /></label><label className="text-[10px] uppercase text-muted-foreground">To<input type="date" value={queryState.dateTo} onChange={(event) => updateUrl({ dateTo: event.target.value })} className="mt-1 h-8 w-full rounded-lg bg-background px-1 text-[11px]" /></label></div>
+            <AppSelect
+              label="Priority"
+              value={queryState.priority}
+              options={[{ value: "", label: "All priorities" }, ...PROJECT_PRIORITIES.map((value) => ({ value, label: priorityLabels[value] }))]}
+              onChange={(priority) => updateUrl({ priority })}
+            />
+            <AppSelect
+              label="Account"
+              value={queryState.account}
+              options={[{ value: "", label: "All accounts" }, ...availableAccountOptions.map((account) => ({ value: account.label, label: account.label }))]}
+              onChange={(account) => updateUrl({ account })}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <AppDatePicker label="From" value={queryState.dateFrom} onChange={(dateFrom) => updateUrl({ dateFrom })} size="xs" />
+              <AppDatePicker label="To" value={queryState.dateTo} onChange={(dateTo) => updateUrl({ dateTo })} size="xs" />
+            </div>
             <button type="button" onClick={() => updateUrl({ priority: null, account: null, dateFrom: null, dateTo: null })} className="text-left text-xs text-muted-foreground hover:text-foreground">Clear filters</button>
           </div> : null}</div>
           <span className="hidden flex-1 lg:block" />
-          <select aria-label="Sort projects" value={`${queryState.sort}:${queryState.direction}`} onChange={(event) => { const [sort, direction] = event.target.value.split(":"); updateUrl({ sort, direction }); }} className="h-8 rounded-lg border border-white/[0.055] bg-background px-2 text-xs text-muted-foreground outline-none">{PROJECT_SORTS.flatMap((sort) => ["asc", "desc"].map((direction) => <option key={`${sort}:${direction}`} value={`${sort}:${direction}`}>{sort} {direction === "asc" ? "ascending" : "descending"}</option>))}</select>
+          <AppSelect
+            ariaLabel="Sort projects"
+            value={`${queryState.sort}:${queryState.direction}`}
+            options={PROJECT_SORTS.flatMap((sort) => ["asc", "desc"].map((direction) => ({
+              value: `${sort}:${direction}`,
+              label: `${sort} ${direction === "asc" ? "ascending" : "descending"}`,
+            })))}
+            onChange={(nextSort) => {
+              const [sort, direction] = nextSort.split(":");
+              updateUrl({ sort, direction });
+            }}
+            className="w-[190px] shrink-0"
+          />
           <div className="relative"><button type="button" onClick={() => setColumnsOpen((open) => !open)} className="grid size-8 place-items-center rounded-lg border border-white/[0.055] text-muted-foreground" aria-label="Choose columns"><Columns3 className="size-3.5" /></button>{columnsOpen ? <div className="absolute right-0 top-10 z-40 w-44 rounded-xl border border-white/[0.08] bg-[#18181a] p-2 shadow-2xl">{PROJECT_COLUMNS.map((column) => <label key={column} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-white/[0.04]"><input type="checkbox" checked={visibleColumns.has(column)} onChange={() => { const next = visibleColumns.has(column) ? queryState.columns.filter((item) => item !== column) : [...queryState.columns, column]; updateUrl({ columns: next.length === PROJECT_COLUMNS.length ? null : next.length === 0 ? "none" : next.join(",") }); }} />{columnLabels[column]}</label>)}</div> : null}</div>
         </div>
       </div>
@@ -409,7 +444,7 @@ export function ProjectsPreview({
         <tbody>{visibleProjects.map((project, index) => <ProjectRow key={project.id ?? `${project.name}-${index}`} project={project} visibleColumns={visibleColumns} onOpen={() => setSelectedProject(project)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</tbody>
       </table></div>
       <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project, index) => <ProjectCard key={project.id ?? `${project.name}-${index}`} project={project} onOpen={() => setSelectedProject(project)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</div>
-      <div className="flex min-h-12 items-center justify-between px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8"><span>Showing {filteredProjects.length} {filteredProjects.length === 1 ? "project" : "projects"}</span><div className="flex items-center gap-2"><select aria-label="Projects per page" value={queryState.pageSize} onChange={(event) => updateUrl({ pageSize: event.target.value, page: 1 }, true)} className="h-7 rounded-md bg-card px-2"><option value="10">10 per page</option><option value="25">25 per page</option><option value="50">50 per page</option></select><Button variant="secondary" size="sm" disabled={currentPage <= 1} onClick={() => updateUrl({ page: currentPage - 1 }, true)}>Previous</Button><span>{currentPage} / {totalPages}</span><Button variant="secondary" size="sm" disabled={currentPage >= totalPages} onClick={() => updateUrl({ page: currentPage + 1 }, true)}>Next</Button></div></div>
+      <div className="flex min-h-12 items-center justify-between px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8"><span>Showing {filteredProjects.length} {filteredProjects.length === 1 ? "project" : "projects"}</span><div className="flex items-center gap-2"><AppSelect ariaLabel="Projects per page" value={String(queryState.pageSize)} options={[{ value: "10", label: "10 per page" }, { value: "25", label: "25 per page" }, { value: "50", label: "50 per page" }]} onChange={(pageSize) => updateUrl({ pageSize, page: 1 }, true)} className="w-[120px]" size="xs" /><Button variant="secondary" size="sm" disabled={currentPage <= 1} onClick={() => updateUrl({ page: currentPage - 1 }, true)}>Previous</Button><span>{currentPage} / {totalPages}</span><Button variant="secondary" size="sm" disabled={currentPage >= totalPages} onClick={() => updateUrl({ page: currentPage + 1 }, true)}>Next</Button></div></div>
 
       <AddProjectDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} onCreate={handleCreateProject} accountOptions={availableAccountOptions} />
       <ProjectDetailPanel project={selectedProject} onClose={() => setSelectedProject(null)} onUpdate={handleUpdateProject} onLogoUploaded={handleLogoUploaded} onArchive={handleArchiveProject} onDelete={handleDeleteProject} accountOptions={availableAccountOptions} />
@@ -473,7 +508,7 @@ function ProjectRow({
       {visibleColumns.has("priority") ? <td className="px-3"><Priority value={project.priority} /></td> : null}
       {visibleColumns.has("work") ? <td className="px-3"><Tags tags={project.work} strong max={2} /></td> : null}
       {visibleColumns.has("type") ? <td className="px-3"><Tags tags={project.type} max={2} /></td> : null}
-      {visibleColumns.has("accounts") ? <td className="px-3"><AccountChips accounts={project.accounts} /></td> : null}
+      {visibleColumns.has("accounts") ? <td className="px-3"><AccountAvatarGroup accounts={project.accounts} accountDetails={project.accountDetails} /></td> : null}
       {visibleColumns.has("completion") ? <td className="px-3"><Progress value={project.progress} /></td> : null}
       {visibleColumns.has("date") ? <td className="whitespace-nowrap px-3 text-xs text-foreground">{project.date}</td> : null}
       <td className="px-3">
@@ -598,17 +633,193 @@ function Tags({ tags, strong = false, max = 2 }: { tags: string[]; strong?: bool
   );
 }
 
-function AccountChips({ accounts }: { accounts: string[] }) {
-  if (accounts.length === 0) return <span className="text-[11px] text-[#8f97a2]">Unassigned</span>;
+export function AccountAvatarGroup({
+  accounts,
+  accountDetails,
+  maxVisible = 4,
+}: {
+  accounts: string[];
+  accountDetails?: ProjectAccountOption[];
+  maxVisible?: number;
+}) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState({ left: 0, top: 0 });
+  const overflowButtonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const assignedAccounts = accountDetails?.length
+    ? accountDetails
+    : accounts.map((label, index) => ({
+        id: `fallback-${label}-${index}`,
+        label,
+        avatarUrl: null,
+      }));
+
+  useEffect(() => {
+    if (!overflowOpen) return;
+
+    const focusFrame = window.requestAnimationFrame(() => popoverRef.current?.focus());
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (popoverRef.current?.contains(target) || overflowButtonRef.current?.contains(target)) return;
+      setOverflowOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setOverflowOpen(false);
+      window.requestAnimationFrame(() => overflowButtonRef.current?.focus());
+    }
+
+    function handleScroll(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && popoverRef.current?.contains(target)) return;
+      setOverflowOpen(false);
+    }
+
+    const closePopover = () => setOverflowOpen(false);
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closePopover);
+    window.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closePopover);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [overflowOpen]);
+
+  if (assignedAccounts.length === 0) {
+    return <span className="text-[11px] text-[#8f97a2]">Unassigned</span>;
+  }
+
+  const visibleAccounts = assignedAccounts.slice(0, maxVisible);
+  const hiddenCount = assignedAccounts.length - visibleAccounts.length;
+  const renderedCount = visibleAccounts.length + (hiddenCount > 0 ? 1 : 0);
+
+  function motionStyle(index: number) {
+    const distance = activeIndex === null ? 0 : Math.abs(activeIndex - index);
+    const shift = activeIndex === null ? 0 : -3 * Math.pow(0.45, distance);
+    const scale = activeIndex === index ? 1.04 : 1;
+
+    return {
+      transform: `translateY(${shift.toFixed(3)}px) scale(${scale})`,
+      transition: `transform ${activeIndex === null ? 180 : 220}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+      zIndex: activeIndex === index ? renderedCount + 1 : index + 1,
+    };
+  }
+
+  function activateAvatar(index: number, pointerType: string) {
+    if (pointerType === "mouse" || pointerType === "pen") setActiveIndex(index);
+  }
+
+  function toggleOverflow(event: ReactMouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const popoverWidth = 224;
+    const estimatedHeight = Math.min(52 + assignedAccounts.length * 36, 272);
+    const viewportPadding = 12;
+    const gap = 8;
+    const hasRoomBelow = rect.bottom + gap + estimatedHeight <= window.innerHeight - viewportPadding;
+
+    setPopoverPosition({
+      left: Math.min(
+        Math.max(rect.left, viewportPadding),
+        window.innerWidth - popoverWidth - viewportPadding,
+      ),
+      top: hasRoomBelow
+        ? rect.bottom + gap
+        : Math.max(viewportPadding, rect.top - estimatedHeight - gap),
+    });
+    setOverflowOpen((open) => !open);
+  }
 
   return (
-    <div className="flex max-w-28 gap-1 overflow-hidden">
-      {accounts.slice(0, 2).map((account) => <span key={account} className="grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.07] text-[10px] font-semibold text-[#aeb5bf]" title={account}>{account[0]}</span>)}
-      {accounts.length > 2 ? <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.07] text-[10px] font-semibold text-[#aeb5bf]">+{accounts.length - 2}</span> : null}
-    </div>
+    <>
+      <div
+        className="inline-flex max-w-28 items-center"
+        role="group"
+        aria-label={`Assigned accounts: ${assignedAccounts.map((account) => account.label).join(", ")}`}
+        onPointerLeave={() => setActiveIndex(null)}
+      >
+        {visibleAccounts.map((account, index) => (
+          <span
+            key={account.id}
+            aria-hidden="true"
+            title={account.label}
+            data-avatar-source={account.avatarUrl ? "image" : "initial"}
+            className="relative -ml-1.5 grid size-6 shrink-0 place-items-center overflow-hidden rounded-full border border-[#101012] bg-[#24262a] bg-cover bg-center text-[9px] font-semibold text-[#c4cad3] shadow-sm first:ml-0 will-change-transform motion-reduce:!transform-none motion-reduce:!transition-none"
+            style={{
+              ...motionStyle(index),
+              backgroundImage: account.avatarUrl
+                ? `url(${JSON.stringify(account.avatarUrl)})`
+                : undefined,
+            }}
+            onPointerEnter={(event) => activateAvatar(index, event.pointerType)}
+          >
+            {account.avatarUrl ? null : account.label.slice(0, 1).toUpperCase()}
+          </span>
+        ))}
+        {hiddenCount > 0 ? (
+          <button
+            ref={overflowButtonRef}
+            type="button"
+            aria-label={`View all ${assignedAccounts.length} assigned accounts`}
+            aria-haspopup="dialog"
+            aria-expanded={overflowOpen}
+            title={`View all ${assignedAccounts.length} assigned accounts`}
+            className="relative -ml-1.5 grid size-6 shrink-0 place-items-center rounded-full border border-[#101012] bg-[#2b2d31] text-[9px] font-semibold text-[#c4cad3] shadow-sm outline-none will-change-transform hover:bg-[#34373c] focus-visible:ring-2 focus-visible:ring-white/30 motion-reduce:!transform-none motion-reduce:!transition-none"
+            style={motionStyle(visibleAccounts.length)}
+            onClick={toggleOverflow}
+            onPointerEnter={(event) => activateAvatar(visibleAccounts.length, event.pointerType)}
+          >
+            +{hiddenCount}
+          </button>
+        ) : null}
+      </div>
+      {overflowOpen && typeof document !== "undefined"
+        ? createPortal(
+          <div
+            ref={popoverRef}
+            role="dialog"
+            aria-label="All assigned accounts"
+            tabIndex={-1}
+            data-account-overflow-popover
+            className="fixed z-[100] w-56 origin-top-left rounded-xl border border-white/[0.08] bg-[#18181a]/[0.98] p-2 shadow-2xl shadow-black/45 outline-none"
+            style={{ left: popoverPosition.left, top: popoverPosition.top }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="px-1 pb-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Assigned accounts</p>
+            <div className="scrollbar-subtle max-h-56 space-y-0.5 overflow-y-auto">
+              {assignedAccounts.map((account) => (
+                <div key={account.id} className="flex items-center gap-2 rounded-lg px-1.5 py-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-full border border-white/[0.07] bg-[#24262a] bg-cover bg-center text-[9px] font-semibold text-[#c4cad3]"
+                    style={{
+                      backgroundImage: account.avatarUrl
+                        ? `url(${JSON.stringify(account.avatarUrl)})`
+                        : undefined,
+                    }}
+                  >
+                    {account.avatarUrl ? null : account.label.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 truncate text-xs font-medium text-[#d8dce2]">{account.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )
+        : null}
+    </>
   );
 }
-
 
 function Progress({ value }: { value: number }) {
   const barColor = value >= 75 ? "bg-success/70" : value >= 40 ? "bg-info/70" : "bg-foreground";
@@ -646,7 +857,7 @@ function ProjectCard({
           ) : null}
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2"><Badge variant={statusVariant(project.status)}>{project.status}</Badge><Priority value={project.priority} /><AccountChips accounts={project.accounts} /></div>
+      <div className="mt-3 flex flex-wrap items-center gap-2"><Badge variant={statusVariant(project.status)}>{project.status}</Badge><Priority value={project.priority} /><AccountAvatarGroup accounts={project.accounts} accountDetails={project.accountDetails} /></div>
       <div className="mt-3 flex flex-wrap gap-1"><Tags tags={project.work} strong max={3} /><Tags tags={project.type} max={2} /></div>
       <div className="mt-3 flex items-center gap-3"><Progress value={project.progress} /></div>
     </article>
@@ -694,6 +905,7 @@ function ProjectDetailPanel({
   const [saveError, setSaveError] = useState("");
   const [editLogoPreview, setEditLogoPreview] = useState("");
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [openEditSelect, setOpenEditSelect] = useState<string | null>(null);
 
   if (!project) return null;
   const p = project;
@@ -718,11 +930,13 @@ function ProjectDetailPanel({
     );
     setEditLogoPreview("");
     setSaveError("");
+    setOpenEditSelect(null);
     setIsEditing(true);
   }
 
   function cancelEdit() {
     setEditLogoPreview("");
+    setOpenEditSelect(null);
     setIsEditing(false);
   }
 
@@ -749,9 +963,10 @@ function ProjectDetailPanel({
         dateStart: editDate || undefined,
         workTypes: editWorkTypes,
         projectTypes: editProjectTypes,
-        websiteUrl: normalizeUrl(editWebsiteUrl) || null,
+        websiteUrl: normalizeHttpUrl(editWebsiteUrl) || null,
         notes: editNotes || null,
       }, editAccountIds);
+      setOpenEditSelect(null);
       setIsEditing(false);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Unable to update project");
@@ -889,56 +1104,56 @@ function ProjectDetailPanel({
             <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
               {isEditing ? (
                 <>
-                  <Property label="Hunt type">
-                    <select value={editHunt} onChange={(e) => setEditHunt(e.target.value)} className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none">
-                      {["Free Hunts", "Retro", "NFT", "Waitlist"].map((value) => <option key={value} value={value}>{value}</option>)}
-                    </select>
-                  </Property>
-                  <Property label="Status">
-                    <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none">
-                      {["Watching", "In progress", "Running", "Paused", "Done", "Dropped"].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </Property>
-                  <Property label="Stage / result">
-                    <div className="grid w-full gap-1.5">
-                      <select value={STAGE_PRESETS.includes(editStage as (typeof STAGE_PRESETS)[number]) ? editStage : "__custom__"} onChange={(e) => {
-                        if (e.target.value === "__custom__") {
-                          if (STAGE_PRESETS.includes(editStage as (typeof STAGE_PRESETS)[number])) setEditStage("");
-                          return;
-                        }
-                        setEditStage(e.target.value);
-                      }} className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none">
-                        {STAGE_PRESETS.map((value) => (
-                          <option key={value} value={value}>{value}</option>
-                        ))}
-                        <option value="__custom__">Custom...</option>
-                      </select>
-                      {!STAGE_PRESETS.includes(editStage as (typeof STAGE_PRESETS)[number]) ? (
-                        <input
-                          value={editStage}
-                          onChange={(e) => setEditStage(e.target.value)}
-                          className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none"
-                          placeholder="Custom stage / result"
-                        />
-                      ) : null}
-                    </div>
-                  </Property>
-                  <Property label="Priority">
-                    <select value={editPriority} onChange={(e) => setEditPriority(e.target.value)} className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none">
-                      {["High", "Medium", "Low"].map((value) => <option key={value} value={value}>{value}</option>)}
-                    </select>
-                  </Property>
+                  <SelectPreview
+                    id="edit-hunt-type"
+                    label="Hunt type"
+                    value={editHunt}
+                    options={["Free Hunts", "Retro", "NFT", "Waitlist"]}
+                    openSelect={openEditSelect}
+                    setOpenSelect={setOpenEditSelect}
+                    onChange={setEditHunt}
+                    compact
+                  />
+                  <SelectPreview
+                    id="edit-status"
+                    label="Status"
+                    value={editStatus}
+                    options={["Watching", "In progress", "Running", "Paused", "Done", "Dropped"]}
+                    openSelect={openEditSelect}
+                    setOpenSelect={setOpenEditSelect}
+                    onChange={setEditStatus}
+                    compact
+                  />
+                  <SelectPreview
+                    id="edit-stage-result"
+                    label="Stage / result"
+                    value={editStage || "Not applicable"}
+                    options={[...STAGE_PRESETS]}
+                    openSelect={openEditSelect}
+                    setOpenSelect={setOpenEditSelect}
+                    onChange={setEditStage}
+                    compact
+                    allowCustom
+                  />
+                  <SelectPreview
+                    id="edit-priority"
+                    label="Priority"
+                    value={editPriority}
+                    options={["High", "Medium", "Low"]}
+                    openSelect={openEditSelect}
+                    setOpenSelect={setOpenEditSelect}
+                    onChange={setEditPriority}
+                    compact
+                  />
                   <Property label="Completion">
                     <div className="flex items-center gap-2">
                       <input type="number" min={0} max={100} value={editProgress} onChange={(e) => setEditProgress(Number(e.target.value))} className="h-8 w-16 rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none" />
                       <span className="text-xs text-muted-foreground">%</span>
                     </div>
                   </Property>
-                  <Property label="Date start">
-                    <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none" />
-                  </Property>
+                  <AppDatePicker label="Date start" value={editDate} onChange={setEditDate} />
                   <Property label="Project URL">
-                    <input type="url" value={editWebsiteUrl} onChange={(e) => setEditWebsiteUrl(e.target.value)} className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none" placeholder="https://..." />
+                    <input type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" value={editWebsiteUrl} onChange={(e) => setEditWebsiteUrl(e.target.value)} onBlur={() => setEditWebsiteUrl((value) => normalizeHttpUrl(value))} className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none" placeholder="project.com or https://project.com" />
                   </Property>
                 </>
               ) : (
@@ -1142,7 +1357,7 @@ function AddProjectDialog({
         date: dateStart ? formatDateValue(dateStart) : "",
         dateValue: dateStart,
         activity: "now",
-        websiteUrl: normalizeUrl(websiteUrl) || undefined,
+        websiteUrl: normalizeHttpUrl(websiteUrl) || undefined,
         notes: notes.trim() || undefined,
         logoUrl: logoPreview || undefined,
       }, assignedAccountIds, { logoFile });
@@ -1212,10 +1427,7 @@ function AddProjectDialog({
                 placeholder="Soundness, NexusHQ, Linera..."
               />
             </label>
-            <label className="block">
-              <span className="block text-center text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Date</span>
-              <DatePreview value={dateStart} onChange={setDateStart} />
-            </label>
+            <AppDatePicker label="Date" value={dateStart} onChange={setDateStart} triggerClassName="h-10 justify-center px-2" />
           </div>
 
           <div className="px-2 py-2">
@@ -1255,7 +1467,7 @@ function AddProjectDialog({
             {showOptionalContext ? (
               <>
                 <div className="grid gap-3 md:grid-cols-3">
-                  <Field label="Project URL" placeholder="https://..." value={websiteUrl} onChange={setWebsiteUrl} />
+                  <Field label="Project URL" placeholder="project.com or https://project.com" value={websiteUrl} onChange={setWebsiteUrl} onBlur={() => setWebsiteUrl((value) => normalizeHttpUrl(value))} inputMode="url" />
                   <ComboboxPreview id="work-type" label="Work type" values={workTypes} options={["Testnet", "Node", "CLI running", "Farm role", "Galxe", "Whitelist", "Proof submit"]} placeholder="Add work type..." onChange={setWorkTypes} open={openSelect === "work-type"} onOpenChange={(nextOpen) => setOpenSelect(nextOpen ? "work-type" : null)} menuPlacement="top" />
                   <ComboboxPreview id="project-type" label="Project type" values={projectTypes} options={["ZK", "AI", "DePIN", "L1", "L2", "Security", "Data"]} placeholder="Add project type..." onChange={setProjectTypes} open={openSelect === "project-type"} onOpenChange={(nextOpen) => setOpenSelect(nextOpen ? "project-type" : null)} menuPlacement="top" />
                 </div>
@@ -1294,13 +1506,6 @@ function formatDateValue(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "2-digit" }).format(parseDateValue(value));
 }
 
-function formatCalendarDateValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function getTodayDateValue() {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Jakarta",
@@ -1324,11 +1529,11 @@ function TogglePill({ label, active = false, onClick }: { label: string; active?
   );
 }
 
-function Field({ label, placeholder, className = "", value, onChange }: { label: string; placeholder: string; className?: string; value?: string; onChange?: (value: string) => void }) {
+function Field({ label, placeholder, className = "", value, onChange, onBlur, inputMode }: { label: string; placeholder: string; className?: string; value?: string; onChange?: (value: string) => void; onBlur?: () => void; inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"] }) {
   return (
     <label className={className}>
       <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</span>
-      <input value={value} onChange={onChange ? (event) => onChange(event.target.value) : undefined} className="mt-1.5 h-9 w-full soft-inset rounded-lg border border-white/[0.055] bg-input px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-ring" placeholder={placeholder} />
+      <input value={value} onChange={onChange ? (event) => onChange(event.target.value) : undefined} onBlur={onBlur} inputMode={inputMode} autoCapitalize={inputMode === "url" ? "none" : undefined} autoCorrect={inputMode === "url" ? "off" : undefined} className="mt-1.5 h-9 w-full soft-inset rounded-lg border border-white/[0.055] bg-input px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-ring" placeholder={placeholder} />
     </label>
   );
 }
@@ -1618,100 +1823,6 @@ function ComboboxPreview({
       {menu}
     </div>
   );
-}
-
-function DatePreview({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const [visibleMonth, setVisibleMonth] = useState(() => parseDateValue(value));
-  const [open, setOpen] = useState(false);
-  const days = getCalendarDays(visibleMonth);
-  const todayValue = getTodayDateValue();
-
-  return (
-    <div className="relative mt-1.5">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className={cn(
-          "flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-white/[0.055] bg-white/[0.035] px-2 text-xs text-muted-foreground hover:bg-white/[0.055] hover:text-foreground",
-          open ? "border-white/[0.12] bg-white/[0.055]" : "",
-        )}
-        title="Date added"
-      >
-        <CalendarClock className="size-3" />
-        <span className="font-medium tabular-nums">{value ? formatDateValue(value) : "Add date"}</span>
-      </button>
-
-      {open ? (
-        <div className="absolute right-0 top-full z-[90] mt-1.5 w-[252px] overflow-hidden rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-2 text-left shadow-2xl shadow-black/45 backdrop-blur">
-          <div className="flex items-center justify-between gap-2 px-1 pb-2">
-            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, -1))} className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" aria-label="Previous month">‹</button>
-            <div className="text-xs font-semibold text-foreground">{formatMonthLabel(visibleMonth)}</div>
-            <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))} className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-white/[0.055] hover:text-foreground" aria-label="Next month">›</button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 px-1 pb-1 text-center text-[10px] font-medium text-muted-foreground">
-            {weekDays.map((day) => <span key={day}>{day}</span>)}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {days.map((day) => {
-              const dateValue = formatCalendarDateValue(day.date);
-              const selected = value === dateValue;
-              const isToday = todayValue === dateValue;
-              return (
-                <button
-                  key={day.key}
-                  type="button"
-                  onClick={() => {
-                    onChange(dateValue);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    "grid size-7 place-items-center rounded-lg text-[11px] font-medium transition-colors",
-                    day.inMonth ? "text-foreground hover:bg-white/[0.065]" : "text-muted-foreground/45 hover:bg-white/[0.04]",
-                    selected ? "bg-white/[0.12] text-foreground shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08)]" : "",
-                    !selected && isToday ? "text-info" : "",
-                  )}
-                >
-                  {day.date.getDate()}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-2 flex items-center justify-between border-t border-white/[0.055] px-1 pt-2">
-            <button type="button" onClick={() => onChange("")} className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:bg-white/[0.055] hover:text-foreground">Clear</button>
-            <button type="button" onClick={() => { onChange(todayValue); setVisibleMonth(parseDateValue(todayValue)); setOpen(false); }} className="rounded-lg px-2 py-1 text-[11px] font-medium text-foreground hover:bg-white/[0.055]">Today</button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-function addMonths(date: Date, amount: number) {
-  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
-}
-
-function formatMonthLabel(date: Date) {
-  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(date);
-}
-
-function getCalendarDays(monthDate: Date) {
-  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const start = new Date(firstDay);
-  start.setDate(firstDay.getDate() - firstDay.getDay());
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const date = new Date(start);
-    date.setDate(start.getDate() + index);
-    return {
-      date,
-      key: date.toISOString(),
-      inMonth: date.getMonth() === monthDate.getMonth(),
-    };
-  });
 }
 
 function SelectGlyph({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {

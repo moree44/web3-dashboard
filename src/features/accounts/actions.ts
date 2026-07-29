@@ -9,6 +9,7 @@ import { accounts, projectAccounts, projects, wallets, walletGroups } from "@/li
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { isHttpUrl, normalizeHttpUrl } from "@/lib/url";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -27,7 +28,13 @@ function revalidateAccountViews() {
   revalidatePath("/projects");
 }
 
-const avatarUrlSchema = z.union([z.literal(""), z.string().trim().url()]);
+const avatarUrlSchema = z.preprocess(
+  (value) => typeof value === "string" ? normalizeHttpUrl(value) : value,
+  z.union([
+    z.literal(""),
+    z.string().trim().url().refine(isHttpUrl, "Only http or https URLs are supported"),
+  ]),
+);
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
@@ -183,7 +190,9 @@ export async function setAccountAvatarUrl(
   id: string,
   avatarUrl: string,
 ): Promise<AccountWithStats> {
-  const parsed = avatarUrlSchema.parse(avatarUrl.trim());
+  const result = avatarUrlSchema.safeParse(avatarUrl);
+  if (!result.success) throw new Error("Enter a valid image URL, for example image.example.com/avatar.png");
+  const parsed = result.data;
   if (!parsed) {
     return updateAccount(id, { avatarUrl: null, avatarSource: "none" });
   }

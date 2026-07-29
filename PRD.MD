@@ -1,7 +1,7 @@
 # PRD — Web3 Hunting OS
 
-**Version:** 3.0
-**Status:** Implementation-ready draft. Supersedes v2.8. Synced against current UI implementation and product decisions made after v2.8.
+**Version:** 3.1
+**Status:** Implementation-ready draft. Supersedes v3.0. Synced against the Task lifecycle and Deadline decisions implemented on 2026-07-29.
 **Primary Use:** Personal Web3 hunting workbench
 **Product Type:** Private Web3 activity tracker, inbox, notes system, task manager, account/wallet tracker, project dashboard, and personal trading ledger
 **Stack:** Next.js 15 · TypeScript · Tailwind CSS · shadcn/ui · Supabase PostgreSQL · Supabase Auth · Supabase Storage · Supabase RLS · Drizzle ORM · Zod · React Hook Form · Vercel
@@ -307,6 +307,7 @@ Wallet = address yang digunakan
 Project = garapan Web3
 Task = pekerjaan dalam project
 Task Log = bukti/status aktivitas per hari
+Deadline = reminder atau milestone berbasis tanggal, dengan link Project/Task opsional
 Personal Item = checklist pribadi tanpa project (Phase 1.5)
 Inbox Item = raw input yang belum diproses
 Note = catatan personal atau project knowledge (satu sistem, lihat Section 10)
@@ -331,6 +332,7 @@ Workspace
 │   ├── Tasks
 │   │   └── Task Logs
 │   └── Activity Logs
+├── Deadlines (standalone, optional Project/Task link)
 ├── Daily
 │   ├── Task Checklist (task dengan project_id)
 │   └── Personal Items (checklist tanpa project_id) — Phase 1.5
@@ -368,6 +370,8 @@ Kedua jalur di atas menulis ke tabel `wallets` yang sama. Tidak ada tabel wallet
 **Notes adalah satu sistem, bukan dua.** Note yang ditulis dari dalam Project Detail dan note global di halaman Docs sama-sama masuk ke tabel `notes` yang sama, dibedakan lewat `linked_project_id`. Tidak ada tabel `project_notes` terpisah. Lihat Section 10 untuk detail.
 
 **Task vs Personal Item.** Task selalu terikat ke `project_id` dan punya assigned accounts/wallet/proof. Personal Item tidak terikat project sama sekali, field-nya lebih ringan (judul, frekuensi, catatan opsional), untuk checklist pribadi non-crypto seperti cek berita atau update market. Lihat Section 20A.
+
+**Task lifecycle vs Deadline.** Task menyimpan `start_date` dan `completed_at` untuk mengukur berapa lama aktivitas hunting dikerjakan. Due date hanya dimiliki oleh Deadline. Deadline dapat berdiri sendiri, terhubung ke Project saja, atau terhubung ke Project dan Task untuk kebutuhan seperti mint window, cancel billing, proxy expiry, claim window, atau campaign end. Lihat Section 20B.
 
 ---
 
@@ -1030,7 +1034,8 @@ frequency
 priority
 url
 sort_order
-due_date
+start_date
+completed_at
 created_at
 updated_at
 ```
@@ -1047,6 +1052,8 @@ dropped
 ```
 
 **v3.0 change:** renamed from `skipped` to `dropped`. This is a permanent task-level state — the task will not be worked on again, even though its parent project stays active. This is different from a daily miss recorded in `task_logs.status = 'skip'` (Section 23), which only means "not done today, reappears tomorrow" for recurring tasks. Do not confuse the two: `tasks.status = 'dropped'` is permanent, `task_logs.status = 'skip'` is a single day's record.
+
+`start_date` records when the hunting work began. When status first changes to `done`, the server records `completed_at`. Reopening a completed Task clears `completed_at`; the next completion records a new timestamp while preserving `start_date`. The UI derives a human duration such as Completed same day, Completed in 4 days, or Completed in 2 weeks.
 
 When marking a task as `dropped`, the reason (if any) is recorded as free text in the related `task_logs.notes` field rather than a separate archive-style reason enum. This keeps Archive (Section 24) exclusively project-scoped — there is no parallel archive system for individual tasks.
 
@@ -1199,6 +1206,65 @@ Personal Item does not appear on Dashboard's Hunting Pulse or any other Dashboar
 
 ---
 
+## 20B. Standalone Deadline Model (Phase 1 Core)
+
+Deadline is a date-sensitive reminder or milestone that can exist without a Project or Task. It covers short-lived operational needs that should be visible on Dashboard but do not always justify creating a Task.
+
+Examples:
+
+```txt
+Mint NFT before the public window closes
+Cancel Website A billing before renewal
+Proxy Website B expires in seven days
+Claim campaign reward before deadline
+```
+
+### Deadline Fields
+
+```txt
+id
+workspace_id
+title
+notes
+url
+due_date
+due_time
+status
+linked_project_id
+linked_task_id
+created_at
+updated_at
+```
+
+Status values:
+
+```txt
+upcoming
+done
+cancelled
+```
+
+`overdue` is computed from `due_date` in Asia/Jakarta and is not stored as a status.
+
+### Deadline Relationship Rules
+
+* `linked_project_id` is optional.
+* `linked_task_id` is optional.
+* Linking a Task may infer its Project when no Project was selected.
+* A linked Task must belong to the selected Project when both are present.
+* Due date belongs only to the Deadline record. Task lifecycle timing uses `start_date` and `completed_at`.
+* A Deadline may link only to a Project, to both a Project and Task, or to neither.
+* Creating a detailed Task may optionally create a linked Deadline in the same transaction.
+
+### Deadline UI
+
+* Dashboard Upcoming deadlines shows up to eight nearest items on desktop and five on mobile.
+* The Dashboard panel has a compact Add action.
+* Open navigates to `/deadlines` for the full chronological view.
+* `/deadlines` supports create, edit, status changes, and delete for standalone, Project-linked, and Task-linked Deadline records.
+
+---
+
 ## 21. Task Entry UX
 
 Task entry must be fast. Adding a task should not feel like filling a form.
@@ -1206,7 +1272,7 @@ Task entry must be fast. Adding a task should not feel like filling a form.
 ### Quick Add Flow
 
 ```txt
-User clicks [+ Add task] or uses Quick Capture
+User clicks [Quick add] or uses Quick Capture
 → Inline input appears
 → User types task title
 → Presses Enter to save
@@ -1214,11 +1280,16 @@ User clicks [+ Add task] or uses Quick Capture
    status: todo
    frequency: once
    priority: medium
+   start_date: today in Asia/Jakarta
    assigned: all accounts in project (fallback rule)
 → Input resets, ready for next task
 ```
 
 Defaults are intentional. Most tasks can be used as-is without extra fields.
+
+### Detailed Add Flow
+
+`+ Add task` opens a compact modal using the same visual language as Add Project. It supports Project, title, Start date, status, frequency, priority, assigned accounts, optional wallet, URL, description, and an optional linked Deadline. The Project selector includes the Project logo or initial for faster scanning. This full flow exists alongside Quick Add and does not replace it.
 
 ### Detail Edit
 
@@ -1231,8 +1302,7 @@ priority
 url
 assigned accounts
 assigned wallet
-due_date
-notes
+start_date
 ```
 
 ### Rule
@@ -1244,7 +1314,7 @@ Quick add must work from:
 - Tasks page
 - Dashboard Quick Capture if approved by context
 
-Do not require modal or form for basic task creation.
+Do not require modal or form for basic task creation because Quick Add remains available.
 Detail drawer opens only when user explicitly clicks to edit.
 ```
 
@@ -1514,7 +1584,7 @@ Five panels in a grid, not a two-column "desk vs rail" split:
 ```txt
 Header + Quick Capture (full width)
 ├── Notes desk         → links to /docs
-├── Upcoming deadlines → links to /daily
+├── Upcoming deadlines → links to /deadlines
 ├── Hunting pulse      → links to /projects (spans two row-heights)
 ├── Inbox to process   → links to /inbox
 └── Recent activity    → links to /projects
@@ -1574,7 +1644,7 @@ Project Alpha command note (updated 8m ago)
 
 ### Upcoming deadlines
 
-Shows the nearest date-sensitive items.
+Shows the nearest date-sensitive Deadline records, including standalone, Project-linked, and Task-linked reminders. The panel header includes a compact Add action. It shows up to eight items on desktop and five on mobile; Open navigates to `/deadlines` for the complete timeline.
 
 Examples:
 
@@ -2027,10 +2097,12 @@ Board columns:
 ```txt
 Todo
 In Progress
-Running
 Recheck
 Done
+Dropped
 ```
+
+Running is a separate monitoring view and is not duplicated as a generic Board column.
 
 Every task row/card must show:
 
@@ -2041,8 +2113,9 @@ Every task row/card must show:
 * status badge
 * frequency badge
 * priority only when high
+* Start date, or completion duration when Done
 
-Quick add remains inline. Basic task creation never requires a modal. Board is useful for visual status management, while List remains better for high-volume daily work.
+Quick Add remains inline for high-speed capture. The separate Add Task action opens the detailed create modal. Board is useful for visual status management, while List remains better for high-volume daily work.
 
 ---
 
@@ -2834,7 +2907,25 @@ frequency text check (frequency in ('once','daily','weekly','monthly','custom'))
 priority text check (priority in ('high','medium','low'))
 url text
 sort_order int default 0
-due_date date
+start_date date
+completed_at timestamptz
+created_at timestamptz default now()
+updated_at timestamptz default now()
+```
+
+### deadlines
+
+```sql
+id uuid primary key
+workspace_id uuid references workspaces(id)
+title text not null
+notes text
+url text
+due_date date not null
+due_time time
+status text check (status in ('upcoming','done','cancelled'))
+linked_project_id uuid references projects(id) on delete set null
+linked_task_id uuid references tasks(id) on delete set null
 created_at timestamptz default now()
 updated_at timestamptz default now()
 ```
@@ -3028,6 +3119,9 @@ create index idx_tasks_workspace on tasks(workspace_id);
 create index idx_tasks_status on tasks(status);
 create index idx_tasks_frequency on tasks(frequency);
 
+create index idx_deadlines_workspace_due on deadlines(workspace_id, status, due_date);
+create index idx_deadlines_linked_task on deadlines(linked_task_id);
+
 create index idx_task_logs_date on task_logs(logged_date);
 create index idx_task_logs_task_account_date on task_logs(task_id, account_id, logged_date);
 create index idx_task_logs_account_date on task_logs(account_id, logged_date);
@@ -3104,11 +3198,13 @@ Projects CRUD
 Project logo upload / URL
 Project detail with tabs
 Project-linked Docs (via linked_project_id, not a separate table)
-Task CRUD with quick add
+Task CRUD with Quick Add and detailed Add Task modal
 Task frequency and status badges in UI
 Task assignment to accounts
 Task logs
 Daily checklist with checklist / running-recheck split
+Standalone Deadline CRUD with optional Project/Task links
+Dashboard aggregation of standalone, Project-linked, and Task-linked Deadlines
 Archive with archive reason (project-scoped only)
 Basic activity logs
 ```
@@ -3126,7 +3222,7 @@ Settings — Integrations section, API key storage (scaffold only,
 
 ### Phase 1 Core Dashboard Scope
 
-**v3.0 change:** Running/Recheck removed from Dashboard entirely (moved to Daily and Projects only). A "Reminders" panel was discussed in earlier planning but is not present in the current shipped five-panel grid (Notes desk, Upcoming deadlines, Hunting pulse, Inbox to process, Recent activity) — see DESIGN.md Section 14 "Open question — Reminders panel." Confirm with the user whether to still build it before including it in scope.
+**v3.0 decision update:** Running/Recheck remains outside Dashboard. Standalone reminders are handled by the existing Upcoming deadlines panel and the `/deadlines` route. Do not add a sixth Reminders panel.
 
 Dashboard must show:
 
@@ -3139,7 +3235,7 @@ Inbox to Process
 Recent Activity
 ```
 
-Reminders is not yet built — see DESIGN.md Section 14 open question above. Add it as a sixth standalone panel only after confirming it's still wanted.
+Upcoming deadlines reads Deadline records that may be standalone, Project-linked, or Task-linked. Dashboard shows at most eight on desktop and five on mobile.
 
 Dashboard should not show:
 
@@ -3308,12 +3404,13 @@ Implementation order:
 18. Project logo upload / URL support
 19. Project detail tabs
 20. Project Notes
-21. Tasks CRUD with quick add
-22. Task account assignment
-23. Task logs
-24. Daily checklist with checklist / running-recheck split
-25. Archive system
-26. Activity logs
+21. Standalone Deadline CRUD and Dashboard aggregation
+22. Tasks CRUD with Quick Add and detailed Add Task modal
+23. Task account assignment
+24. Task logs
+25. Daily checklist with checklist / running-recheck split
+26. Archive system
+27. Activity logs
 ```
 
 Do not build Phase 2 or Phase 3 features yet.

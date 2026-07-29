@@ -1,6 +1,6 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.12
+**Version:** 2.13
 **Status:** Current visual direction for Phase 1 preview, completed sidebar coverage, open desktop shell, and light UI polish baseline
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
@@ -572,9 +572,11 @@ Each item shows title and short metadata (folder/type, updated time).
 
 ### Upcoming deadlines
 
-Links to `/daily`. Shows the nearest date-sensitive items.
+Links to `/deadlines`. Shows the nearest standalone, Project-linked, and Task-linked Deadline records.
 
-Limit: 3 items. Each item shows title, short context, and a due label (e.g. "Today", "Tomorrow", or a date).
+Limit: 8 items on desktop and 5 on mobile. Each item shows title, short context, and a due label such as Today, Tomorrow, or a date. A compact View more link appears when additional records exist.
+
+The panel header may include one compact Add action. It opens the shared Deadline modal and must not turn Dashboard into a full management surface. Full create/edit/status/delete management belongs on `/deadlines`.
 
 ### Hunting pulse
 
@@ -599,9 +601,9 @@ Limit: 3 items. Each item shows title, source/metadata, and a priority/status ba
 
 Links to `/projects`. Shows the latest changes across the workspace as a compact short list — title/action text and relative time (e.g. "8m", "24m", "1h").
 
-### Open question — Reminders panel
+### Reminders panel decision
 
-An earlier planning pass considered adding a dedicated "Reminders" panel/section to the dashboard. This was not implemented in the shipped five-panel grid — confirm whether it's still wanted before building it. If added later, it becomes a sixth standalone panel following the same shape as the others, not a sub-section nested inside another panel.
+Do not add a sixth Reminders panel. Date-sensitive reminders use the existing Upcoming deadlines panel and the `/deadlines` management route. This preserves the locked five-panel Dashboard grid.
 
 ---
 
@@ -927,7 +929,7 @@ Board view should feel like a precise task board:
 * single Add Task action in the page header, no per-lane plus controls unless real UX requires it later
 * two-line max task titles
 * when grouped by project, do not repeat the project name inside every card
-* status, mode, frequency, assigned account chips, and Date start visible without opening detail
+* status, frequency, assigned account chips, and Start date or completion duration visible without opening detail
 * descriptions, notes count, proof count, and long logs should move to detail panels later
 * scalable filters instead of horizontal chips for every project
 * compact Running monitor rows that respect the active project filter
@@ -937,18 +939,18 @@ Board view should feel like a precise task board:
 Board columns for normal work:
 
 ```txt
-Not started
 Todo
 In progress
 Recheck
 Done
+Dropped
 ```
 
 Running is not treated as a generic board column by default.
 
-Add Task can use a compact quick-create modal in preview and later should connect to project tasks, Daily generation, and task logs. It should support multi-account assignment because crypto tasks often apply to multiple personas. Search and filters should be functional wherever possible, even before persistence, so the workflow can be tested with preview data.
+Tasks has two intentional creation paths. Quick Add uses a compact inline row with Project and title; Enter saves with Todo, Once, Medium, today's Asia/Jakarta Start date, and all Project Accounts through fallback. The separate Add Task button opens a centered compact modal matching Add Project, with a logo-aware Project selector, full lifecycle properties, Account and Wallet assignment, optional linked Deadline, URL, and Description.
 
-Add Task quick-create modal should follow the same field-label discipline as Add Project. Project, Status, Frequency, Priority, Mode, Assigned accounts, Date start, and Short note should have visible persistent labels. Status, Frequency, and Priority remain fixed-option controls. Date start uses the custom dark date picker, not a native browser date popup.
+The Task edit drawer follows the same field-label discipline as Add Project. Project, Status, Frequency, Priority, Start date, Assigned accounts, optional Project Wallet, URL, and Description have visible persistent labels. Status, Frequency, and Priority remain fixed-option controls. Start date uses the custom dark date picker. Done Tasks show the derived completion duration from Start date to the server-recorded completion timestamp.
 
 Running is a special monitoring state for process-based work only, such as:
 
@@ -960,19 +962,17 @@ Running is a special monitoring state for process-based work only, such as:
 * extension process
 * long-running service
 
-Normal website/testnet/Discord/form/proof tasks should use Not started, Todo, In progress, Recheck, Done, or Skipped later when implemented.
+Normal website/testnet/Discord/form/proof tasks should use Todo, In progress, Recheck, Done, or Dropped. Running is reserved for process-based work.
 
 Every task row or card should show:
 
 * title
 * project mark or logo
 * project name
-* execution mode, visual-only for now
 * assigned account chips
 * status badge
 * frequency badge
-* Date start or monitoring window
-* last log or last check
+* Due date when present
 * priority only when meaningful, especially high priority
 
 Suggested visual execution modes:
@@ -1197,6 +1197,8 @@ Before closing a visual/design batch, verify:
 * Docs has folder/library direction
 * Overview numbers are compact, living inside the Hunting Pulse panel, not large KPI cards
 * Notes desk contains pinned and recent Docs entries
+* Upcoming deadlines combines standalone, Project-linked, and Task-linked Deadline records
+* Deadline create/edit controls reuse shared AppSelect and AppDatePicker surfaces
 * Hunting Pulse contains Overview stat tiles and Category pills, not Running/Recheck
 * Dashboard avoids fragmented widget cards and accidental blank middle space
 * Visual mood uses premium dark gradient ambience
@@ -1222,6 +1224,7 @@ Inbox = raw input
 Docs = notes, research, links, guides, SOP, templates, and safe access metadata
 Daily = full checklist
 Projects = full project database
+Deadlines = standalone, Project-linked, and Task-linked reminder timeline
 ```
 
 Rules:
