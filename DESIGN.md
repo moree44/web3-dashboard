@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.13
-**Status:** Current visual direction for Phase 1 preview, completed sidebar coverage, open desktop shell, and light UI polish baseline
+**Version:** 2.15
+**Status:** Current visual direction for Phase 1, including NFT wallet participation and shared Deadline integration
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -367,14 +367,16 @@ Navigation roles:
 | Docs      | Notes, research, links, guides, SOP, access metadata |
 | Projects  | Main project database, workflow group, and direct link to full table |
 | Watchlist | Project watchlist, nested under Projects              |
+| NFTs      | Collection, whitelist, and mint campaigns, nested under Projects |
 | Daily     | Full checklist execution, nested under Projects      |
+| Deadlines | Chronological reminders and milestones, nested under Projects |
 | Tasks     | Cross-project task management, nested under Projects |
 | Trading   | Portfolio wallets, trade journal, and PnL notes      |
 | Accounts  | Personas, wallets, wallet groups                     |
 | Archive   | Archived projects and results                        |
 | Settings  | App and workspace settings                           |
 
-Do not add hunt categories to sidebar. Projects may contain workflow children only: Watchlist, Daily, and Tasks. The Projects parent is a direct link to the full project table.
+Do not add Project hunt categories to sidebar. Projects may contain workflow children: Watchlist, NFTs, Daily, Deadlines, and Tasks. NFTs is a separate entity and route, not a Project category. The Projects parent is a direct link to the full project table.
 
 Hunt categories stay inside Projects as tabs or filters on the Projects page.
 
@@ -384,9 +386,10 @@ Examples:
 All
 Free Hunts
 Retro
-NFT
 Waitlist
 ```
+
+A compact `NFTs count →` shortcut sits beside the Project filters. It must use a small rectangular navigation treatment with a directional arrow, not the same rounded filter-chip treatment.
 
 Trading is not a Projects category. Trading has its own sidebar menu for portfolio wallets, trade journal, and profit/minus notes.
 
@@ -572,7 +575,7 @@ Each item shows title and short metadata (folder/type, updated time).
 
 ### Upcoming deadlines
 
-Links to `/deadlines`. Shows the nearest standalone, Project-linked, and Task-linked Deadline records.
+Links to `/deadlines`. Shows the nearest standalone, Project-linked, Task-linked, and NFT-linked Deadline records.
 
 Limit: 8 items on desktop and 5 on mobile. Each item shows title, short context, and a due label such as Today, Tomorrow, or a date. A compact View more link appears when additional records exist.
 
@@ -583,7 +586,7 @@ The panel header may include one compact Add action. It opens the shared Deadlin
 Links to `/projects`. Spans two row-heights in the grid since it carries two groups:
 
 * **Overview** — small stat tiles: Projects, Active, Inbox, Due, Running, Archived
-* **Categories** — compact pill counts: Testnet, Free Hunt, Retro, NFT, Waitlist
+* **Categories** — compact pill counts: Testnet, Free Hunt, Retro, NFT, Waitlist. The NFT pill links to `/nfts`; Project category pills link to filtered Projects views.
 
 Trading is not shown here — Trading has its own sidebar section (Section 39A of PRD).
 
@@ -834,6 +837,40 @@ Dashboard must not duplicate this full table.
 Avoid vague preview columns such as Activity unless they are backed by a clear activity log or last-updated field. If needed later, use a clearer label such as Last updated.
 
 Mobile should use compact project cards instead of squeezing table columns.
+
+### 19A. NFTs Page Direction
+
+NFTs is a dedicated list-first workspace at `/nfts`. It should feel lighter than Projects and must not become a collection card wall.
+
+Primary controls:
+
+```txt
+All · Watching · Whitelist · Upcoming · Minted · Missed
+Search collections
+Chain filter
+Add NFT
+```
+
+Desktop columns:
+
+```txt
+Collection · Chain · Status · Participation · Mint schedule · Action
+```
+
+Rules:
+
+* use the shared monochrome artwork icon instead of collection initials or logo uploads
+* reuse the assigned Account avatar group and its interactive overflow behavior
+* Participation combines Account avatars with a compact Whitelisted / Wallets summary
+* Add/Edit groups compatible Wallets below each selected Account
+* each selected Wallet has one shared AppSelect for Planned, Submitted, Whitelisted, Not whitelisted, Minted, or Skipped
+* Accounts without a compatible selected Wallet remain visible with a restrained need wallet state
+* Wallet addresses use compact monospace formatting; controls remain visually secondary to collection identity
+* use the shared AppSelect, AppDatePicker, button, badge, modal, and URL input language
+* Add/Edit NFT stays centered and compact
+* Mint date helper text explains that the date is represented by a linked Deadline
+* status tabs are filters; the Projects-page NFT shortcut is navigation and must look different
+* mobile uses compact list cards, not compressed table columns
 
 ---
 
@@ -1197,7 +1234,7 @@ Before closing a visual/design batch, verify:
 * Docs has folder/library direction
 * Overview numbers are compact, living inside the Hunting Pulse panel, not large KPI cards
 * Notes desk contains pinned and recent Docs entries
-* Upcoming deadlines combines standalone, Project-linked, and Task-linked Deadline records
+* Upcoming deadlines combines standalone, Project-linked, Task-linked, and NFT-linked Deadline records
 * Deadline create/edit controls reuse shared AppSelect and AppDatePicker surfaces
 * Hunting Pulse contains Overview stat tiles and Category pills, not Running/Recheck
 * Dashboard avoids fragmented widget cards and accidental blank middle space
@@ -1224,7 +1261,7 @@ Inbox = raw input
 Docs = notes, research, links, guides, SOP, templates, and safe access metadata
 Daily = full checklist
 Projects = full project database
-Deadlines = standalone, Project-linked, and Task-linked reminder timeline
+Deadlines = standalone, Project-linked, Task-linked, and NFT-linked reminder timeline
 ```
 
 Rules:

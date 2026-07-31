@@ -1,4 +1,4 @@
-export const HUNT_TYPES = ["free_hunts", "retro", "nft", "waitlist"] as const;
+export const HUNT_TYPES = ["free_hunts", "retro", "waitlist"] as const;
 export const PROJECT_STATUSES = [
   "watching",
   "in_progress",

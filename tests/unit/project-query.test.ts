@@ -48,10 +48,10 @@ describe("project URL query state", () => {
   it("parses supported filters, sorting, columns, and pagination", () => {
     const parsed = parseProjectQuery(new URLSearchParams({
       view: "watchlist",
-      hunt: "nft",
-      q: "mint",
+      hunt: "retro",
+      q: "bridge",
       status: "watching",
-      stage: "Joined whitelist",
+      stage: "Accepted",
       priority: "high",
       account: "Moree",
       dateFrom: "2026-07-01",
@@ -65,10 +65,10 @@ describe("project URL query state", () => {
 
     expect(parsed).toMatchObject({
       view: "watchlist",
-      hunt: "nft",
-      query: "mint",
+      hunt: "retro",
+      query: "bridge",
       status: "watching",
-      stage: "Joined whitelist",
+      stage: "Accepted",
       priority: "high",
       account: "Moree",
       dateFrom: "2026-07-01",
@@ -101,6 +101,10 @@ describe("project URL query state", () => {
     expect(parsed.pageSize).toBe(10);
   });
 
+  it("treats the former NFT Project hunt type as unsupported", () => {
+    expect(parseProjectQuery(new URLSearchParams({ hunt: "nft" })).hunt).toBe("");
+  });
+
   it("supports intentionally hiding every optional column", () => {
     expect(parseProjectQuery(new URLSearchParams({ columns: "none" })).columns).toEqual([]);
   });
@@ -129,9 +133,9 @@ describe("project filtering and sorting", () => {
       name: "Dawn",
       statusKey: "watching",
       priorityKey: "medium",
-      huntKey: "nft",
-      stage: "Joined whitelist",
-      work: ["Whitelist"],
+      huntKey: "retro",
+      stage: "Accepted",
+      work: ["Bridge interaction"],
       type: ["DePIN"],
       accounts: ["Wdym"],
       dateValue: "2026-07-10",
@@ -152,10 +156,10 @@ describe("project filtering and sorting", () => {
 
   it("combines hunt, status, priority, stage, account, date, and search filters", () => {
     const result = filterAndSortProjects([...records], state({
-      hunt: "nft",
+      hunt: "retro",
       status: "watching",
       priority: "medium",
-      stage: "Joined whitelist",
+      stage: "Accepted",
       account: "Wdym",
       dateFrom: "2026-07-01",
       dateTo: "2026-07-31",

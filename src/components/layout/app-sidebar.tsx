@@ -13,6 +13,7 @@ import {
   Inbox,
   LayoutDashboard,
   ListChecks,
+  Sparkles,
   Radar,
   Settings,
   TrendingUp,
@@ -23,7 +24,7 @@ import Link from "next/link";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { cn } from "@/lib/utils";
 
-export type AppSection = "Dashboard" | "Inbox" | "Docs" | "Daily" | "Deadlines" | "Projects" | "Watchlist" | "Trading" | "Tasks" | "Accounts" | "Archive" | "Settings";
+export type AppSection = "Dashboard" | "Inbox" | "Docs" | "Daily" | "Deadlines" | "Projects" | "Watchlist" | "NFTs" | "Trading" | "Tasks" | "Accounts" | "Archive" | "Settings";
 
 const mainNavigation = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -33,6 +34,7 @@ const mainNavigation = [
 
 const projectNavigation = [
   { label: "Watchlist", href: "/projects?view=watchlist", icon: Eye, active: "Watchlist" },
+  { label: "NFTs", href: "/nfts", icon: Sparkles, active: "NFTs" },
   { label: "Daily", href: "/daily", icon: CalendarCheck2, active: "Daily" },
   { label: "Deadlines", href: "/deadlines", icon: CalendarClock, active: "Deadlines" },
   { label: "Tasks", href: "/tasks", icon: ListChecks, active: "Tasks" },
@@ -45,7 +47,7 @@ const lowerNavigation = [
 ] as const;
 
 export function AppSidebar({ active }: { active: AppSection }) {
-  const projectGroupActive = active === "Projects" || active === "Watchlist" || active === "Daily" || active === "Deadlines" || active === "Tasks";
+  const projectGroupActive = active === "Projects" || active === "Watchlist" || active === "NFTs" || active === "Daily" || active === "Deadlines" || active === "Tasks";
   const [projectOpen, setProjectOpen] = useState(true);
 
   return (

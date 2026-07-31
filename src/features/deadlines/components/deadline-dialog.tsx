@@ -98,6 +98,7 @@ export function DeadlineDialog({
       meta: task.projectName ? <span className="text-[9px] text-muted-foreground">{task.projectName.slice(0, 1)}</span> : undefined,
     })),
   ];
+  const linkedNftName = deadline?.linkedNftCampaignName;
 
   async function save() {
     if (!canSave) return;
@@ -178,7 +179,7 @@ export function DeadlineDialog({
               {deadline ? "Edit deadline" : "Add deadline"}
             </h2>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Project and Task links are optional.
+              {linkedNftName ? "This mint schedule is linked to its NFT campaign." : "Project and Task links are optional."}
             </p>
           </div>
           <button
@@ -220,10 +221,17 @@ export function DeadlineDialog({
             </label>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AppSelect label="Project, optional" value={linkedProjectId} options={projectOptions} onChange={changeProject} />
-            <AppSelect label="Related task, optional" value={linkedTaskId} options={taskOptions} onChange={changeTask} />
-          </div>
+          {linkedNftName ? (
+            <div className="rounded-xl bg-white/[0.025] px-3 py-2.5 ring-1 ring-white/[0.045]">
+              <span className="block text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">NFT campaign</span>
+              <span className="mt-1 block text-xs font-medium">{linkedNftName}</span>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AppSelect label="Project, optional" value={linkedProjectId} options={projectOptions} onChange={changeProject} />
+              <AppSelect label="Related task, optional" value={linkedTaskId} options={taskOptions} onChange={changeTask} />
+            </div>
+          )}
 
           {deadline ? (
             <AppSelect label="Status" value={status} options={statusOptions} onChange={setStatus} className="max-w-[220px]" />

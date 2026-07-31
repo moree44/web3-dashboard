@@ -39,6 +39,8 @@ describe("DeadlineDialog", () => {
       linkedTaskId: options.tasks[0].id,
       linkedProjectName: "Project A",
       linkedTaskTitle: "Mint NFT",
+      linkedNftCampaignId: null,
+      linkedNftCampaignName: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

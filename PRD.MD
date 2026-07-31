@@ -1,7 +1,7 @@
 # PRD — Web3 Hunting OS
 
-**Version:** 3.1
-**Status:** Implementation-ready draft. Supersedes v3.0. Synced against the Task lifecycle and Deadline decisions implemented on 2026-07-29.
+**Version:** 3.3
+**Status:** Implementation-ready draft. Supersedes v3.2. Synced against dedicated NFT wallet participation tracking implemented on 2026-07-30.
 **Primary Use:** Personal Web3 hunting workbench
 **Product Type:** Private Web3 activity tracker, inbox, notes system, task manager, account/wallet tracker, project dashboard, and personal trading ledger
 **Stack:** Next.js 15 · TypeScript · Tailwind CSS · shadcn/ui · Supabase PostgreSQL · Supabase Auth · Supabase Storage · Supabase RLS · Drizzle ORM · Zod · React Hook Form · Vercel
@@ -12,7 +12,7 @@ To reach a usable state quickly, implementation is split into two waves within P
 
 ```
 Phase 1 Core       Auth, Workspace, Inbox, Docs, Accounts, Wallets,
-                    Projects, Tasks, Daily, Archive
+                    Projects, NFTs, Tasks, Daily, Deadlines, Archive
                     → build and ship first
 
 Phase 1.5          Trading (Trade Log, Portfolio, Token Watchlist),
@@ -307,7 +307,7 @@ Wallet = address yang digunakan
 Project = garapan Web3
 Task = pekerjaan dalam project
 Task Log = bukti/status aktivitas per hari
-Deadline = reminder atau milestone berbasis tanggal, dengan link Project/Task opsional
+Deadline = reminder atau milestone berbasis tanggal, dengan link Project, Task, atau NFT Campaign opsional
 Personal Item = checklist pribadi tanpa project (Phase 1.5)
 Inbox Item = raw input yang belum diproses
 Note = catatan personal atau project knowledge (satu sistem, lihat Section 10)
@@ -332,7 +332,7 @@ Workspace
 │   ├── Tasks
 │   │   └── Task Logs
 │   └── Activity Logs
-├── Deadlines (standalone, optional Project/Task link)
+├── Deadlines (standalone, optional Project/Task/NFT link)
 ├── Daily
 │   ├── Task Checklist (task dengan project_id)
 │   └── Personal Items (checklist tanpa project_id) — Phase 1.5
@@ -787,14 +787,13 @@ updated_at
 
 ---
 
-## 14. Hunt Types
+## 14. Project Hunt Types
 
 Hunt type adalah kategori besar project.
 
 ```txt
 free_hunts
 retro
-nft
 waitlist
 ```
 
@@ -802,10 +801,57 @@ waitlist
 | ---------- | --------------------------------------------------------------------- |
 | free_hunts | Testnet, node, CLI, role grinding, point farming, Galxe, Zealy, badge |
 | retro      | Retroactive protocol interaction                                      |
-| nft        | Mint, whitelist, NFT campaign                                         |
 | waitlist   | Early access, form, registration, check result                        |
 
 Trading bukan hunt type project di Phase 1. Trading adalah menu sendiri untuk portfolio wallet, trade journal, dan catatan profit/minus.
+
+NFT juga bukan lagi Hunt Type Project. NFT hunting memakai entity dan route dedicated agar field mint dan chain tidak membawa seluruh beban model Project.
+
+### 14A. NFT Campaigns
+
+NFT Campaign adalah collection, whitelist, atau mint opportunity yang berdiri sendiri di bawah workflow Projects melalui route `/nfts`.
+
+Fields:
+
+```txt
+id
+workspace_id
+name
+chain
+status
+mint_url
+notes
+created_at
+updated_at
+```
+
+Status values:
+
+```txt
+watching
+whitelisted
+upcoming
+minted
+missed
+```
+
+Account assignments use nft_campaign_accounts. Mint schedule is not duplicated on the campaign row. It uses one linked Deadline record so Dashboard, Deadlines, and NFTs read the same date and time.
+
+Wallet participation uses nft_campaign_wallets. Each assignment links one Wallet to one NFT Campaign and stores an individual result: planned, submitted, whitelisted, not_whitelisted, minted, or skipped.
+
+The Campaign status represents the overall lifecycle. The Wallet status represents the result for a specific address. A Campaign may therefore contain three participating Accounts while only two Wallets are Whitelisted. Wallets remain visible after an unsuccessful result so the attempt history is not lost.
+
+Wallet selection rules:
+
+* selecting an Account exposes Wallets owned by that Account
+* a single compatible Wallet may be preselected, but it remains visible and removable
+* an Account may be saved before a Wallet is selected and is then shown as needing a Wallet
+* ownerless Wallets may be selected as shared Wallets
+* selected Wallets must belong to the same workspace
+* a Wallet with an owner requires that Account to be assigned to the Campaign
+* Chain compatibility accepts exact normalized matches and treats EVM-family networks as compatible
+
+NFT campaign form stays intentionally small: Collection name, Chain, lifecycle Status, Accounts, Wallet participation, optional Mint date/time, Mint URL, and Notes. Project-only fields such as Priority, Work Type, Project Type, Progress, and Start date do not appear.
 
 ---
 
@@ -931,11 +977,11 @@ Catatan: value `done` sengaja tidak masuk preset Stage. Project yang sudah seles
 Field Stage tetap tampil untuk semua Hunt Type (tidak disembunyikan secara dinamis), tapi default value-nya berbeda:
 
 ```txt
-Hunt Type: waitlist, nft   → default "watching"
+Hunt Type: waitlist          → default "watching"
 Hunt Type: free_hunts, retro → default "not_applicable"
 ```
 
-Alasan: Waitlist dan NFT project memang berjalan lewat tahapan menunggu hasil eksternal, jadi Stage relevan sejak awal. Free Hunts dan Retro biasanya dikerjakan langsung (testnet, interaction) sehingga progress sudah cukup terwakili oleh `status`.
+Alasan: Waitlist berjalan lewat tahapan menunggu hasil eksternal, jadi Stage relevan sejak awal. Free Hunts dan Retro biasanya dikerjakan langsung sehingga progress sudah cukup terwakili oleh `status`. NFT lifecycle memakai status dedicated pada NFT Campaign.
 
 Contoh:
 
@@ -1232,6 +1278,7 @@ due_time
 status
 linked_project_id
 linked_task_id
+linked_nft_campaign_id
 created_at
 updated_at
 ```
@@ -1250,18 +1297,21 @@ cancelled
 
 * `linked_project_id` is optional.
 * `linked_task_id` is optional.
+* `linked_nft_campaign_id` is optional and identifies the single mint schedule owned by an NFT campaign.
 * Linking a Task may infer its Project when no Project was selected.
 * A linked Task must belong to the selected Project when both are present.
 * Due date belongs only to the Deadline record. Task lifecycle timing uses `start_date` and `completed_at`.
-* A Deadline may link only to a Project, to both a Project and Task, or to neither.
+* A Deadline may link to a Project, to both a Project and Task, to an NFT Campaign, or to neither.
 * Creating a detailed Task may optionally create a linked Deadline in the same transaction.
+* Setting a Mint date on an NFT Campaign creates or updates its linked Deadline. Clearing the date removes that linked mint Deadline.
+* Marking an NFT Campaign Minted completes its linked Deadline; Missed cancels it.
 
 ### Deadline UI
 
 * Dashboard Upcoming deadlines shows up to eight nearest items on desktop and five on mobile.
 * The Dashboard panel has a compact Add action.
 * Open navigates to `/deadlines` for the full chronological view.
-* `/deadlines` supports create, edit, status changes, and delete for standalone, Project-linked, and Task-linked Deadline records.
+* `/deadlines` supports create, edit, status changes, and delete for standalone, Project-linked, Task-linked, and NFT-linked Deadline records.
 
 ---
 
@@ -1495,16 +1545,18 @@ Settings
 | Dashboard | Personal desk: inbox, docs, and pulse                     |
 | Inbox     | Raw input waiting to be processed                         |
 | Docs      | Notes, guides, links, templates, SOP, and safe references |
-| Projects  | Main project database — parent item links directly to the full table, also groups Watchlist/Daily/Tasks |
+| Projects  | Main project database — parent item links directly to the full table, also groups workflow children |
 | Watchlist | Filtered Projects view for stage-pending items, nested under Projects |
+| NFTs      | Dedicated collection, whitelist, and mint campaign workspace, nested under Projects |
 | Daily     | Full checklist grouped by account, plus Personal Items (Phase 1.5), nested under Projects |
+| Deadlines | Full chronological reminder and milestone view, nested under Projects |
 | Tasks     | Cross-project task management, nested under Projects      |
 | Trading   | Trade log, portfolio, and token watchlist (Phase 1.5)     |
 | Accounts  | Identities, wallets, and groups                           |
 | Archive   | Archived projects and results (project-scoped only)       |
 | Settings  | Workspace, account, and integration settings              |
 
-Sidebar harus tetap kecil dan stabil. Projects boleh menjadi dropdown workflow, tetapi hunt category tetap tidak menjadi top-level navigation.
+Sidebar harus tetap kecil dan stabil. Projects boleh menjadi dropdown workflow. NFTs adalah workflow entity sendiri, bukan Hunt Type filter.
 
 Project categories tetap filters/tabs di dalam Projects page, bukan sidebar child:
 
@@ -1512,9 +1564,10 @@ Project categories tetap filters/tabs di dalam Projects page, bukan sidebar chil
 All
 Free Hunts
 Retro
-NFT
 Waitlist
 ```
+
+Projects page menampilkan shortcut terpisah `NFTs count →` di samping filters. Shortcut harus terlihat sebagai navigation action, bukan filter chip.
 
 Trading tidak menjadi category Projects. Trading hidup sebagai menu sendiri.
 
@@ -1524,7 +1577,7 @@ Mapping workflow Notion lama:
 | ----------------------------- | ------------------------ |
 | Testnet and Grind drop        | Projects → Free Hunts    |
 | Retro                         | Projects → Retro         |
-| NFT                           | Projects → NFT           |
+| NFT mint / whitelist          | Projects → NFTs          |
 | Waitlist/check                | Projects → Waitlist      |
 | Trading Activity / portfolio  | Trading                  |
 | Trash                         | Archive                  |
@@ -1644,7 +1697,7 @@ Project Alpha command note (updated 8m ago)
 
 ### Upcoming deadlines
 
-Shows the nearest date-sensitive Deadline records, including standalone, Project-linked, and Task-linked reminders. The panel header includes a compact Add action. It shows up to eight items on desktop and five on mobile; Open navigates to `/deadlines` for the complete timeline.
+Shows the nearest date-sensitive Deadline records, including standalone, Project-linked, Task-linked, and NFT-linked reminders. The panel header includes a compact Add action. It shows up to eight items on desktop and five on mobile; Open navigates to `/deadlines` for the complete timeline.
 
 Examples:
 
@@ -2852,7 +2905,7 @@ description text
 logo_url text
 logo_path text
 logo_source text check (logo_source in ('uploaded','external_url','favicon','manual','none'))
-hunt_type text check (hunt_type in ('free_hunts','retro','nft','waitlist'))
+hunt_type text check (hunt_type in ('free_hunts','retro','waitlist'))
 status text check (status in ('watching','in_progress','running','paused','done','dropped','archived'))
 priority text check (priority in ('high','medium','low'))
 work_types text[]
@@ -2892,6 +2945,39 @@ wallet_id uuid references wallets(id)
 primary key (project_id, wallet_id)
 ```
 
+### nft_campaigns
+
+```sql
+id uuid primary key
+workspace_id uuid references workspaces(id)
+name text not null
+chain text not null
+status text check (status in ('watching','whitelisted','upcoming','minted','missed'))
+mint_url text
+notes text
+created_at timestamptz default now()
+updated_at timestamptz default now()
+```
+
+### nft_campaign_accounts
+
+```sql
+nft_campaign_id uuid references nft_campaigns(id) on delete cascade
+account_id uuid references accounts(id) on delete cascade
+primary key (nft_campaign_id, account_id)
+```
+
+### nft_campaign_wallets
+
+```sql
+nft_campaign_id uuid references nft_campaigns(id) on delete cascade
+wallet_id uuid references wallets(id) on delete cascade
+status text check (status in ('planned','submitted','whitelisted','not_whitelisted','minted','skipped'))
+created_at timestamptz default now()
+updated_at timestamptz default now()
+primary key (nft_campaign_id, wallet_id)
+```
+
 ### tasks
 
 **v3.0 change:** `status` enum value `skipped` renamed to `dropped` — see Section 20.
@@ -2926,6 +3012,7 @@ due_time time
 status text check (status in ('upcoming','done','cancelled'))
 linked_project_id uuid references projects(id) on delete set null
 linked_task_id uuid references tasks(id) on delete set null
+linked_nft_campaign_id uuid references nft_campaigns(id) on delete cascade
 created_at timestamptz default now()
 updated_at timestamptz default now()
 ```
@@ -3203,8 +3290,8 @@ Task frequency and status badges in UI
 Task assignment to accounts
 Task logs
 Daily checklist with checklist / running-recheck split
-Standalone Deadline CRUD with optional Project/Task links
-Dashboard aggregation of standalone, Project-linked, and Task-linked Deadlines
+Standalone Deadline CRUD with optional Project/Task/NFT links
+Dashboard aggregation of standalone, Project-linked, Task-linked, and NFT-linked Deadlines
 Archive with archive reason (project-scoped only)
 Basic activity logs
 ```

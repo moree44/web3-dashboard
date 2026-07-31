@@ -21,12 +21,13 @@ import { compareDeadlineDates } from "./deadline-utils";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
-import { deadlines, projects, tasks } from "@/lib/db/schema";
+import { deadlines, nftCampaigns, projects, tasks } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 
 export type DeadlineWithContext = typeof deadlines.$inferSelect & {
   linkedProjectName: string | null;
   linkedTaskTitle: string | null;
+  linkedNftCampaignName: string | null;
 };
 
 export type UpcomingDeadlineItem = {
@@ -39,6 +40,7 @@ export type UpcomingDeadlineItem = {
   url: string | null;
   linkedProjectId: string | null;
   linkedTaskId: string | null;
+  linkedNftCampaignId: string | null;
 };
 
 export type DeadlineProjectOption = {
@@ -71,7 +73,7 @@ async function requireWorkspace() {
 }
 
 function revalidateDeadlineViews() {
-  for (const path of ["/", "/deadlines", "/tasks", "/daily"]) {
+  for (const path of ["/", "/deadlines", "/tasks", "/daily", "/nfts"]) {
     revalidatePath(path);
   }
 }
@@ -89,14 +91,17 @@ async function getDeadlineRecords(workspaceId: string) {
       status: deadlines.status,
       linkedProjectId: deadlines.linkedProjectId,
       linkedTaskId: deadlines.linkedTaskId,
+      linkedNftCampaignId: deadlines.linkedNftCampaignId,
       createdAt: deadlines.createdAt,
       updatedAt: deadlines.updatedAt,
       linkedProjectName: projects.name,
       linkedTaskTitle: tasks.title,
+      linkedNftCampaignName: nftCampaigns.name,
     })
     .from(deadlines)
     .leftJoin(projects, eq(deadlines.linkedProjectId, projects.id))
     .leftJoin(tasks, eq(deadlines.linkedTaskId, tasks.id))
+    .leftJoin(nftCampaigns, eq(deadlines.linkedNftCampaignId, nftCampaigns.id))
     .where(eq(deadlines.workspaceId, workspaceId))
     .orderBy(asc(deadlines.dueDate), asc(deadlines.dueTime), desc(deadlines.updatedAt));
 }
@@ -137,12 +142,13 @@ function toUpcomingItems(deadlineRows: DeadlineWithContext[]) {
       id: item.id,
       source: "deadline",
       title: item.title,
-      context: item.linkedTaskTitle ?? item.linkedProjectName ?? item.notes ?? "Standalone deadline",
+      context: item.linkedTaskTitle ?? item.linkedProjectName ?? item.linkedNftCampaignName ?? item.notes ?? "Standalone deadline",
       dueDate: item.dueDate,
       dueTime: item.dueTime,
       url: item.url,
       linkedProjectId: item.linkedProjectId,
       linkedTaskId: item.linkedTaskId,
+      linkedNftCampaignId: item.linkedNftCampaignId,
     }));
 
   return deadlineItems.sort(compareDeadlineDates);
@@ -246,6 +252,7 @@ export async function createDeadline(data: DeadlineInput): Promise<DeadlineWithC
     ...created,
     linkedProjectName: null,
     linkedTaskTitle: null,
+    linkedNftCampaignName: null,
   };
 }
 
@@ -287,6 +294,7 @@ export async function updateDeadline(
     ...updated,
     linkedProjectName: null,
     linkedTaskTitle: null,
+    linkedNftCampaignName: null,
   };
 }
 

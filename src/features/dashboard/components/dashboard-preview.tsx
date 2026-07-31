@@ -29,11 +29,11 @@ const overviewMetrics = [
 ];
 
 const pulseItems = [
-  { label: "Testnet", value: "12" },
-  { label: "Free Hunt", value: "14" },
-  { label: "Retro", value: "6" },
-  { label: "NFT", value: "5" },
-  { label: "Waitlist", value: "8" },
+  { label: "Testnet", value: "12", href: "/projects" },
+  { label: "Free Hunt", value: "14", href: "/projects?hunt=free_hunts" },
+  { label: "Retro", value: "6", href: "/projects?hunt=retro" },
+  { label: "NFT", value: "5", href: "/nfts" },
+  { label: "Waitlist", value: "8", href: "/projects?hunt=waitlist" },
 ];
 
 const inboxItems = [
@@ -66,11 +66,13 @@ export function DashboardPreview({
   deadlineItems,
   deadlineOptions = emptyDeadlineOptions,
   deadlineDueCount,
+  nftCount,
   canManageDeadlines = false,
 }: {
   deadlineItems?: UpcomingDeadlineItem[];
   deadlineOptions?: DeadlineOptions;
   deadlineDueCount?: number;
+  nftCount?: number;
   canManageDeadlines?: boolean;
 } = {}) {
   const { dateLabel, headline, motivation } = getDashboardGreeting();
@@ -78,6 +80,9 @@ export function DashboardPreview({
   const metrics = overviewMetrics.map((metric) => metric.label === "Due" && deadlineDueCount !== undefined
     ? { ...metric, value: String(deadlineDueCount) }
     : metric);
+  const categories = pulseItems.map((item) => item.label === "NFT" && nftCount !== undefined
+    ? { ...item, value: String(nftCount) }
+    : item);
 
   return (
     <div className="px-4 py-3 sm:px-5 lg:px-6 lg:py-4">
@@ -141,7 +146,7 @@ export function DashboardPreview({
 
           <SectionLabel label="Categories" className="mt-2.5" />
           <div className="flex flex-wrap gap-1.5">
-            {pulseItems.map((item) => <PulsePill key={item.label} item={item} />)}
+            {categories.map((item) => <PulsePill key={item.label} item={item} />)}
           </div>
 
         </DashboardPanel>
@@ -231,7 +236,7 @@ function MetricTile({ item }: { item: (typeof overviewMetrics)[number] }) {
 
 function PulsePill({ item }: { item: (typeof pulseItems)[number] }) {
   return (
-    <Link href="/projects" className="inline-flex items-baseline gap-1.5 rounded-md bg-white/[0.035] px-2 py-1 hover:bg-white/[0.055] hover:text-foreground">
+    <Link href={item.href} className="inline-flex items-baseline gap-1.5 rounded-md bg-white/[0.035] px-2 py-1 hover:bg-white/[0.055] hover:text-foreground">
       <span className="text-[11px] text-muted-foreground">{item.label}</span>
       <span className="text-[13px] font-semibold tabular-nums tracking-[-0.025em]">{item.value}</span>
     </Link>
@@ -261,9 +266,9 @@ function DeadlineRow({ item, className }: { item: UpcomingDeadlineItem; classNam
 function getFallbackDeadlines(): UpcomingDeadlineItem[] {
   const today = getJakartaDateValue();
   return [
-    { id: "preview-proof", source: "deadline", title: "Project Alpha proof", context: "Submit before reset", dueDate: today, dueTime: null, url: null, linkedProjectId: null, linkedTaskId: "preview-proof" },
-    { id: "preview-billing", source: "deadline", title: "Cancel Website A billing", context: "Standalone deadline", dueDate: shiftDateValue(today, 1), dueTime: null, url: null, linkedProjectId: null, linkedTaskId: null },
-    { id: "preview-proxy", source: "deadline", title: "Proxy Website B expires", context: "Renew if farming stays active", dueDate: shiftDateValue(today, 7), dueTime: "20:00", url: null, linkedProjectId: null, linkedTaskId: null },
+    { id: "preview-proof", source: "deadline", title: "Project Alpha proof", context: "Submit before reset", dueDate: today, dueTime: null, url: null, linkedProjectId: null, linkedTaskId: "preview-proof", linkedNftCampaignId: null },
+    { id: "preview-billing", source: "deadline", title: "Cancel Website A billing", context: "Standalone deadline", dueDate: shiftDateValue(today, 1), dueTime: null, url: null, linkedProjectId: null, linkedTaskId: null, linkedNftCampaignId: null },
+    { id: "preview-proxy", source: "deadline", title: "Proxy Website B expires", context: "Renew if farming stays active", dueDate: shiftDateValue(today, 7), dueTime: "20:00", url: null, linkedProjectId: null, linkedTaskId: null, linkedNftCampaignId: null },
   ];
 }
 

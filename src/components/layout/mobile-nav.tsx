@@ -19,17 +19,20 @@ export function MobileNav({ active }: { active: AppSection }) {
         className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-20 grid h-16 grid-cols-5 rounded-2xl border soft-divider-strong bg-secondary/95 px-2 shadow-xl shadow-black/30 lg:hidden"
         aria-label="Mobile navigation"
       >
-        {items.map(({ label, href, icon: Icon }) => (
-          <Link
-            key={label}
-            href={href}
-            aria-current={active === label ? "page" : undefined}
-            className={cn("flex flex-col items-center justify-center gap-1 text-[10px] font-medium", active === label ? "text-foreground" : "text-muted-foreground")}
-          >
-            <Icon aria-hidden="true" className="size-[18px]" />
-            <span>{label}</span>
-          </Link>
-        ))}
+        {items.map(({ label, href, icon: Icon }) => {
+          const isActive = active === label || (label === "Projects" && active === "NFTs");
+          return (
+            <Link
+              key={label}
+              href={href}
+              aria-current={isActive ? "page" : undefined}
+              className={cn("flex flex-col items-center justify-center gap-1 text-[10px] font-medium", isActive ? "text-foreground" : "text-muted-foreground")}
+            >
+              <Icon aria-hidden="true" className="size-[18px]" />
+              <span>{label}</span>
+            </Link>
+          );
+        })}
       </nav>
     </>
   );

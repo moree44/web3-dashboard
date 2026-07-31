@@ -7,6 +7,7 @@ import {
   Clock3,
   ListChecks,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
@@ -61,7 +62,7 @@ export function DeadlinesPreview({
       .map((deadline) => ({
         id: deadline.id,
         title: deadline.title,
-        context: deadline.linkedTaskTitle ?? deadline.linkedProjectName ?? deadline.notes ?? "Standalone deadline",
+        context: deadline.linkedTaskTitle ?? deadline.linkedProjectName ?? deadline.linkedNftCampaignName ?? deadline.notes ?? "Standalone deadline",
         dueDate: deadline.dueDate,
         dueTime: deadline.dueTime,
         status: deadline.status,
@@ -205,14 +206,14 @@ function DeadlineListRow({ item, onOpen }: { item: DisplayDeadline; onOpen?: () 
   const content = (
     <>
       <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/[0.035] text-muted-foreground">
-        {item.record?.linkedTaskId ? <ListChecks className="size-4" /> : <CalendarClock className="size-4" />}
+        {item.record?.linkedTaskId ? <ListChecks className="size-4" /> : item.record?.linkedNftCampaignId ? <Sparkles className="size-4" /> : <CalendarClock className="size-4" />}
       </span>
       <span className="min-w-0 flex-1 text-left">
         <span className="block truncate text-[13px] font-medium text-foreground">{item.title}</span>
         <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{item.context}</span>
       </span>
       <Badge variant="secondary" className="hidden text-[10px] sm:inline-flex">
-        {item.record?.linkedTaskId ? "Task" : item.record?.linkedProjectId ? "Project" : "Deadline"}
+        {item.record?.linkedTaskId ? "Task" : item.record?.linkedProjectId ? "Project" : item.record?.linkedNftCampaignId ? "NFT" : "Deadline"}
       </Badge>
       <span className="w-24 shrink-0 text-right">
         <span className={cn("block text-[11px] font-medium tabular-nums", overdue ? "text-destructive" : dueLabel === "Today" ? "text-warning" : "text-muted-foreground")}>{dueLabel}</span>

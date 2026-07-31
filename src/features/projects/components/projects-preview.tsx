@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { Archive, ArrowUpRight, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -46,14 +46,12 @@ const priorityLabels: Record<string, string> = {
 const huntLabels: Record<string, string> = {
   free_hunts: "Free Hunts",
   retro: "Retro",
-  nft: "NFT",
   waitlist: "Waitlist",
 };
 
 const reverseHuntLabels: Record<string, string> = {
   "Free Hunts": "free_hunts",
   Retro: "retro",
-  NFT: "nft",
   Waitlist: "waitlist",
 };
 
@@ -210,9 +208,9 @@ const fallbackProjects: Project[] = [
     logoClass: "bg-white/[0.065] text-[#c4cad3]",
     status: "Watching",
     priority: "Medium",
-    hunt: "NFT",
-    stage: "Joined whitelist",
-    work: ["Whitelist", "Extension"],
+    hunt: "Waitlist",
+    stage: "Waiting result",
+    work: ["Early access", "Extension"],
     type: ["DePIN"],
     accounts: ["Wdym"],
     progress: 10,
@@ -232,11 +230,13 @@ export function ProjectsPreview({
   initialProjects = [],
   developmentPreview = false,
   accountOptions = [],
+  nftCount = 0,
 }: {
   view?: "all" | "watchlist";
   initialProjects?: DbProject[];
   developmentPreview?: boolean;
   accountOptions?: ProjectAccountOption[];
+  nftCount?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -263,21 +263,20 @@ export function ProjectsPreview({
     ...project,
     statusKey: (reverseStatusLabels[project.status] ?? "watching") as "watching" | "in_progress" | "running" | "paused" | "done" | "dropped",
     priorityKey: (reversePriorityLabels[project.priority] ?? "medium") as "high" | "medium" | "low",
-    huntKey: (reverseHuntLabels[project.hunt] ?? "free_hunts") as "free_hunts" | "retro" | "nft" | "waitlist",
+    huntKey: (reverseHuntLabels[project.hunt] ?? "free_hunts") as "free_hunts" | "retro" | "waitlist",
   })), [projectItems]);
   const filteredProjects = useMemo(() => filterAndSortProjects(filterable, { ...queryState, view: view === "watchlist" ? "watchlist" : queryState.view }), [filterable, queryState, view]);
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / queryState.pageSize));
   const currentPage = Math.min(queryState.page, totalPages);
   const visibleProjects = filteredProjects.slice((currentPage - 1) * queryState.pageSize, currentPage * queryState.pageSize);
   const watchlistCount = filterable.filter(isWatchlistProject).length;
-  const counts = { free_hunts: 0, retro: 0, nft: 0, waitlist: 0 };
+  const counts = { free_hunts: 0, retro: 0, waitlist: 0 };
   for (const project of filterable) counts[project.huntKey] += 1;
   const tabs = [
     { label: `All ${projectItems.length}`, view: "all", hunt: "" },
     { label: `Watchlist ${watchlistCount}`, view: "watchlist", hunt: "" },
     { label: `Free Hunts ${counts.free_hunts}`, view: "all", hunt: "free_hunts" },
     { label: `Retro ${counts.retro}`, view: "all", hunt: "retro" },
-    { label: `NFT ${counts.nft}`, view: "all", hunt: "nft" },
     { label: `Waitlist ${counts.waitlist}`, view: "all", hunt: "waitlist" },
   ];
   const visibleColumns = new Set(queryState.columns);
@@ -378,11 +377,14 @@ export function ProjectsPreview({
         <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add project</Button>
       </header>
 
-      <div className="border-b soft-divider px-4 sm:px-6 lg:px-8"><div className="scrollbar-subtle flex gap-1 overflow-x-auto py-2.5">
+      <div className="border-b soft-divider px-4 sm:px-6 lg:px-8"><div className="flex items-center gap-2 py-2.5">
+        <div className="scrollbar-subtle flex min-w-0 flex-1 gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const active = (tab.view === "watchlist" ? queryState.view === "watchlist" || view === "watchlist" : queryState.view !== "watchlist" && view !== "watchlist") && queryState.hunt === tab.hunt;
           return <button key={tab.label} type="button" onClick={() => activateTab(tab)} className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-medium", active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}>{tab.label}</button>;
         })}
+        </div>
+        <Link href="/nfts" className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-white/[0.035] px-3 text-xs font-medium text-muted-foreground ring-1 ring-white/[0.055] transition-[background-color,color,transform] duration-150 hover:bg-white/[0.06] hover:text-foreground active:scale-[0.97]" aria-label={"Open NFTs workspace, " + nftCount + " campaigns"}>NFTs <span className="tabular-nums text-foreground">{nftCount}</span><ArrowUpRight className="size-3.5" /></Link>
       </div></div>
 
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
@@ -1108,7 +1110,7 @@ function ProjectDetailPanel({
                     id="edit-hunt-type"
                     label="Hunt type"
                     value={editHunt}
-                    options={["Free Hunts", "Retro", "NFT", "Waitlist"]}
+                    options={["Free Hunts", "Retro", "Waitlist"]}
                     openSelect={openEditSelect}
                     setOpenSelect={setOpenEditSelect}
                     onChange={setEditHunt}
@@ -1432,7 +1434,7 @@ function AddProjectDialog({
 
           <div className="px-2 py-2">
             <div className="grid grid-cols-2 gap-1.5 md:grid-cols-4">
-              <SelectPreview id="hunt" label="Hunt type" value={hunt} options={["Free Hunts", "Retro", "NFT", "Waitlist"]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={(nextHunt) => { setHunt(nextHunt); setStage(nextHunt === "Waitlist" || nextHunt === "NFT" ? "Watching" : "Not applicable"); }} compact />
+              <SelectPreview id="hunt" label="Hunt type" value={hunt} options={["Free Hunts", "Retro", "Waitlist"]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={(nextHunt) => { setHunt(nextHunt); setStage(nextHunt === "Waitlist" ? "Watching" : "Not applicable"); }} compact />
               <SelectPreview id="stage" label="Stage" value={stage} options={[...STAGE_PRESETS]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={setStage} compact allowCustom />
               <SelectPreview id="status" label="Status" value={status} options={["Watching", "In progress", "Running", "Paused", "Done", "Dropped"]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={setStatus} compact />
               <SelectPreview id="priority" label="Priority" value={priority} options={["High", "Medium", "Low"]} openSelect={openSelect} setOpenSelect={setOpenSelect} onChange={setPriority} compact />

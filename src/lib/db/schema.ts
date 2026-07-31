@@ -131,7 +131,7 @@ export const projects = pgTable("projects", {
     enum: ["uploaded", "external_url", "favicon", "manual", "none"],
   }),
   huntType: text("hunt_type", {
-    enum: ["free_hunts", "retro", "nft", "waitlist"],
+    enum: ["free_hunts", "retro", "waitlist"],
   }),
   status: text("status", {
     enum: [
@@ -198,6 +198,87 @@ export const projectWallets = pgTable(
   (table) => [primaryKey({ columns: [table.projectId, table.walletId] })],
 );
 
+// ─── NFT Campaigns ────────────────────────────────────────────────────────────
+
+export const nftCampaigns = pgTable(
+  "nft_campaigns",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id),
+    name: text("name").notNull(),
+    chain: text("chain").notNull(),
+    status: text("status", {
+      enum: ["watching", "whitelisted", "upcoming", "minted", "missed"],
+    })
+      .notNull()
+      .default("watching"),
+    mintUrl: text("mint_url"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("nft_campaigns_workspace_name_unique")
+      .on(table.workspaceId, sql`lower(trim(${table.name}))`),
+    index("nft_campaigns_workspace_status_idx").on(
+      table.workspaceId,
+      table.status,
+      table.updatedAt,
+    ),
+  ],
+);
+
+export const nftCampaignAccounts = pgTable(
+  "nft_campaign_accounts",
+  {
+    nftCampaignId: uuid("nft_campaign_id")
+      .notNull()
+      .references(() => nftCampaigns.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.nftCampaignId, table.accountId] }),
+  ],
+);
+
+export const nftCampaignWallets = pgTable(
+  "nft_campaign_wallets",
+  {
+    nftCampaignId: uuid("nft_campaign_id")
+      .notNull()
+      .references(() => nftCampaigns.id, { onDelete: "cascade" }),
+    walletId: uuid("wallet_id")
+      .notNull()
+      .references(() => wallets.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: [
+        "planned",
+        "submitted",
+        "whitelisted",
+        "not_whitelisted",
+        "minted",
+        "skipped",
+      ],
+    })
+      .notNull()
+      .default("planned"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.nftCampaignId, table.walletId] }),
+    index("nft_campaign_wallets_campaign_status_idx").on(
+      table.nftCampaignId,
+      table.status,
+    ),
+    index("nft_campaign_wallets_wallet_idx").on(table.walletId),
+  ],
+);
+
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 export const tasks = pgTable("tasks", {
@@ -248,6 +329,10 @@ export const deadlines = pgTable(
     linkedTaskId: uuid("linked_task_id").references(() => tasks.id, {
       onDelete: "set null",
     }),
+    linkedNftCampaignId: uuid("linked_nft_campaign_id").references(
+      () => nftCampaigns.id,
+      { onDelete: "cascade" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
@@ -258,6 +343,9 @@ export const deadlines = pgTable(
       table.dueDate,
     ),
     index("deadlines_linked_task_idx").on(table.linkedTaskId),
+    uniqueIndex("deadlines_linked_nft_campaign_unique")
+      .on(table.linkedNftCampaignId)
+      .where(sql`${table.linkedNftCampaignId} IS NOT NULL`),
   ],
 );
 

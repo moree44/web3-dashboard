@@ -6,6 +6,7 @@ import {
   getProjects,
 } from "@/features/projects/actions";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
+import { getNftCampaignCount } from "@/features/nfts/actions";
 
 type ProjectsPageProps = {
   searchParams?: Promise<{ view?: string | string[] }>;
@@ -16,13 +17,15 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
 
   let initialProjects: Awaited<ReturnType<typeof getProjects>> = [];
   let accountOptions: Awaited<ReturnType<typeof getProjectAccountOptions>> = [];
+  let nftCount = 0;
 
   if (!developmentPreview) {
     const user = await requireUser();
     await ensureDefaultWorkspace(user.id);
-    [initialProjects, accountOptions] = await Promise.all([
+    [initialProjects, accountOptions, nftCount] = await Promise.all([
       getProjects(),
       getProjectAccountOptions(),
+      getNftCampaignCount(),
     ]);
   }
 
@@ -36,6 +39,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         view={view}
         initialProjects={initialProjects}
         accountOptions={accountOptions}
+        nftCount={nftCount}
         developmentPreview={developmentPreview}
       />
     </AppShell>

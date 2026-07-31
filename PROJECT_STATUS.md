@@ -1,14 +1,14 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-07-29
+Last updated: 2026-07-31
 
 ## Current Position
 
 Web3 Hunting OS is in **Phase 1 Core, CRUD partially wired**.
 
-The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
+The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
 
-**Data foundation is in place:** Drizzle ORM schema (16 tables), 9 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through `0009_task_lifecycle_dates.sql` have been applied to the live database. RLS is verified active on all 16 application tables. **CRUD server actions now exist for Projects, Accounts, Wallets, Wallet Groups, Archive, Deadlines, and Tasks**, with create, update, and delete flows wired where noted below. **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects and Tasks render assigned account avatars from those stored account records.
+**Data foundation is in place:** Drizzle ORM schema (19 tables), 11 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0011_add_nft_campaign_wallet_tracking.sql have been applied to the live database. RLS is enabled on all 19 application tables. **CRUD server actions now exist for Projects, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, and Tasks**, with create, update, and delete flows wired where noted below. **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
 
 **Remaining gap:** Inbox, Docs, and Daily generation are still static previews with no persistence. Task logs and Activity logs are not yet implemented. Wallet Group update UI and Project wallet assignment UI are pending. Personal Items remain explicit Phase 1.5 preview scaffolding. UI foundation cleanup now standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs now share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
 
@@ -16,12 +16,12 @@ The app has a working Next.js 15 desktop preview shell with routed UI for Dashbo
 
 Read these before major work:
 
-1. `PRD.MD` — product behavior, scope, phasing, data model, implementation order (v3.1)
-2. `DESIGN.md` — visual direction, layout, density, spacing, interaction tone
+1. PRD.MD — product behavior, scope, phasing, data model, implementation order (v3.3)
+2. DESIGN.md — visual direction, layout, density, spacing, interaction tone (v2.15)
 3. `PROJECT_STATUS.md` — implementation state only (this file)
 4. `AGENTS.md` — contributor workflow guidance
 
-PRD v3.1 supersedes v3.0 and older decisions.
+PRD v3.3 supersedes v3.2 and older decisions.
 
 ## Agent Lessons and Project Conventions
 
@@ -38,15 +38,15 @@ PRD v3.1 supersedes v3.0 and older decisions.
 - Verify database migrations against the live database, not only by checking that a SQL file exists
 - In Storage policies, qualify the file path as `storage.objects.name`; unqualified `name` can bind to `workspaces.name` inside a subquery
 
-## PRD v3.1 Alignment Notes
+## PRD v3.3 Alignment Notes
 
 Current implementation should align with:
 
-- Phase 1 Core ships first: Auth, Workspace, Inbox, Docs, Accounts, Wallets, Projects, Tasks, Daily, Archive
+- Phase 1 Core ships first: Auth, Workspace, Inbox, Docs, Accounts, Wallets, Projects, NFTs, Tasks, Daily, Deadlines, Archive
 - Phase 1.5 is fast-follow: Trading, Personal Items, Settings Integrations
 - Dashboard formula: `Dashboard = Inbox + Docs + Pulse`
 - Dashboard must not become a mini Daily or mini Projects page
-- Dashboard Upcoming deadlines reads standalone, Project-linked, and Task-linked Deadline records
+- Dashboard Upcoming deadlines reads standalone, Project-linked, Task-linked, and NFT-linked Deadline records
 - Task lifecycle timing uses `start_date` and `completed_at`; due dates belong only to Deadline records
 - Running/Recheck belong on Daily and Projects only, not Dashboard
 - Docs is the UI label for unified notes (guides, links, templates, SOP, project references)
@@ -54,6 +54,7 @@ Current implementation should align with:
 - Project-linked docs/notes use `notes.linked_project_id`
 - Archive is project-scoped only
 - Trading is a separate top-level Phase 1.5 area, not a project category
+- NFTs is a separate Phase 1 Core entity nested under Projects, not a Project Hunt Type
 - Personal Items are Phase 1.5
 - Project status and task status stay distinct from frequency and stage/result
 
@@ -62,23 +63,24 @@ Current implementation should align with:
 ### App Shell and Navigation
 
 - Open desktop-style shell: fixed sidebar + independently scrollable main workspace
-- Sidebar routes: Dashboard, Inbox, Docs, Projects, Watchlist, Daily, Deadlines, Tasks, Accounts, Archive, Settings, inactive Trading
-- Projects parent links to `/projects`; Watchlist, Daily, Deadlines, and Tasks nested below
+- Sidebar routes: Dashboard, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Deadlines, Tasks, Accounts, Archive, Settings, inactive Trading
+- Projects parent links to `/projects`; Watchlist, NFTs, Daily, Deadlines, and Tasks are nested below
 - Mobile nav exists but is secondary
 
 ### Data Foundation
 
 - **Drizzle ORM** installed and configured (`drizzle-orm`, `drizzle-kit`, `pg`)
-- **Schema** (`src/lib/db/schema.ts`): 16 tables matching the updated PRD v3.1 Section 41
+- **Schema** (src/lib/db/schema.ts): 19 tables matching PRD v3.3
   - `workspaces`, `workspace_members`
   - `accounts`, `wallet_groups`, `wallets`
   - `projects`, `project_accounts`, `project_wallets`
+  - `nft_campaigns`, `nft_campaign_accounts`, `nft_campaign_wallets`
   - `tasks`, `task_accounts`, `task_wallets`, `task_logs`
   - `deadlines`
   - `inbox_items`, `notes`, `activity_logs`
 - **RLS hardening** (`src/lib/db/migrations/0007_enable_rls_and_fix_storage_policies.sql`):
   - Supersedes `0001_rls_policies.sql`, which was not successfully applied and contained a recursive `workspace_members` policy
-  - Enables RLS on the original 15 application tables; migration `0008` adds the same workspace policy to `deadlines`
+  - Enables RLS on the original 15 application tables; migration `0008` secures `deadlines`; migrations `0010` and `0011` secure all three NFT tables
   - Uses `public.user_workspace_ids()` as a `SECURITY DEFINER` membership helper with `search_path=public`
   - Restores workspace ownership checks for `project-logos`
   - Live verification: owner sees 1 workspace; an unrelated authenticated user sees 0
@@ -99,12 +101,13 @@ Current implementation should align with:
 
 ### Server Actions (CRUD)
 
-Server actions exist for three surfaces, following the workspace-scoped pattern:
+Server actions follow the same workspace-scoped pattern across implemented CRUD surfaces:
 
 | Surface | File | Queries | Mutations |
 | --- | --- | --- | --- |
 | Auth | `src/features/auth/actions.ts` | — | signup, login |
 | Projects | `src/features/projects/actions.ts` | `getProjects`, `getArchivedProjects`, `getProjectAccountOptions` | `createProject`, `updateProject`, `archiveProject`, `restoreProject`, `deleteProject`, `uploadProjectLogo` |
+| NFTs | `src/features/nfts/actions.ts` | `getNftPageData`, `getNftCampaignCount` | `createNftCampaign`, `updateNftCampaign`, `deleteNftCampaign` |
 | Accounts | `src/features/accounts/actions.ts` | `getAccounts` (with stats), `getWallets`, `getWalletGroups` | `createAccount`, `updateAccount`, `deleteAccount`, `uploadAccountAvatar`, `setAccountAvatarUrl`, `createWallet`, `updateWallet`, `deleteWallet`, `createWalletGroup`, `updateWalletGroup`, `deleteWalletGroup` |
 | Tasks | `src/features/tasks/actions.ts` | `getTaskWorkspaceData` | `createTask`, `updateTask`, `updateTaskStatus`, `deleteTask` |
 
@@ -160,15 +163,34 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - **Update** (edit group name/description): server action exists (`updateWalletGroup`) but not yet wired to UI
 - Page route fetches real groups via `getWalletGroups()` when not in dev preview
 
+### NFTs — dedicated CRUD workspace
+
+- Migrations `0010_add_nft_campaigns.sql` and `0011_add_nft_campaign_wallet_tracking.sql` are applied to the live database
+- `nft_campaigns`, `nft_campaign_accounts`, and `nft_campaign_wallets` use workspace-scoped RLS; catalog verification reports RLS enabled with one policy on each table
+- Projects no longer accepts `nft` as a Hunt Type; the live database has zero legacy NFT Project rows
+- `/nfts` provides All, Watching, Whitelist, Upcoming, Minted, and Missed views, plus search and Chain filtering
+- Add/Edit NFT uses the shared modal, AppSelect, AppDatePicker, URL normalization, Account and Wallet selection, per-Wallet result status, and two-step delete confirmation patterns
+- Fields stay intentionally light: Collection name, Chain, lifecycle Status, Accounts, Wallet participation, optional Mint schedule, Mint URL, and Notes
+- Assigned Accounts reuse stored avatars, initials fallback, hover motion, and the interactive `+N` overflow popover
+- Account-owned Wallets are filtered by exact or EVM-family Chain compatibility; ownerless Wallets remain available as Shared wallets
+- A sole compatible Account Wallet is preselected visibly, while Accounts without a selected Wallet remain tracked as `need wallet`
+- Wallet outcomes are tracked independently as Planned, Submitted, Whitelisted, Not whitelisted, Minted, or Skipped
+- NFT list Participation shows Account avatars with a compact Whitelisted/Wallet total, including partial results such as `2/3 WL`
+- Mint dates are stored as linked Deadline records rather than duplicated on NFT rows
+- Creating, updating, or clearing an NFT mint date creates, synchronizes, or removes its linked Deadline
+- Minted marks the linked Deadline Done; Missed marks it Cancelled
+- Projects displays a separate `NFTs count →` navigation shortcut instead of an NFT filter chip
+- Dashboard Hunting Pulse reads the live NFT count and its NFT pill navigates to `/nfts`
+
 ### Standalone Deadlines - CRUD wired
 
 - Migration `0008_add_deadlines.sql` is applied to the live database
 - Migration `0009_task_lifecycle_dates.sql` converted the existing Task due date into a linked Deadline and removed `tasks.due_date`
-- `deadlines` has workspace-scoped RLS, two indexes, and optional Project/Task foreign keys
+- `deadlines` has workspace-scoped RLS and optional Project, Task, and NFT Campaign foreign keys
 - Server actions support create, update, delete, full-page reads, and Dashboard aggregation
 - Deadline validation covers required title/date, optional 24-hour time, URL, status, and workspace-owned links
 - Linking a Task infers its Project when needed and rejects mismatched Project/Task pairs
-- `/deadlines` shows Upcoming, Done, and Cancelled records that may be standalone, Project-linked, or Task-linked
+- `/deadlines` shows Upcoming, Done, and Cancelled records that may be standalone, Project-linked, Task-linked, or NFT-linked
 - All Deadline rows open the same edit modal; linked Task and Project context remains visible
 - Dashboard Upcoming deadlines shows up to eight nearest records on desktop and five on mobile, with a compact Add action and View more state
 - Overdue is computed using the Asia/Jakarta calendar date and is not stored as mutable status
@@ -180,7 +202,7 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Greeting, WIB date, motivation line, Quick Capture, notes/inbox/pulse-style desk content, static counts
 - Quick Capture visual only
 - Notes, Inbox, activity, and most pulse counts remain static preview data
-- Upcoming deadlines now reads persisted Deadline records regardless of whether they link to a Project or Task
+- Upcoming deadlines now reads persisted Deadline records regardless of whether they link to a Project, Task, or NFT Campaign
 - The Due metric uses the complete upcoming Deadline count and Open navigates to `/deadlines`
 
 ### Tasks - CRUD wired
@@ -246,13 +268,13 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | `archive-preview.tsx` | ~278 lines | CRUD wired (restore, delete) |
 | `daily-preview.tsx` | ~300+ lines | Static preview |
 
-Unit tests: 9 files, 44 tests total, including shared HTTP URL normalization, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, and Recheck Review coverage.
+Unit tests: 12 files, 55 tests total, including shared HTTP URL normalization, NFT validation, NFT Wallet Chain compatibility, partial-update safety and create modal assignment, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, and Recheck Review coverage.
 
-E2E diagnostics now include focused Accounts/Projects coverage and a full application smoke suite. The latest full smoke run after RLS activation completed 37 checks successfully, found 1 known product gap (Wallet Group rename is not reachable from the UI), and captured no console errors.
+E2E diagnostics now include focused Accounts/Projects, NFT Wallet participation, and a full application smoke suite. The latest focused NFT browser smoke passed login, Account and Wallet setup, Chain-compatible auto-selection, Submitted and Whitelisted persistence, desktop/mobile rendering, delete cleanup, and captured no console or page errors.
 
 ## Latest Change Batch
 
-The 2026-07-28 Phase 1 Core batch includes:
+The 2026-07-31 Phase 1 Core batch includes:
 
 - Auth and default-workspace hardening
 - Database migrations `0002` through `0007`
@@ -265,7 +287,7 @@ The 2026-07-28 Phase 1 Core batch includes:
 - Shared dropdown consistency pass for Projects filters, Projects pagination, Accounts wallet create/edit fields, and Tasks filter/Add Task fields
 - Shared date picker consistency pass for Projects filters, Projects create/edit dates, and Tasks Add Task date
 - Standalone Deadline CRUD with optional Project and Task relations
-- Dashboard aggregation of standalone, Project-linked, and Task-linked Deadlines
+- Dashboard aggregation of standalone, Project-linked, Task-linked, and NFT-linked Deadlines
 - New `/deadlines` route with Upcoming, Done, and Cancelled views
 - Deadline modal consistency pass using shared dropdown and date picker foundations
 - Nested dropdown Escape behavior covered so closing a dropdown does not close the parent modal
@@ -278,13 +300,19 @@ The 2026-07-28 Phase 1 Core batch includes:
 - Dashboard Deadline capacity increased to eight desktop items and five mobile items
 - Project query unit coverage and CRUD smoke diagnostics
 - Focused account avatar group regression coverage
+- Dedicated `/nfts` CRUD workspace with Account assignment, lifecycle status, Chain filtering, and compact list/mobile layouts
+- Live migration `0010_add_nft_campaigns.sql` with NFT tables, RLS, Project Hunt Type constraint, and linked NFT Deadline relation
+- Live migration `0011_add_nft_campaign_wallet_tracking.sql` with per-Wallet outcome status and workspace-scoped RLS
+- NFT Account and Wallet participation flow with Chain compatibility, Shared wallets, partial whitelist outcomes, and `need wallet` visibility
+- Automatic NFT mint Deadline create/update/remove lifecycle
+- NFT navigation under Projects, separate Projects-page shortcut, and live Dashboard Hunting Pulse count
+- Project Hunt Types reduced to Free Hunts, Retro, and Waitlist
+- PRD v3.3 and DESIGN v2.15 alignment
 - Updated implementation and validation status
 
 Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the source release.
 
 ## What Is Not Implemented Yet
-
-The next approved product direction to plan is a dedicated NFTs workspace nested under Projects. It should not reuse the full Project create model because NFT records need a smaller chain-oriented field set. Navigation, fields, data model, and migration are not implemented yet and require a separate approved plan.
 
 ### Phase 1 Core remaining (ordered by priority)
 
@@ -323,7 +351,7 @@ The next approved product direction to plan is a dedicated NFTs workspace nested
 - Trading inactive in sidebar
 - Large preview files make the repo harder to read than the route list suggests, especially `projects-preview.tsx` after adding the assigned-account avatar group
 
-## CRUD Implementation Order (PRD v3.1)
+## CRUD Implementation Order (PRD v3.3)
 
 ```
 DONE     1. Projects: create, update, delete, archive, logo upload wired
@@ -346,7 +374,7 @@ Checked 2026-07-29 after Task lifecycle, detailed Add Task, linked Deadline, and
 ```txt
 pnpm typecheck  # pass
 pnpm lint       # pass, 0 warnings
-pnpm test       # pass, 9 files and 44 tests
+pnpm test       # pass, 12 files and 55 tests
 pnpm build      # pass
 ```
 
@@ -379,6 +407,28 @@ Live migration 0008 reports RLS enabled with one Deadline policy
 Live migration 0009 converted 1 Task due date into 1 linked Deadline; all 3 Tasks received Start dates
 Database insert, status update, and delete smoke passed inside a rolled-back transaction
 Production build includes /deadlines
+```
+
+Focused NFTs regression:
+
+```txt
+Migration 0010 applied to the live database
+RLS enabled with one workspace policy on nft_campaigns and nft_campaign_accounts
+Migration 0011 applied to the live database
+RLS enabled with one workspace policy on nft_campaign_wallets
+NFT Wallet insert and Submitted to Whitelisted update passed inside a rolled-back transaction
+0 legacy Project rows use the former NFT Hunt Type
+NFT Campaign to Deadline foreign key smoke passed inside a rolled-back transaction
+Bare mint URLs normalize to HTTPS; invalid time and non-HTTP URLs are rejected
+Add NFT modal Account and auto-compatible Wallet selection payload are covered
+Duplicate Wallet assignments and incompatible Chain families are rejected
+Partial NFT updates do not inject create defaults or clear Account/Wallet assignments
+Focused Playwright login and NFT Wallet smoke passed 1/1 in 50.8 seconds
+Browser reload preserved Submitted and Whitelisted Wallet states and the 1/1 WL summary
+Desktop and 390px mobile layouts passed without horizontal overflow
+Browser smoke cleanup left 0 Campaign, 0 Wallet, and 0 Account test records
+No browser console errors or page errors were captured
+Production build includes /nfts
 ```
 
 Focused Tasks CRUD regression:
@@ -438,6 +488,7 @@ Shared AppDatePicker covers date entry with the same dark surface language as Ap
 /deadlines
 /projects
 /projects?view=watchlist
+/nfts
 /tasks
 /accounts
 /archive
