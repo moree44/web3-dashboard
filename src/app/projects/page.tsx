@@ -3,6 +3,7 @@ import { ProjectsPreview } from "@/features/projects/components/projects-preview
 import { requireUser } from "@/lib/auth/session";
 import {
   getProjectAccountOptions,
+  getProjectWalletOptions,
   getProjects,
 } from "@/features/projects/actions";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
@@ -17,14 +18,16 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
 
   let initialProjects: Awaited<ReturnType<typeof getProjects>> = [];
   let accountOptions: Awaited<ReturnType<typeof getProjectAccountOptions>> = [];
+  let walletOptions: Awaited<ReturnType<typeof getProjectWalletOptions>> = [];
   let nftCount = 0;
 
   if (!developmentPreview) {
     const user = await requireUser();
     await ensureDefaultWorkspace(user.id);
-    [initialProjects, accountOptions, nftCount] = await Promise.all([
+    [initialProjects, accountOptions, walletOptions, nftCount] = await Promise.all([
       getProjects(),
       getProjectAccountOptions(),
+      getProjectWalletOptions(),
       getNftCampaignCount(),
     ]);
   }
@@ -39,6 +42,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         view={view}
         initialProjects={initialProjects}
         accountOptions={accountOptions}
+        walletOptions={walletOptions}
         nftCount={nftCount}
         developmentPreview={developmentPreview}
       />

@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.15
-**Status:** Current visual direction for Phase 1, including NFT wallet participation and shared Deadline integration
+**Version:** 2.16
+**Status:** Current visual direction for Phase 1, including Project Wallet assignment, NFT wallet participation, and shared Deadline integration
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -211,18 +211,21 @@ For Add Project, the active direction is a compact quick-create modal with:
 * status
 * priority
 * assigned accounts
+* compact Project Wallet selection, including an inline custom-chain wallet form
 * optional URL, work type, project type, and short note
 
 Move these to project detail instead of the quick-create modal:
 
 * full logo upload workflow
-* detailed wallet assignment
+* wallet metadata editing beyond label, address, Chain, and optional owner
 * starter task generation
 * full docs/resources
 * long Watchlist explanation
 * activity/history
 
 The modal should feel quick to open, quick to scan, and safe to skip optional fields. The project name remains the clearest first input.
+
+Project Wallet choices use compact selectable rows with label, shortened address, Chain, and owner context. The inline new-wallet form stays collapsed until requested, uses the shared dropdown surface for optional owner selection, and keeps Wallet Type implicit as `project_wallet`. The modal must use viewport-bounded scrolling once wallet choices increase its height.
 
 Native browser select menus should be avoided in dark modals because their option popup can render with browser-default styling. Use compact custom dark dropdowns for enum-like controls such as Hunt Type, Stage/Result, Status, and Priority. Priority should use small ranking glyphs instead of bright color blocks.
 

@@ -10,18 +10,18 @@ The app has a working Next.js 15 desktop preview shell with routed UI for Dashbo
 
 **Data foundation is in place:** Drizzle ORM schema (19 tables), 11 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0011_add_nft_campaign_wallet_tracking.sql have been applied to the live database. RLS is enabled on all 19 application tables. **CRUD server actions now exist for Projects, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, and Tasks**, with create, update, and delete flows wired where noted below. **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
 
-**Remaining gap:** Inbox, Docs, and Daily generation are still static previews with no persistence. Task logs and Activity logs are not yet implemented. Wallet Group update UI and Project wallet assignment UI are pending. Personal Items remain explicit Phase 1.5 preview scaffolding. UI foundation cleanup now standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs now share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
+**Remaining gap:** Inbox, Docs, and Daily generation are still static previews with no persistence. Task logs and Activity logs are not yet implemented. Wallet Group update UI is pending. Personal Items remain explicit Phase 1.5 preview scaffolding. Project Wallet assignment is now complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
 
 ## Active Source of Truth
 
 Read these before major work:
 
-1. PRD.MD — product behavior, scope, phasing, data model, implementation order (v3.3)
-2. DESIGN.md — visual direction, layout, density, spacing, interaction tone (v2.15)
+1. PRD.MD — product behavior, scope, phasing, data model, implementation order (v3.4)
+2. DESIGN.md — visual direction, layout, density, spacing, interaction tone (v2.16)
 3. `PROJECT_STATUS.md` — implementation state only (this file)
 4. `AGENTS.md` — contributor workflow guidance
 
-PRD v3.3 supersedes v3.2 and older decisions.
+PRD v3.4 supersedes v3.3 and older decisions.
 
 ## Agent Lessons and Project Conventions
 
@@ -38,7 +38,7 @@ PRD v3.3 supersedes v3.2 and older decisions.
 - Verify database migrations against the live database, not only by checking that a SQL file exists
 - In Storage policies, qualify the file path as `storage.objects.name`; unqualified `name` can bind to `workspaces.name` inside a subquery
 
-## PRD v3.3 Alignment Notes
+## PRD v3.4 Alignment Notes
 
 Current implementation should align with:
 
@@ -70,7 +70,7 @@ Current implementation should align with:
 ### Data Foundation
 
 - **Drizzle ORM** installed and configured (`drizzle-orm`, `drizzle-kit`, `pg`)
-- **Schema** (src/lib/db/schema.ts): 19 tables matching PRD v3.3
+- **Schema** (src/lib/db/schema.ts): 19 tables matching PRD v3.4
   - `workspaces`, `workspace_members`
   - `accounts`, `wallet_groups`, `wallets`
   - `projects`, `project_accounts`, `project_wallets`
@@ -106,7 +106,7 @@ Server actions follow the same workspace-scoped pattern across implemented CRUD 
 | Surface | File | Queries | Mutations |
 | --- | --- | --- | --- |
 | Auth | `src/features/auth/actions.ts` | — | signup, login |
-| Projects | `src/features/projects/actions.ts` | `getProjects`, `getArchivedProjects`, `getProjectAccountOptions` | `createProject`, `updateProject`, `archiveProject`, `restoreProject`, `deleteProject`, `uploadProjectLogo` |
+| Projects | `src/features/projects/actions.ts` | `getProjects`, `getArchivedProjects`, `getProjectAccountOptions`, `getProjectWalletOptions` | `createProject`, `updateProject`, `archiveProject`, `restoreProject`, `deleteProject`, `uploadProjectLogo` |
 | NFTs | `src/features/nfts/actions.ts` | `getNftPageData`, `getNftCampaignCount` | `createNftCampaign`, `updateNftCampaign`, `deleteNftCampaign` |
 | Accounts | `src/features/accounts/actions.ts` | `getAccounts` (with stats), `getWallets`, `getWalletGroups` | `createAccount`, `updateAccount`, `deleteAccount`, `uploadAccountAvatar`, `setAccountAvatarUrl`, `createWallet`, `updateWallet`, `deleteWallet`, `createWalletGroup`, `updateWalletGroup`, `deleteWalletGroup` |
 | Tasks | `src/features/tasks/actions.ts` | `getTaskWorkspaceData` | `createTask`, `updateTask`, `updateTaskStatus`, `deleteTask` |
@@ -121,8 +121,14 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
   - **Delete**: Dropdown on ProjectRow (table), ProjectCard (mobile), and ProjectDetailPanel header → `deleteProject` → local state remove
 - **Archive**: ProjectRow/ProjectCard/ProjectDetailPanel → `archiveProject` → local state remove
 - **Logo upload**: Supabase Storage bucket `project-logos` with RLS policies, file picker, and clipboard paste (Ctrl+V) in both Add Project dialog and Edit mode of ProjectDetailPanel
-- Page route (`/projects`) fetches real projects via `getProjects()` + `getProjectAccountOptions()` when not in dev preview
-- Project create and edit persist multiple selected account assignments through `project_accounts`
+- Page route (`/projects`) fetches real Projects, Account options, and Wallet options when not in dev preview
+- Project create and edit persist Account assignments through `project_accounts` and Wallet assignments through `project_wallets`
+- Add/Edit Project can select eligible existing Wallets or create a custom-chain Project Wallet inline with required label, address, and Chain
+- New inline Wallets receive `wallet_type = project_wallet`; owner is optional, but an owner must be one of the selected Project Accounts
+- Project and new Wallet creation share one database transaction, preventing orphan Wallets on failed Project creation
+- Deselecting an Account removes Wallets owned by that Account; Shared Wallets remain eligible
+- Deleting a Project unlinks `project_wallets` but never deletes reusable Wallet records
+- Partial Project updates use an explicit update schema, so logo upload no longer risks injecting create defaults into unrelated fields
 - Project reads include assigned account labels and avatar metadata; rows without an assignment show `Unassigned` instead of a blank cell
 - Project table and mobile cards render assigned accounts as compact avatar groups, using account avatars when present and initials as fallback
 - Avatar groups show up to 4 visible accounts, then a clickable `+N` overflow button that opens a popover listing every assigned account
@@ -264,13 +270,13 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | --- | --- | --- |
 | `tasks-preview.tsx` | ~316 lines | CRUD wired; Personal Item remains preview |
 | `accounts-preview.tsx` | ~1600+ lines | CRUD wired (identities, wallets, groups) |
-| `projects-preview.tsx` | ~1935 lines | CRUD wired + logo upload + paste + assigned-account avatar group |
+| `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation |
 | `archive-preview.tsx` | ~278 lines | CRUD wired (restore, delete) |
 | `daily-preview.tsx` | ~300+ lines | Static preview |
 
-Unit tests: 12 files, 55 tests total, including shared HTTP URL normalization, NFT validation, NFT Wallet Chain compatibility, partial-update safety and create modal assignment, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, and Recheck Review coverage.
+Unit tests: 13 files, 60 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, and Recheck Review coverage.
 
-E2E diagnostics now include focused Accounts/Projects, NFT Wallet participation, and a full application smoke suite. The latest focused NFT browser smoke passed login, Account and Wallet setup, Chain-compatible auto-selection, Submitted and Whitelisted persistence, desktop/mobile rendering, delete cleanup, and captured no console or page errors.
+E2E diagnostics now include focused Accounts/Projects, Project Wallet assignment, NFT Wallet participation, and a full application smoke suite. The latest focused Project Wallet browser smoke passed login, custom-chain Wallet creation, reload persistence, Project unlink behavior, Wallet survival, cleanup, and captured no console or page errors.
 
 ## Latest Change Batch
 
@@ -307,7 +313,11 @@ The 2026-07-31 Phase 1 Core batch includes:
 - Automatic NFT mint Deadline create/update/remove lifecycle
 - NFT navigation under Projects, separate Projects-page shortcut, and live Dashboard Hunting Pulse count
 - Project Hunt Types reduced to Free Hunts, Retro, and Waitlist
-- PRD v3.3 and DESIGN v2.15 alignment
+- Project Wallet selection and inline custom-chain Wallet creation in Add/Edit Project
+- Transactional Project and Project Wallet creation with workspace and owner validation
+- Safe Project deletion that unlinks but preserves Wallet records
+- Explicit partial Project update schema that protects unrelated fields during logo upload
+- PRD v3.4 and DESIGN v2.16 alignment
 - Updated implementation and validation status
 
 Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the source release.
@@ -322,7 +332,6 @@ Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the 
 4. **Docs CRUD** — server actions + markdown editor + project links + folders
 5. **Activity logs** — auto-generated from mutations
 6. **Wallet Group edit UI** — `updateWalletGroup` action exists but not wired to UI
-7. **Project wallet assignment** — wallets still pending in project create/edit
 
 ### Phase 1.5 (do not treat as current Core work)
 
@@ -351,10 +360,11 @@ Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the 
 - Trading inactive in sidebar
 - Large preview files make the repo harder to read than the route list suggests, especially `projects-preview.tsx` after adding the assigned-account avatar group
 
-## CRUD Implementation Order (PRD v3.3)
+## CRUD Implementation Order (PRD v3.4)
 
 ```
 DONE     1. Projects: create, update, delete, archive, logo upload wired
+DONE     1b. Project Wallets: existing assignment and custom-chain creation wired
 DONE     2. Accounts: create, update, delete wired
 DONE     3. Wallets: create, update, delete wired
 PARTIAL  3b. Wallet Groups: create and delete wired; update action exists but UI pending
@@ -369,21 +379,21 @@ PENDING  10. Activity logs
 
 ## Validation Status
 
-Checked 2026-07-29 after Task lifecycle, detailed Add Task, linked Deadline, and Dashboard capacity changes:
+Checked 2026-07-31 after Project Wallet assignment and custom-chain Wallet creation:
 
 ```txt
 pnpm typecheck  # pass
 pnpm lint       # pass, 0 warnings
-pnpm test       # pass, 12 files and 55 tests
+pnpm test       # pass, 13 files and 60 tests
 pnpm build      # pass
 ```
 
 Live database metadata verification:
 
 ```txt
-Application tables found             16
-Tables with RLS enabled              16
-Application policies                18
+Application tables found             19
+Tables with RLS enabled              19
+Application policies                21
 user_workspace_ids SECURITY DEFINER true
 user_workspace_ids search_path      public
 Owner-visible workspaces             1
@@ -391,6 +401,26 @@ Unrelated-user-visible workspaces    0
 Avatar upload ownership policy       present
 Project logo ownership policy        present
 Deadline workspace policy            present
+project_wallets RLS                  enabled, 1 workspace policy
+```
+
+Focused Project Wallet regression:
+
+```txt
+Create Project accepts eligible existing Wallets and inline custom-chain Wallets
+Inline Wallet requires label, address, and free-text Chain
+Inline Wallet Type is fixed server-side to project_wallet
+Owner Account is optional; when present it must be a selected Project Account
+Deselecting an Account removes existing and draft Wallets owned by that Account
+Project and new Wallet creation run in one database transaction
+Partial Project updates do not inject create defaults into logo or property updates
+Project deletion unlinks project_wallets and preserves the Wallet record
+Focused Playwright login smoke passed 1/1 in 1.1 minutes
+Browser reload preserved the custom Wallet label, address, Chain, and assignment
+Add Task immediately exposed the assigned custom Project Wallet after selecting its Project
+Project deletion left the Wallet visible in Accounts before explicit smoke cleanup
+0 browser console errors or page errors were captured
+Production build includes /projects
 ```
 
 Focused Deadline regression:

@@ -1,7 +1,7 @@
 # PRD — Web3 Hunting OS
 
-**Version:** 3.3
-**Status:** Implementation-ready draft. Supersedes v3.2. Synced against dedicated NFT wallet participation tracking implemented on 2026-07-30.
+**Version:** 3.4
+**Status:** Implementation-ready draft. Supersedes v3.3. Synced against Project Wallet assignment and custom-chain wallet creation implemented on 2026-07-31.
 **Primary Use:** Personal Web3 hunting workbench
 **Product Type:** Private Web3 activity tracker, inbox, notes system, task manager, account/wallet tracker, project dashboard, and personal trading ledger
 **Stack:** Next.js 15 · TypeScript · Tailwind CSS · shadcn/ui · Supabase PostgreSQL · Supabase Auth · Supabase Storage · Supabase RLS · Drizzle ORM · Zod · React Hook Form · Vercel
@@ -356,7 +356,7 @@ Dibuat dari Account detail
 Dibuat dari Project detail
   → wallet_type otomatis "project_wallet"
   → otomatis linked ke project itu
-  → owner_account_id tetap harus dipilih manual
+  → owner_account_id boleh memilih Assigned Account atau tetap null sebagai Shared wallet
 
 Wallet tanpa owner (owner_account_id = null)
   → masuk wallet_group (mis. "L1", "Burner")
@@ -366,6 +366,10 @@ Wallet tanpa owner (owner_account_id = null)
 Kedua jalur di atas menulis ke tabel `wallets` yang sama. Tidak ada tabel wallet terpisah per entry point.
 
 **`chain_type` pada wallet adalah free text, bukan enum.** Boleh diisi EVM, Solana, Sui, Aptos, Cosmos, atau chain apa pun — tidak dibatasi daftar tetap.
+
+**Project Wallet assignment memakai satu flow di Add dan Edit Project.** User dapat memilih Wallet existing yang owner-nya termasuk Assigned Account, memilih Shared wallet tanpa owner, atau membuat `project_wallet` baru secara inline. Wallet baru wajib memiliki label, address, dan free-text Chain. Project dan Wallet baru harus dibuat dalam satu database transaction agar tidak ada orphan wallet jika Project gagal dibuat.
+
+Jika Assigned Account dilepas dari Project, Wallet milik Account tersebut otomatis dilepas dari selection. Menghapus Project hanya menghapus relasi `project_wallets`; record Wallet tidak ikut dihapus dan tetap dapat digunakan kembali.
 
 **Notes adalah satu sistem, bukan dua.** Note yang ditulis dari dalam Project Detail dan note global di halaman Docs sama-sama masuk ke tabel `notes` yang sama, dibedakan lewat `linked_project_id`. Tidak ada tabel `project_notes` terpisah. Lihat Section 10 untuk detail.
 

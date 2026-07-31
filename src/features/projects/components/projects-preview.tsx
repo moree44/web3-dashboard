@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArrowUpRight, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { Archive, ArrowUpRight, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Upload, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -20,8 +20,10 @@ import {
   updateProject,
   uploadProjectLogo,
   type ProjectAccountOption,
+  type ProjectWalletOption,
   type ProjectWithAccounts,
 } from "@/features/projects/actions";
+import type { ProjectAssignmentInput, ProjectWalletDraft } from "@/features/projects/project-schema";
 import type { projects as projectsSchema } from "@/lib/db/schema";
 import { ARCHIVE_REASONS, filterAndSortProjects, isWatchlistProject, parseProjectQuery, PROJECT_COLUMNS, PROJECT_PRIORITIES, PROJECT_SORTS, PROJECT_STATUSES, STAGE_PRESETS, type ProjectColumn } from "@/features/projects/project-query";
 
@@ -87,6 +89,8 @@ function dbToUIProject(record: DbProject): Project {
     accounts: record.assignedAccounts.map((account) => account.label),
     accountDetails: record.assignedAccounts,
     accountIds: record.assignedAccounts.map((account) => account.id),
+    walletDetails: record.assignedWallets,
+    walletIds: record.assignedWallets.map((wallet) => wallet.id),
     progress: Number(record.progressEstimate) || 0,
     date: dateValue
       ? formatDateValue(dateValue)
@@ -116,6 +120,8 @@ type Project = {
   accounts: string[];
   accountDetails?: ProjectAccountOption[];
   accountIds?: string[];
+  walletDetails?: ProjectWalletOption[];
+  walletIds?: string[];
   progress: number;
   date: string;
   dateValue?: string;
@@ -230,12 +236,14 @@ export function ProjectsPreview({
   initialProjects = [],
   developmentPreview = false,
   accountOptions = [],
+  walletOptions = [],
   nftCount = 0,
 }: {
   view?: "all" | "watchlist";
   initialProjects?: DbProject[];
   developmentPreview?: boolean;
   accountOptions?: ProjectAccountOption[];
+  walletOptions?: ProjectWalletOption[];
   nftCount?: number;
 }) {
   const router = useRouter();
@@ -248,6 +256,11 @@ export function ProjectsPreview({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const availableAccountOptions = developmentPreview && accountOptions.length === 0 ? previewAccountOptions : accountOptions;
+  const availableWalletOptions = useMemo(() => {
+    const byId = new Map(walletOptions.map((wallet) => [wallet.id, wallet]));
+    projectItems.flatMap((project) => project.walletDetails ?? []).forEach((wallet) => byId.set(wallet.id, wallet));
+    return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [projectItems, walletOptions]);
 
   function updateUrl(updates: Record<string, string | number | null>, keepPage = false) {
     const next = new URLSearchParams(searchParams.toString());
@@ -292,7 +305,7 @@ export function ProjectsPreview({
     router.replace("/projects" + (next.size ? "?" + next.toString() : ""), { scroll: false });
   }
 
-  async function handleCreateProject(project: Project, accountIds: string[], context?: { logoFile?: File | null }) {
+  async function handleCreateProject(project: Project, assignments: ProjectAssignmentInput, context?: { logoFile?: File | null }) {
     if (developmentPreview) {
       setProjectItems((items) => [{ ...project, id: `preview-${Date.now()}` }, ...items]);
     } else {
@@ -311,7 +324,7 @@ export function ProjectsPreview({
         notes: project.notes || undefined,
         logoUrl: externalLogoUrl,
         logoSource: externalLogoUrl ? "external_url" : "none",
-      }, accountIds);
+      }, assignments);
       let logoUploadError = "";
       if (context?.logoFile) {
         const formData = new FormData();
@@ -354,8 +367,8 @@ export function ProjectsPreview({
     }
   }
 
-  async function handleUpdateProject(id: string, data: Partial<Omit<typeof projectsSchema.$inferInsert, "workspaceId">>, accountIds?: string[]) {
-    const updated = await updateProject(id, data, accountIds);
+  async function handleUpdateProject(id: string, data: Partial<Omit<typeof projectsSchema.$inferInsert, "workspaceId">>, assignments?: ProjectAssignmentInput) {
+    const updated = await updateProject(id, data, assignments);
     const mapped = dbToUIProject(updated);
     setProjectItems((items) => items.map((item) => item.id === id ? mapped : item));
     setSelectedProject(mapped);
@@ -448,8 +461,8 @@ export function ProjectsPreview({
       <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project, index) => <ProjectCard key={project.id ?? `${project.name}-${index}`} project={project} onOpen={() => setSelectedProject(project)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</div>
       <div className="flex min-h-12 items-center justify-between px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8"><span>Showing {filteredProjects.length} {filteredProjects.length === 1 ? "project" : "projects"}</span><div className="flex items-center gap-2"><AppSelect ariaLabel="Projects per page" value={String(queryState.pageSize)} options={[{ value: "10", label: "10 per page" }, { value: "25", label: "25 per page" }, { value: "50", label: "50 per page" }]} onChange={(pageSize) => updateUrl({ pageSize, page: 1 }, true)} className="w-[120px]" size="xs" /><Button variant="secondary" size="sm" disabled={currentPage <= 1} onClick={() => updateUrl({ page: currentPage - 1 }, true)}>Previous</Button><span>{currentPage} / {totalPages}</span><Button variant="secondary" size="sm" disabled={currentPage >= totalPages} onClick={() => updateUrl({ page: currentPage + 1 }, true)}>Next</Button></div></div>
 
-      <AddProjectDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} onCreate={handleCreateProject} accountOptions={availableAccountOptions} />
-      <ProjectDetailPanel project={selectedProject} onClose={() => setSelectedProject(null)} onUpdate={handleUpdateProject} onLogoUploaded={handleLogoUploaded} onArchive={handleArchiveProject} onDelete={handleDeleteProject} accountOptions={availableAccountOptions} />
+      <AddProjectDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} onCreate={handleCreateProject} accountOptions={availableAccountOptions} walletOptions={availableWalletOptions} />
+      <ProjectDetailPanel project={selectedProject} onClose={() => setSelectedProject(null)} onUpdate={handleUpdateProject} onLogoUploaded={handleLogoUploaded} onArchive={handleArchiveProject} onDelete={handleDeleteProject} accountOptions={availableAccountOptions} walletOptions={availableWalletOptions} />
     </div>
   );
 }
@@ -874,18 +887,20 @@ function ProjectDetailPanel({
   onArchive,
   onDelete,
   accountOptions,
+  walletOptions,
 }: {
   project: Project | null;
   onClose: () => void;
   onUpdate: (
     id: string,
     data: Partial<Omit<typeof projectsSchema.$inferInsert, "workspaceId">>,
-    accountIds?: string[],
+    assignments?: ProjectAssignmentInput,
   ) => Promise<void | Project>;
   onLogoUploaded: (id: string, updated: ProjectWithAccounts) => void;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   accountOptions: ProjectAccountOption[];
+  walletOptions: ProjectWalletOption[];
 }) {
   useDrawerDismiss(onClose, Boolean(project));
 
@@ -900,6 +915,8 @@ function ProjectDetailPanel({
   const [editWorkTypes, setEditWorkTypes] = useState<string[]>([]);
   const [editProjectTypes, setEditProjectTypes] = useState<string[]>([]);
   const [editAccountIds, setEditAccountIds] = useState<string[]>([]);
+  const [editWalletIds, setEditWalletIds] = useState<string[]>([]);
+  const [editNewWallets, setEditNewWallets] = useState<ProjectWalletDraft[]>([]);
   const [editWebsiteUrl, setEditWebsiteUrl] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -930,6 +947,8 @@ function ProjectDetailPanel({
         .filter((account) => p.accounts.includes(account.label))
         .map((account) => account.id),
     );
+    setEditWalletIds(p.walletIds ?? []);
+    setEditNewWallets([]);
     setEditLogoPreview("");
     setSaveError("");
     setOpenEditSelect(null);
@@ -967,7 +986,11 @@ function ProjectDetailPanel({
         projectTypes: editProjectTypes,
         websiteUrl: normalizeHttpUrl(editWebsiteUrl) || null,
         notes: editNotes || null,
-      }, editAccountIds);
+      }, {
+        accountIds: editAccountIds,
+        walletIds: editWalletIds,
+        newWallets: editNewWallets,
+      });
       setOpenEditSelect(null);
       setIsEditing(false);
     } catch (error) {
@@ -1002,11 +1025,12 @@ function ProjectDetailPanel({
   }
 
   function toggleEditAccount(id: string) {
-    setEditAccountIds((current) => (
-      current.includes(id)
-        ? current.filter((accountId) => accountId !== id)
-        : [...current, id]
-    ));
+    setEditAccountIds((current) => {
+      if (!current.includes(id)) return [...current, id];
+      setEditWalletIds((walletIds) => walletIds.filter((walletId) => walletOptions.find((wallet) => wallet.id === walletId)?.ownerAccountId !== id));
+      setEditNewWallets((drafts) => drafts.filter((wallet) => wallet.ownerAccountId !== id));
+      return current.filter((accountId) => accountId !== id);
+    });
   }
 
   return (
@@ -1204,6 +1228,15 @@ function ProjectDetailPanel({
                     ) : null}
                   </div>
                 </div>
+                <ProjectWalletPicker
+                  accountOptions={accountOptions}
+                  walletOptions={walletOptions}
+                  selectedAccountIds={editAccountIds}
+                  selectedWalletIds={editWalletIds}
+                  newWallets={editNewWallets}
+                  onWalletIdsChange={setEditWalletIds}
+                  onNewWalletsChange={setEditNewWallets}
+                />
               </>
             ) : (
               <>
@@ -1222,6 +1255,16 @@ function ProjectDetailPanel({
                   ) : (
                     <span className="text-[11px] text-muted-foreground/60">Unassigned</span>
                   )}
+                </PropertyBlock>
+                <PropertyBlock label="Project wallets">
+                  {(project.walletDetails?.length ?? 0) > 0 ? (
+                    <div className="grid w-full gap-1.5 sm:grid-cols-2">
+                      {project.walletDetails?.map((wallet) => {
+                        const owner = accountOptions.find((account) => account.id === wallet.ownerAccountId)?.label ?? "Shared";
+                        return <div key={wallet.id} className="flex min-w-0 items-center gap-2 rounded-xl bg-white/[0.025] px-2.5 py-2"><WalletCards className="size-3.5 shrink-0 text-muted-foreground" /><span className="min-w-0"><span className="block truncate text-xs font-medium text-foreground">{wallet.label}</span><span className="block truncate font-mono text-[10px] text-muted-foreground">{shortWalletAddress(wallet.address)} · {wallet.chainType || "Chain not set"} · {owner}</span></span></div>;
+                      })}
+                    </div>
+                  ) : <span className="text-[11px] text-muted-foreground/60">No wallet assigned</span>}
                 </PropertyBlock>
               </>
             )}
@@ -1271,6 +1314,122 @@ function PropertyBlock({ label, children }: { label: string; children: ReactNode
   return <div className="border-t border-white/[0.04] pt-3"><p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p><div className="mt-1 flex min-h-[22px] items-center text-xs text-foreground">{children}</div></div>;
 }
 
+function shortWalletAddress(address: string) {
+  if (address.length <= 14) return address;
+  return `${address.slice(0, 7)}...${address.slice(-5)}`;
+}
+
+function ProjectWalletPicker({
+  accountOptions,
+  walletOptions,
+  selectedAccountIds,
+  selectedWalletIds,
+  newWallets,
+  onWalletIdsChange,
+  onNewWalletsChange,
+}: {
+  accountOptions: ProjectAccountOption[];
+  walletOptions: ProjectWalletOption[];
+  selectedAccountIds: string[];
+  selectedWalletIds: string[];
+  newWallets: ProjectWalletDraft[];
+  onWalletIdsChange: (ids: string[]) => void;
+  onNewWalletsChange: (wallets: ProjectWalletDraft[]) => void;
+}) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [label, setLabel] = useState("");
+  const [address, setAddress] = useState("");
+  const [chainType, setChainType] = useState("");
+  const [ownerAccountId, setOwnerAccountId] = useState("shared");
+  const [draftError, setDraftError] = useState("");
+  const eligibleWallets = walletOptions
+    .filter((wallet) => !wallet.ownerAccountId || selectedAccountIds.includes(wallet.ownerAccountId))
+    .sort((a, b) => {
+      const aOwner = accountOptions.find((account) => account.id === a.ownerAccountId)?.label ?? "Shared";
+      const bOwner = accountOptions.find((account) => account.id === b.ownerAccountId)?.label ?? "Shared";
+      return aOwner.localeCompare(bOwner) || a.label.localeCompare(b.label);
+    });
+
+  function addDraft() {
+    if (!label.trim() || !address.trim() || !chainType.trim()) {
+      setDraftError("Label, address, and chain are required");
+      return;
+    }
+    onNewWalletsChange([...newWallets, {
+      label: label.trim(),
+      address: address.trim(),
+      chainType: chainType.trim(),
+      ownerAccountId: ownerAccountId === "shared" ? null : ownerAccountId,
+    }]);
+    setLabel("");
+    setAddress("");
+    setChainType("");
+    setOwnerAccountId("shared");
+    setDraftError("");
+    setIsAdding(false);
+  }
+
+  return (
+    <div className="border-t border-white/[0.04] pt-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Project wallets</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Choose an existing wallet or add one for a custom chain.</p>
+        </div>
+        <button type="button" onClick={() => { setDraftError(""); setIsAdding((value) => !value); }} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-foreground hover:bg-white/[0.05] active:scale-[0.97]">
+          <Plus className="size-3.5" />New project wallet
+        </button>
+      </div>
+
+      {eligibleWallets.length > 0 ? (
+        <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+          {eligibleWallets.map((wallet) => {
+            const active = selectedWalletIds.includes(wallet.id);
+            const owner = accountOptions.find((account) => account.id === wallet.ownerAccountId)?.label ?? "Shared";
+            return (
+              <button key={wallet.id} type="button" onClick={() => onWalletIdsChange(active ? selectedWalletIds.filter((id) => id !== wallet.id) : [...selectedWalletIds, wallet.id])} className={cn("flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-[background-color,border-color,transform] active:scale-[0.985]", active ? "border-white/[0.12] bg-white/[0.07]" : "border-white/[0.055] bg-white/[0.02] hover:bg-white/[0.04]")}>
+                <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-white/[0.045]"><WalletCards className="size-3.5 text-muted-foreground" /></span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{wallet.label}</span><span className="block truncate font-mono text-[10px] text-muted-foreground">{shortWalletAddress(wallet.address)} · {wallet.chainType || "Chain not set"} · {owner}</span></span>
+                {active ? <Check className="size-3.5 shrink-0 text-foreground" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : <p className="mt-2 text-[11px] text-muted-foreground/70">No eligible existing wallets. Select an Account or add a project wallet.</p>}
+
+      {newWallets.length > 0 ? (
+        <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+          {newWallets.map((wallet, index) => (
+            <div key={`${wallet.address}-${index}`} className="flex min-w-0 items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.07] px-2.5 py-2">
+              <WalletCards className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{wallet.label}</span><span className="block truncate font-mono text-[10px] text-muted-foreground">{shortWalletAddress(wallet.address)} · {wallet.chainType}</span></span>
+              <button type="button" onClick={() => onNewWalletsChange(newWallets.filter((_, draftIndex) => draftIndex !== index))} className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.06] hover:text-foreground" aria-label={`Remove ${wallet.label}`}><X className="size-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {isAdding ? (
+        <div className="mt-2 rounded-xl border border-white/[0.065] bg-white/[0.02] p-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field label="Wallet label" placeholder="Project node wallet" value={label} onChange={setLabel} />
+            <Field label="Chain" placeholder="Custom L1 name" value={chainType} onChange={setChainType} />
+            <div className="sm:col-span-2"><Field label="Address" placeholder="Wallet address" value={address} onChange={setAddress} /></div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Owner Account</p>
+              <AppSelect ariaLabel="Wallet owner Account" value={ownerAccountId} options={[{ value: "shared", label: "Shared / no owner" }, ...accountOptions.filter((account) => selectedAccountIds.includes(account.id)).map((account) => ({ value: account.id, label: account.label }))]} onChange={setOwnerAccountId} className="mt-1.5 w-full" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            {draftError ? <p className="text-[11px] text-danger">{draftError}</p> : <span />}
+            <div className="flex gap-2"><Button variant="secondary" size="sm" onClick={() => setIsAdding(false)}>Cancel</Button><Button size="sm" onClick={addDraft}>Add wallet</Button></div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function DetailLink({ label, value, href, external = false }: { label: string; value: string; href: string; external?: boolean }) {
   return <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className="flex items-center justify-between rounded-lg border border-white/[0.055] bg-muted/20 px-3 py-2 text-xs text-muted-foreground hover:bg-accent/40 hover:text-foreground"><span><span className="text-foreground">{label}</span> · {value}</span><ExternalLink className="size-3.5" /></a>;
 }
@@ -1280,11 +1439,13 @@ function AddProjectDialog({
   onClose,
   onCreate,
   accountOptions,
+  walletOptions,
 }: {
   open: boolean;
   onClose: () => void;
-  onCreate: (project: Project, accountIds: string[], context?: { logoFile?: File | null }) => Promise<void>;
+  onCreate: (project: Project, assignments: ProjectAssignmentInput, context?: { logoFile?: File | null }) => Promise<void>;
   accountOptions: ProjectAccountOption[];
+  walletOptions: ProjectWalletOption[];
 }) {
   const [openSelect, setOpenSelect] = useState<string | null>(null);
   const [showOptionalContext, setShowOptionalContext] = useState(false);
@@ -1294,6 +1455,8 @@ function AddProjectDialog({
   const [status, setStatus] = useState("Watching");
   const [priority, setPriority] = useState("Medium");
   const [assignedAccountIds, setAssignedAccountIds] = useState<string[]>(() => accountOptions[0] ? [accountOptions[0].id] : []);
+  const [assignedWalletIds, setAssignedWalletIds] = useState<string[]>([]);
+  const [newWallets, setNewWallets] = useState<ProjectWalletDraft[]>([]);
   const [dateStart, setDateStart] = useState(getTodayDateValue);
   const [workTypes, setWorkTypes] = useState<string[]>(["Testnet"]);
   const [projectTypes, setProjectTypes] = useState<string[]>([]);
@@ -1315,6 +1478,8 @@ function AddProjectDialog({
     setStatus("Watching");
     setPriority("Medium");
     setAssignedAccountIds(accountOptions[0] ? [accountOptions[0].id] : []);
+    setAssignedWalletIds([]);
+    setNewWallets([]);
     setDateStart(getTodayDateValue());
     setWorkTypes(["Testnet"]);
     setProjectTypes([]);
@@ -1362,7 +1527,7 @@ function AddProjectDialog({
         websiteUrl: normalizeHttpUrl(websiteUrl) || undefined,
         notes: notes.trim() || undefined,
         logoUrl: logoPreview || undefined,
-      }, assignedAccountIds, { logoFile });
+      }, { accountIds: assignedAccountIds, walletIds: assignedWalletIds, newWallets }, { logoFile });
       resetForm();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Unable to create project");
@@ -1372,12 +1537,17 @@ function AddProjectDialog({
   }
 
   function toggleAccount(id: string) {
-    setAssignedAccountIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+    setAssignedAccountIds((current) => {
+      if (!current.includes(id)) return [...current, id];
+      setAssignedWalletIds((walletIds) => walletIds.filter((walletId) => walletOptions.find((wallet) => wallet.id === walletId)?.ownerAccountId !== id));
+      setNewWallets((walletDrafts) => walletDrafts.filter((wallet) => wallet.ownerAccountId !== id));
+      return current.filter((item) => item !== id);
+    });
   }
 
   return (
     <div className="modal-backdrop-in fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="add-project-title">
-      <div className="modal-card-in soft-panel w-full max-w-[680px] overflow-visible rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45" onPaste={(event) => {
+      <div className="modal-card-in soft-panel max-h-[calc(100vh-32px)] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle" onPaste={(event) => {
         const target = event.target as HTMLElement;
         if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
         const items = event.clipboardData.items;
@@ -1452,6 +1622,18 @@ function AddProjectDialog({
               ))}
               {accountOptions.length === 0 ? <span className="text-[11px] text-muted-foreground">Add an account first to assign this project.</span> : null}
             </div>
+          </div>
+
+          <div className="mt-2 px-2 pb-2">
+            <ProjectWalletPicker
+              accountOptions={accountOptions}
+              walletOptions={walletOptions}
+              selectedAccountIds={assignedAccountIds}
+              selectedWalletIds={assignedWalletIds}
+              newWallets={newWallets}
+              onWalletIdsChange={setAssignedWalletIds}
+              onNewWalletsChange={setNewWallets}
+            />
           </div>
 
           <div className="mt-4 border-t soft-divider px-2 pt-3">

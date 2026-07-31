@@ -2,72 +2,34 @@
 
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
-import { z } from "zod";
 
 import { db } from "@/lib/db/client";
-import { accounts, projectAccounts, projects } from "@/lib/db/schema";
+import { accounts, projectAccounts, projectWallets, projects, wallets } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { isHttpUrl, normalizeHttpUrl } from "@/lib/url";
-import { ARCHIVE_REASONS, HUNT_TYPES, PROJECT_PRIORITIES, PROJECT_STATUSES } from "@/features/projects/project-query";
+import { ARCHIVE_REASONS } from "@/features/projects/project-query";
+import {
+  parseProjectAssignments,
+  parseProjectInput,
+  parseProjectUpdate,
+  type ProjectAssignmentInput,
+} from "@/features/projects/project-schema";
 
 export type ProjectAccountOption = Pick<
   typeof accounts.$inferSelect,
   "id" | "label" | "avatarUrl"
 >;
 
+export type ProjectWalletOption = Pick<
+  typeof wallets.$inferSelect,
+  "id" | "label" | "address" | "ownerAccountId" | "chainType" | "walletType"
+>;
+
 export type ProjectWithAccounts = typeof projects.$inferSelect & {
   assignedAccounts: ProjectAccountOption[];
+  assignedWallets: ProjectWalletOption[];
 };
-
-const optionalHttpUrl = z.preprocess(
-  (value) => typeof value === "string" ? normalizeHttpUrl(value) : value,
-  z.union([
-    z.literal(""),
-    z.string().trim().url().refine(isHttpUrl, "Only http or https URLs are supported"),
-  ]).nullable().optional(),
-);
-
-const projectInputSchema = z.object({
-  name: z.string().trim().min(1, "Project name is required").max(120),
-  huntType: z.enum(HUNT_TYPES).default("free_hunts"),
-  status: z.enum(PROJECT_STATUSES).default("watching"),
-  priority: z.enum(PROJECT_PRIORITIES).default("medium"),
-  workTypes: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
-  projectTypes: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
-  stageResult: z.string().trim().min(1).max(100).default("Not applicable"),
-  progressEstimate: z.union([z.string(), z.number()]).optional(),
-  dateStart: z.union([z.literal(""), z.string().date()]).nullable().optional(),
-  websiteUrl: optionalHttpUrl,
-  notes: z.string().trim().max(5000).nullable().optional(),
-  logoUrl: optionalHttpUrl,
-  logoPath: z.string().trim().max(500).nullable().optional(),
-  logoSource: z.enum(["uploaded", "external_url", "favicon", "manual", "none"]).nullable().optional(),
-});
-const projectUpdateSchema = projectInputSchema.partial();
-
-function projectValidationError(error: z.ZodError) {
-  const issue = error.issues[0];
-  if (issue?.path[0] === "websiteUrl" || issue?.path[0] === "logoUrl") {
-    return new Error("Enter a valid URL, for example project.com");
-  }
-  return new Error(issue?.message ?? "Project details are invalid");
-}
-
-function parseProjectInput(data: unknown) {
-  const result = projectInputSchema.safeParse(data);
-  if (!result.success) throw projectValidationError(result.error);
-  return result.data;
-}
-
-function parseProjectUpdate(data: unknown) {
-  const result = projectUpdateSchema.safeParse(data);
-  if (!result.success) throw projectValidationError(result.error);
-  return result.data;
-}
-
-const archiveReasonSchema = z.enum(ARCHIVE_REASONS);
 
 function revalidateProjectViews() {
   for (const path of ["/projects", "/archive", "/daily", "/tasks"]) revalidatePath(path);
@@ -154,6 +116,47 @@ async function getAssignments(
   return assignments;
 }
 
+async function getWalletAssignments(
+  workspaceId: string,
+  projectIds: string[],
+): Promise<Map<string, ProjectWalletOption[]>> {
+  const assignments = new Map<string, ProjectWalletOption[]>();
+  if (projectIds.length === 0) return assignments;
+
+  const rows = await db
+    .select({
+      projectId: projectWallets.projectId,
+      id: wallets.id,
+      label: wallets.label,
+      address: wallets.address,
+      ownerAccountId: wallets.ownerAccountId,
+      chainType: wallets.chainType,
+      walletType: wallets.walletType,
+    })
+    .from(projectWallets)
+    .innerJoin(projects, eq(projectWallets.projectId, projects.id))
+    .innerJoin(wallets, eq(projectWallets.walletId, wallets.id))
+    .where(and(
+      eq(projects.workspaceId, workspaceId),
+      eq(wallets.workspaceId, workspaceId),
+      inArray(projectWallets.projectId, projectIds),
+    ));
+
+  for (const row of rows) {
+    const current = assignments.get(row.projectId) ?? [];
+    current.push({
+      id: row.id,
+      label: row.label,
+      address: row.address,
+      ownerAccountId: row.ownerAccountId,
+      chainType: row.chainType,
+      walletType: row.walletType,
+    });
+    assignments.set(row.projectId, current);
+  }
+  return assignments;
+}
+
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
 export async function getProjects(): Promise<ProjectWithAccounts[]> {
@@ -169,14 +172,16 @@ export async function getProjects(): Promise<ProjectWithAccounts[]> {
     )
     .orderBy(desc(projects.updatedAt));
 
-  const assignments = await getAssignments(
-    workspaceId,
-    records.map((project) => project.id),
-  );
+  const projectIds = records.map((project) => project.id);
+  const [assignments, walletAssignments] = await Promise.all([
+    getAssignments(workspaceId, projectIds),
+    getWalletAssignments(workspaceId, projectIds),
+  ]);
 
   return records.map((project) => ({
     ...project,
     assignedAccounts: assignments.get(project.id) ?? [],
+    assignedWallets: walletAssignments.get(project.id) ?? [],
   }));
 }
 
@@ -185,8 +190,16 @@ export async function getArchivedProjects(): Promise<ProjectWithAccounts[]> {
   const records = await db.select().from(projects)
     .where(and(eq(projects.workspaceId, workspaceId), eq(projects.isArchived, true)))
     .orderBy(desc(projects.archivedAt), desc(projects.updatedAt));
-  const assignments = await getAssignments(workspaceId, records.map((project) => project.id));
-  return records.map((project) => ({ ...project, assignedAccounts: assignments.get(project.id) ?? [] }));
+  const projectIds = records.map((project) => project.id);
+  const [assignments, walletAssignments] = await Promise.all([
+    getAssignments(workspaceId, projectIds),
+    getWalletAssignments(workspaceId, projectIds),
+  ]);
+  return records.map((project) => ({
+    ...project,
+    assignedAccounts: assignments.get(project.id) ?? [],
+    assignedWallets: walletAssignments.get(project.id) ?? [],
+  }));
 }
 
 export async function getProjectAccountOptions(): Promise<ProjectAccountOption[]> {
@@ -203,19 +216,35 @@ export async function getProjectAccountOptions(): Promise<ProjectAccountOption[]
     .orderBy(accounts.label);
 }
 
+export async function getProjectWalletOptions(): Promise<ProjectWalletOption[]> {
+  const { workspaceId } = await requireWorkspace();
+  return db
+    .select({
+      id: wallets.id,
+      label: wallets.label,
+      address: wallets.address,
+      ownerAccountId: wallets.ownerAccountId,
+      chainType: wallets.chainType,
+      walletType: wallets.walletType,
+    })
+    .from(wallets)
+    .where(eq(wallets.workspaceId, workspaceId))
+    .orderBy(wallets.label);
+}
+
 // ─── Mutations ───────────────────────────────────────────────────────────────
 
 export async function createProject(
   data: Omit<typeof projects.$inferInsert, "workspaceId">,
-  accountIds: string[] = [],
+  assignmentInput: ProjectAssignmentInput = { accountIds: [], walletIds: [], newWallets: [] },
 ): Promise<ProjectWithAccounts> {
   const { workspaceId } = await requireWorkspace();
   const parsed = parseProjectInput(data);
+  const assignments = parseProjectAssignments(assignmentInput);
   await assertUniqueName(workspaceId, parsed.name);
-  const uniqueAccountIds = [...new Set(accountIds)];
 
   const result = await protectProjectWrite(() => db.transaction(async (tx) => {
-    const selectedAccounts = uniqueAccountIds.length > 0
+    const selectedAccounts = assignments.accountIds.length > 0
       ? await tx
           .select({
             id: accounts.id,
@@ -226,13 +255,35 @@ export async function createProject(
           .where(
             and(
               eq(accounts.workspaceId, workspaceId),
-              inArray(accounts.id, uniqueAccountIds),
+              inArray(accounts.id, assignments.accountIds),
             ),
           )
       : [];
 
-    if (selectedAccounts.length !== uniqueAccountIds.length) {
+    if (selectedAccounts.length !== assignments.accountIds.length) {
       throw new Error("One or more selected accounts are unavailable");
+    }
+
+    const selectedAccountIds = new Set(assignments.accountIds);
+    const selectedWallets = assignments.walletIds.length > 0
+      ? await tx
+          .select({
+            id: wallets.id,
+            label: wallets.label,
+            address: wallets.address,
+            ownerAccountId: wallets.ownerAccountId,
+            chainType: wallets.chainType,
+            walletType: wallets.walletType,
+          })
+          .from(wallets)
+          .where(and(eq(wallets.workspaceId, workspaceId), inArray(wallets.id, assignments.walletIds)))
+      : [];
+    if (selectedWallets.length !== assignments.walletIds.length) throw new Error("One or more selected wallets are unavailable");
+    if (selectedWallets.some((wallet) => wallet.ownerAccountId && !selectedAccountIds.has(wallet.ownerAccountId))) {
+      throw new Error("A wallet owner must also be assigned to the project");
+    }
+    if (assignments.newWallets.some((wallet) => wallet.ownerAccountId && !selectedAccountIds.has(wallet.ownerAccountId))) {
+      throw new Error("A new wallet owner must also be assigned to the project");
     }
 
     const [project] = await tx
@@ -249,7 +300,30 @@ export async function createProject(
       );
     }
 
-    return { ...project, assignedAccounts: selectedAccounts };
+    const createdWallets = assignments.newWallets.length > 0
+      ? await tx.insert(wallets).values(assignments.newWallets.map((wallet) => ({
+          workspaceId,
+          ownerAccountId: wallet.ownerAccountId ?? null,
+          label: wallet.label,
+          address: wallet.address,
+          chainType: wallet.chainType,
+          walletType: "project_wallet" as const,
+          updatedAt: new Date(),
+        }))).returning({
+          id: wallets.id,
+          label: wallets.label,
+          address: wallets.address,
+          ownerAccountId: wallets.ownerAccountId,
+          chainType: wallets.chainType,
+          walletType: wallets.walletType,
+        })
+      : [];
+    const assignedWallets = [...selectedWallets, ...createdWallets];
+    if (assignedWallets.length > 0) {
+      await tx.insert(projectWallets).values(assignedWallets.map((wallet) => ({ projectId: project.id, walletId: wallet.id })));
+    }
+
+    return { ...project, assignedAccounts: selectedAccounts, assignedWallets };
   }));
 
   revalidateProjectViews();
@@ -260,30 +334,60 @@ export async function createProject(
 export async function updateProject(
   id: string,
   data: Partial<Omit<typeof projects.$inferInsert, "workspaceId">>,
-  accountIds?: string[],
+  assignmentInput?: ProjectAssignmentInput,
 ): Promise<ProjectWithAccounts> {
   const { workspaceId } = await requireWorkspace();
   const parsed = parseProjectUpdate(data);
   if (parsed.name) await assertUniqueName(workspaceId, parsed.name, id);
-  const uniqueAccountIds = accountIds ? [...new Set(accountIds)] : undefined;
+  const assignments = assignmentInput ? parseProjectAssignments(assignmentInput) : undefined;
 
   const project = await protectProjectWrite(() => db.transaction(async (tx) => {
-    if (uniqueAccountIds) {
-      const selectedAccounts = uniqueAccountIds.length > 0
+    const [existingProject] = await tx.select({ id: projects.id }).from(projects)
+      .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId))).limit(1);
+    if (!existingProject) throw new Error("Project not found");
+
+    let walletIdsToAssign: string[] = [];
+    if (assignments) {
+      const selectedAccounts = assignments.accountIds.length > 0
         ? await tx
             .select({ id: accounts.id })
             .from(accounts)
             .where(
               and(
                 eq(accounts.workspaceId, workspaceId),
-                inArray(accounts.id, uniqueAccountIds),
+                inArray(accounts.id, assignments.accountIds),
               ),
             )
         : [];
 
-      if (selectedAccounts.length !== uniqueAccountIds.length) {
+      if (selectedAccounts.length !== assignments.accountIds.length) {
         throw new Error("One or more selected accounts are unavailable");
       }
+      const selectedAccountIds = new Set(assignments.accountIds);
+      const selectedWallets = assignments.walletIds.length > 0
+        ? await tx.select({ id: wallets.id, ownerAccountId: wallets.ownerAccountId }).from(wallets)
+            .where(and(eq(wallets.workspaceId, workspaceId), inArray(wallets.id, assignments.walletIds)))
+        : [];
+      if (selectedWallets.length !== assignments.walletIds.length) throw new Error("One or more selected wallets are unavailable");
+      if (selectedWallets.some((wallet) => wallet.ownerAccountId && !selectedAccountIds.has(wallet.ownerAccountId))) {
+        throw new Error("A wallet owner must also be assigned to the project");
+      }
+      if (assignments.newWallets.some((wallet) => wallet.ownerAccountId && !selectedAccountIds.has(wallet.ownerAccountId))) {
+        throw new Error("A new wallet owner must also be assigned to the project");
+      }
+
+      const createdWallets = assignments.newWallets.length > 0
+        ? await tx.insert(wallets).values(assignments.newWallets.map((wallet) => ({
+            workspaceId,
+            ownerAccountId: wallet.ownerAccountId ?? null,
+            label: wallet.label,
+            address: wallet.address,
+            chainType: wallet.chainType,
+            walletType: "project_wallet" as const,
+            updatedAt: new Date(),
+          }))).returning({ id: wallets.id })
+        : [];
+      walletIdsToAssign = [...assignments.walletIds, ...createdWallets.map((wallet) => wallet.id)];
     }
 
     const [updatedProject] = await tx
@@ -294,32 +398,43 @@ export async function updateProject(
 
     if (!updatedProject) throw new Error("Project not found");
 
-    if (uniqueAccountIds) {
+    if (assignments) {
       await tx.delete(projectAccounts).where(eq(projectAccounts.projectId, id));
-
-      if (uniqueAccountIds.length > 0) {
+      if (assignments.accountIds.length > 0) {
         await tx.insert(projectAccounts).values(
-          uniqueAccountIds.map((accountId) => ({
+          assignments.accountIds.map((accountId) => ({
             projectId: id,
             accountId,
           })),
         );
+      }
+      await tx.delete(projectWallets).where(eq(projectWallets.projectId, id));
+      if (walletIdsToAssign.length > 0) {
+        await tx.insert(projectWallets).values(walletIdsToAssign.map((walletId) => ({ projectId: id, walletId })));
       }
     }
 
     return updatedProject;
   }));
 
-  const assignments = await getAssignments(workspaceId, [project.id]);
+  const [accountAssignments, walletAssignments] = await Promise.all([
+    getAssignments(workspaceId, [project.id]),
+    getWalletAssignments(workspaceId, [project.id]),
+  ]);
 
   revalidateProjectViews();
 
-  return { ...project, assignedAccounts: assignments.get(project.id) ?? [] };
+  return {
+    ...project,
+    assignedAccounts: accountAssignments.get(project.id) ?? [],
+    assignedWallets: walletAssignments.get(project.id) ?? [],
+  };
 }
 
 export async function archiveProject(id: string, reason: string): Promise<void> {
   const { workspaceId } = await requireWorkspace();
-  const cleanReason = archiveReasonSchema.parse(reason.trim().toLowerCase());
+  const cleanReason = reason.trim().toLowerCase();
+  if (!ARCHIVE_REASONS.includes(cleanReason as (typeof ARCHIVE_REASONS)[number])) throw new Error("Choose a valid archive reason");
   const [archived] = await db.update(projects).set({ isArchived: true, status: "archived", archiveReason: cleanReason, archivedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)))
     .returning({ id: projects.id });
@@ -373,6 +488,11 @@ export async function deleteProject(id: string): Promise<void> {
       await tx
         .delete(projectAccounts)
         .where(eq(projectAccounts.projectId, project.id));
+
+      // Project deletion only unlinks wallets. Wallet records remain reusable.
+      await tx
+        .delete(projectWallets)
+        .where(eq(projectWallets.projectId, project.id));
 
       await tx
         .delete(projects)
