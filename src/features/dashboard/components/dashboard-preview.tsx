@@ -13,6 +13,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { DeadlineOptions, UpcomingDeadlineItem } from "@/features/deadlines/actions";
+import type { DashboardData, DashboardInboxItem, DashboardNoteItem } from "@/features/dashboard/actions";
 import { DeadlineCreateButton } from "@/features/deadlines/components/deadline-create-button";
 import { formatDeadlineDueLabel, formatDeadlineTime, getDeadlineDayDifference, getJakartaDateValue, shiftDateValue } from "@/features/deadlines/deadline-utils";
 import { Badge } from "@/components/ui/badge";
@@ -68,12 +69,14 @@ export function DashboardPreview({
   deadlineDueCount,
   nftCount,
   canManageDeadlines = false,
+  dashboardData,
 }: {
   deadlineItems?: UpcomingDeadlineItem[];
   deadlineOptions?: DeadlineOptions;
   deadlineDueCount?: number;
   nftCount?: number;
   canManageDeadlines?: boolean;
+  dashboardData?: DashboardData;
 } = {}) {
   const { dateLabel, headline, motivation } = getDashboardGreeting();
   const deadlines = deadlineItems ?? getFallbackDeadlines();
@@ -83,6 +86,10 @@ export function DashboardPreview({
   const categories = pulseItems.map((item) => item.label === "NFT" && nftCount !== undefined
     ? { ...item, value: String(nftCount) }
     : item);
+  const dashboardInboxItems = dashboardData?.inboxItems ?? inboxItems;
+  const dashboardPinnedNotes = dashboardData?.pinnedNotes ?? pinnedNotes;
+  const dashboardRecentNotes = dashboardData?.recentNotes ?? recentNotes;
+  const dashboardRecentActivity = dashboardData?.recentActivity ?? recentActivity;
 
   return (
     <div className="px-4 py-3 sm:px-5 lg:px-6 lg:py-4">
@@ -111,11 +118,11 @@ export function DashboardPreview({
         <DashboardPanel icon={StickyNote} title="Notes desk" href="/docs">
           <SectionLabel label="Pinned notes" />
           <div className="divide-y divide-white/[0.045]">
-            {pinnedNotes.map((note) => <PinnedNoteRow key={note.title} note={note} />)}
+            {dashboardPinnedNotes.map((note, index) => <PinnedNoteRow key={note.title + "-" + index} note={note} />)}
           </div>
           <SectionLabel label="Recent notes" className="mt-2.5" />
           <div className="divide-y divide-white/[0.045]">
-            {recentNotes.map((note) => <SimpleRow key={note.title} title={note.title} meta={note.meta} />)}
+            {dashboardRecentNotes.map((note, index) => <SimpleRow key={note.title + "-" + index} title={note.title} meta={note.meta} />)}
           </div>
         </DashboardPanel>
 
@@ -153,13 +160,13 @@ export function DashboardPreview({
 
         <DashboardPanel icon={Inbox} title="Inbox to process" href="/inbox">
           <div className="divide-y divide-white/[0.045]">
-            {inboxItems.map((item) => <InboxRow key={item.title} item={item} />)}
+            {dashboardInboxItems.map((item, index) => <InboxRow key={item.title + "-" + index} item={item} />)}
           </div>
         </DashboardPanel>
 
         <DashboardPanel icon={AlertCircle} title="Recent activity" href="/projects">
           <div className="divide-y divide-white/[0.045]">
-            {recentActivity.map((activity) => <Activity key={activity.text} {...activity} />)}
+            {dashboardRecentActivity.map((activity, index) => <Activity key={activity.text + "-" + index} {...activity} />)}
           </div>
         </DashboardPanel>
       </div>
@@ -191,37 +198,37 @@ function SectionLabel({ label, className = "" }: { label: string; className?: st
   return <h3 className={"mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground " + className}>{label}</h3>;
 }
 
-function InboxRow({ item }: { item: (typeof inboxItems)[number] }) {
+function InboxRow({ item }: { item: DashboardInboxItem }) {
   return (
-    <button className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-1.5 text-left hover:bg-white/[0.025]">
+    <Link href="/inbox" className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-1.5 text-left hover:bg-white/[0.025]">
       <span className="min-w-0">
         <span className="block truncate text-[13px] font-medium">{item.title}</span>
         <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{item.meta}</span>
       </span>
       <Badge variant={item.variant}>{item.badge}</Badge>
-    </button>
+    </Link>
   );
 }
 
-function PinnedNoteRow({ note }: { note: (typeof pinnedNotes)[number] }) {
-  const Icon = note.icon;
+function PinnedNoteRow({ note }: { note: DashboardNoteItem & { icon?: typeof StickyNote } }) {
+  const Icon = note.icon ?? StickyNote;
   return (
-    <button className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 py-1.5 text-left hover:bg-white/[0.025]">
+    <Link href="/docs" className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 py-1.5 text-left hover:bg-white/[0.025]">
       <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground"><Icon className="size-3.5" /></span>
       <span className="min-w-0">
         <span className="block truncate text-[13px] font-medium">{note.title}</span>
         <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{note.meta}</span>
       </span>
-    </button>
+    </Link>
   );
 }
 
 function SimpleRow({ title, meta }: { title: string; meta: string }) {
   return (
-    <button className="grid w-full py-1.5 text-left hover:bg-white/[0.025]">
+    <Link href="/docs" className="grid w-full py-1.5 text-left hover:bg-white/[0.025]">
       <span className="truncate text-[13px] font-medium">{title}</span>
       <span className="mt-0.5 truncate text-[11px] text-muted-foreground">{meta}</span>
-    </button>
+    </Link>
   );
 }
 

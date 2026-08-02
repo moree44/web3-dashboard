@@ -1705,6 +1705,7 @@ function TogglePill({ label, active = false, onClick }: { label: string; active?
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn("soft-control rounded-full px-3 py-1 text-xs font-medium", active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}
     >

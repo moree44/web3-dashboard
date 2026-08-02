@@ -363,9 +363,9 @@ test("full app smoke — menus, accounts, avatar upload, wallets, groups, projec
     await expect(page.getByRole("heading", { name: groupName })).toHaveCount(0, { timeout: 15000 });
   });
 
-  await soft("Groups: rename/edit option exists in menu (known gap)", async () => {
+  await soft("Groups: edit option exists in menu", async () => {
     if (!groupMenuHasEdit) {
-      throw new Error("no Edit/Rename in group card menu — updateWalletGroup action is unreachable from UI");
+      throw new Error("no Edit/Rename in group card menu");
     }
   });
 

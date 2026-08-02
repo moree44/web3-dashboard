@@ -1,16 +1,16 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-07-31
+Last updated: 2026-08-02
 
 ## Current Position
 
-Web3 Hunting OS is in **Phase 1 Core, CRUD partially wired**.
+Web3 Hunting OS is in **Phase 1 Core, CRUD mostly wired**.
 
 The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
 
-**Data foundation is in place:** Drizzle ORM schema (19 tables), 11 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0011_add_nft_campaign_wallet_tracking.sql have been applied to the live database. RLS is enabled on all 19 application tables. **CRUD server actions now exist for Projects, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, and Tasks**, with create, update, and delete flows wired where noted below. **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
+**Data foundation is in place:** Drizzle ORM schema (19 tables), 14 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0014_activity_logs_set_null_targets.sql have been applied to the live database; the notes.folder column, folder index, and Activity Log delete behavior were verified live. RLS is enabled on all 19 application tables. **CRUD server actions now exist for Projects, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
 
-**Remaining gap:** Inbox, Docs, and Daily generation are still static previews with no persistence. Task logs and Activity logs are not yet implemented. Wallet Group update UI is pending. Personal Items remain explicit Phase 1.5 preview scaffolding. Project Wallet assignment is now complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
+**Remaining gap:** Gmail remains Phase 2 because it requires OAuth and an email connector. Dashboard Quick Capture is still a route shortcut, while overview and Hunting Pulse metrics remain fixture-based except for live deadlines and NFT count. Personal Items remain explicit Phase 1.5 preview scaffolding. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
 
 ## Active Source of Truth
 
@@ -110,6 +110,10 @@ Server actions follow the same workspace-scoped pattern across implemented CRUD 
 | NFTs | `src/features/nfts/actions.ts` | `getNftPageData`, `getNftCampaignCount` | `createNftCampaign`, `updateNftCampaign`, `deleteNftCampaign` |
 | Accounts | `src/features/accounts/actions.ts` | `getAccounts` (with stats), `getWallets`, `getWalletGroups` | `createAccount`, `updateAccount`, `deleteAccount`, `uploadAccountAvatar`, `setAccountAvatarUrl`, `createWallet`, `updateWallet`, `deleteWallet`, `createWalletGroup`, `updateWalletGroup`, `deleteWalletGroup` |
 | Tasks | `src/features/tasks/actions.ts` | `getTaskWorkspaceData` | `createTask`, `updateTask`, `updateTaskStatus`, `deleteTask` |
+| Inbox | `src/features/inbox/actions.ts` | `getInboxPageData` | `createInboxItem`, `updateInboxItem`, `setInboxStatus`, link and conversion actions |
+| Docs | `src/features/docs/actions.ts` | `getDocsPageData` | `createDocsNote`, `updateDocsNote`, `deleteDocsNote` |
+| Activity | `src/features/activity/actions.ts` | `getRecentActivity` | `recordActivity` mutation event writes |
+| Dashboard | `src/features/dashboard/actions.ts` | `getDashboardData` | - |
 
 All mutations call `revalidatePath()` to refresh Next.js cache.
 
@@ -162,12 +166,13 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Uses `reverseWalletTypeLabels` to map display labels back to DB enum values in `saveEdit()`
 - Owner and Group edit fields use live account/group lists as dropdown options
 
-### Wallet Groups — CRUD partially wired
+### Wallet Groups - CRUD wired
 
 - **Create**: wired via Add Group inline
-- **Delete**: Dropdown on each group card's MoreHorizontal button → `deleteWalletGroup` → local state remove
-- **Update** (edit group name/description): server action exists (`updateWalletGroup`) but not yet wired to UI
+- **Update**: More menu opens an Edit dialog for name and description, then calls `updateWalletGroup` and refreshes local state
+- **Delete**: Dropdown on each group card's MoreHorizontal button -> `deleteWalletGroup` -> local state remove
 - Page route fetches real groups via `getWalletGroups()` when not in dev preview
+- Focused Wallet Group and Dashboard activity smoke covers rename, reload persistence, cleanup, and the new activity event
 
 ### NFTs — dedicated CRUD workspace
 
@@ -205,11 +210,20 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 
 ### Dashboard Preview
 
-- Greeting, WIB date, motivation line, Quick Capture, notes/inbox/pulse-style desk content, static counts
-- Quick Capture visual only
-- Notes, Inbox, activity, and most pulse counts remain static preview data
+- Greeting, WIB date, motivation line, and the accepted compact desk layout remain intact
+- Notes desk reads pinned and recent persisted Docs records outside development preview
+- Inbox to process reads new and reviewing persisted Inbox records outside development preview
+- Recent activity reads persisted Activity Log records with workspace scoping and relative timestamps
+- Quick Capture remains a route shortcut strip; it does not yet persist directly from Dashboard
 - Upcoming deadlines now reads persisted Deadline records regardless of whether they link to a Project, Task, or NFT Campaign
 - The Due metric uses the complete upcoming Deadline count and Open navigates to `/deadlines`
+
+### Activity Logs - persisted mutation feed
+
+- `recordActivity()` writes workspace-scoped mutation events without blocking the originating CRUD action if logging fails
+- Accounts, Wallets, Wallet Groups, Projects, Tasks, Daily Task Logs, Inbox, Docs, Deadlines, and NFT Campaign mutations emit activity events
+- `getRecentActivity()` and `getDashboardData()` provide workspace-scoped recent activity for the Dashboard
+- Live migration `0014_activity_logs_set_null_targets.sql` changes target foreign keys to `ON DELETE SET NULL`, preserving history when a referenced CRUD record is deleted
 
 ### Tasks - CRUD wired
 
@@ -225,27 +239,33 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Account assignments use stored avatars with initials fallback. Empty explicit assignment consistently resolves through project_accounts
 - Marking a Task Done records `completed_at`; reopening clears it, and the UI derives human completion duration from Start date
 - Personal Item creation remains visibly marked Preview and local-only because persistence belongs to Phase 1.5
-- Task logs are not implemented in this batch
+- Task Logs are persisted through the Daily execution surface; Activity Logs remain separate
 
-### Daily Preview
+### Daily — persisted execution
 
-- Collapsible account sections; By Account / By Project / Personal preview modes
-- CSS checkbox draw animation
-- Running/Recheck as non-checkbox rows
-- Date defaults to Asia/Jakarta today in preview
-- Static tasks + local UI state only
+- Reads workspace-scoped Tasks and effective Account assignments outside development preview
+- Generates Once, Daily, Weekly, and Monthly checklist rows for the selected Asia/Jakarta date
+- Keeps Running and Recheck tasks visible as monitoring rows
+- Persists Done, Skip, Pending reset, transaction hash, proof URL, and notes through `task_logs`
+- Date navigation, account/project grouping, search, and Hide done filters are functional
+- Personal Items remain preview-only Phase 1.5
 
-### Inbox Preview
+### Inbox — manual-first CRUD
 
-- Manual queue layout: search, filters, list, detail, actions
-- Search is a real input but not persisted
-- No real inbox CRUD or conversion flow
+- `/inbox` reads workspace-scoped `inbox_items` with linked Project, Task, and Docs labels
+- Capture and edit persist title, content, URL, sender, detected project, and priority
+- Search, status filter, priority filter, detail editing, Review, Ignore, and Archive are functional
+- Explicit confirmation converts an item into a Project, Task, or Docs note
+- Existing Projects and Tasks can be linked without automatic conversion
+- Conversion actions update the Inbox relationship and status atomically with the new target record
+- Capture is disabled while a mutation is pending to prevent async state overwrite
+- Manual and quick capture remain the only Phase 1 sources; Gmail stays Phase 2
 
-### Docs Preview
+### Docs — persisted unified notes
 
-- Unified notes/docs direction: pinned, folders, safe-access warning, recent
-- Search and new-doc actions visual/preview only
-- No real docs CRUD, project links, folders, or markdown editor
+- Workspace-scoped note CRUD with Markdown textarea, folders, pinning, project links, search, and delete confirmation
+- Safe-secret validation rejects seed phrases, private keys, recovery phrases, and 2FA backup codes
+- Notes can be created directly or from an Inbox item
 
 ### Archive — CRUD wired
 
@@ -272,15 +292,16 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | `accounts-preview.tsx` | ~1600+ lines | CRUD wired (identities, wallets, groups) |
 | `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation |
 | `archive-preview.tsx` | ~278 lines | CRUD wired (restore, delete) |
-| `daily-preview.tsx` | ~300+ lines | Static preview |
+| `daily-workspace.tsx` | ~300+ lines | Task Log and Daily execution wired |
+| `docs-workspace.tsx` | ~300+ lines | Docs CRUD wired |
 
-Unit tests: 13 files, 60 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, and Recheck Review coverage.
+Unit tests: 16 files, 71 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, and Recheck Review coverage, and Daily per-account generation coverage.
 
-E2E diagnostics now include focused Accounts/Projects, Project Wallet assignment, NFT Wallet participation, and a full application smoke suite. The latest focused Project Wallet browser smoke passed login, custom-chain Wallet creation, reload persistence, Project unlink behavior, Wallet survival, cleanup, and captured no console or page errors.
+E2E diagnostics now include focused Accounts/Projects, Project Wallet assignment, NFT Wallet participation, Docs/Daily, Inbox, and a full application smoke suite. The latest focused Project Wallet browser smoke passed login, custom-chain Wallet creation, reload persistence, Project unlink behavior, Wallet survival, cleanup, and captured no console or page errors.
 
 ## Latest Change Batch
 
-The 2026-07-31 Phase 1 Core batch includes:
+The 2026-08-01 Phase 1 Core batch includes:
 
 - Auth and default-workspace hardening
 - Database migrations `0002` through `0007`
@@ -317,21 +338,49 @@ The 2026-07-31 Phase 1 Core batch includes:
 - Transactional Project and Project Wallet creation with workspace and owner validation
 - Safe Project deletion that unlinks but preserves Wallet records
 - Explicit partial Project update schema that protects unrelated fields during logo upload
+- Live migration `0012_task_logs_daily_indexes.sql` with the PRD-required daily unique constraint and Task Log query indexes
+- Tested Daily scheduling foundation for Once, Daily, Weekly, Monthly, Running, and Recheck behavior
+- Workspace-scoped Task Log read and upsert actions with WIB dates, relation validation, and daily unique-conflict handling
+- Real Daily execution surface with Account fallback, per-account Once completion, date navigation, Done, Skip, Pending reset, proof/transaction/note logging, filtering, and separate Running/Recheck
+- Live migration `0013_add_note_folders.sql` with verified nullable `notes.folder` column and folder index
+- Live migration `0014_activity_logs_set_null_targets.sql` with `ON DELETE SET NULL` Activity Log target FKs verified live
+- Wallet Group rename/description edit dialog wired to the existing update action with reload persistence
+- Workspace-scoped Activity Log mutation events wired across Core CRUD, Daily Task Logs, Inbox, Docs, Deadlines, and NFT Campaigns
+- Dashboard Inbox, Notes desk, and Recent activity panels activated from live workspace data; Quick Capture remains a route shortcut
+- Workspace-scoped Docs CRUD with Markdown textarea, folder, pin, project link, search, safe-secret validation, and delete confirmation
+- Manual-first Inbox capture, edit, filters, explicit Project/Task/Docs conversion, link actions, and reload persistence smoke coverage
+- Shared AppSelect viewport-aware positioning so Inbox and other feature menus stay inside the visible browser surface
 - PRD v3.4 and DESIGN v2.16 alignment
+- Targeted Wallet Group/Dashboard, Docs/Daily, and Inbox Playwright smoke coverage
 - Updated implementation and validation status
 
 Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the source release.
 
 ## What Is Not Implemented Yet
 
-### Phase 1 Core remaining (ordered by priority)
+### Phase 1 Core remaining
 
-1. **Task logs** — with Asia/Jakarta `logged_date`
-2. **Daily generation** — from real tasks / assignments / logs (replaces static preview)
-3. **Inbox CRUD** — server actions + UI wiring + conversion flow to tasks/notes
-4. **Docs CRUD** — server actions + markdown editor + project links + folders
-5. **Activity logs** — auto-generated from mutations
-6. **Wallet Group edit UI** — `updateWalletGroup` action exists but not wired to UI
+| Priority | Area | Current state | Work still required |
+| --- | --- | --- | --- |
+| 1 | Task Logs | **Wired**: workspace-scoped reads and unique daily upserts validate Task, Project, Account, and Wallet relations | Daily execution remains separate from the mutation Activity Log feed |
+| 2 | Daily | **Wired**: real Tasks, effective Account assignments, Task Logs, date navigation, execution actions, and filters | Personal Items remain preview-only Phase 1.5 |
+| 3 | Inbox | **Wired**: workspace-scoped capture/edit/status actions, search/filter UI, explicit Project/Task/Docs conversion, and link actions | Gmail remains Phase 2; Dashboard Inbox summary is now live for new and reviewing items |
+| 4 | Docs | **Wired**: Note CRUD, Markdown textarea, folder, pinning, project links, and persisted search | Dashboard Notes desk is live; Quick Capture remains a route shortcut |
+| 5 | Activity Logs | **Wired**: mutation events, recent activity query, and delete-safe target foreign keys | Add pagination and richer history views when the product scope requires them |
+| 6 | Wallet Groups | **Wired**: create, rename/description edit, and delete UI | Add richer group management only if the product scope expands |
+| 7 | Dashboard activation | **Partially live**: Inbox, Notes desk, Recent activity, Deadlines, and NFT count are live | Persist Dashboard Quick Capture and replace remaining overview/pulse fixtures with aggregate queries |
+| 8 | Settings | **Preview only** | Wire approved profile, workspace, and security settings; Integrations remain Phase 1.5 |
+
+### Task Logs and Daily implementation notes
+
+Task Logs and Daily are now implemented on top of the completed foundation:
+
+- `task_logs` already has workspace RLS and migration `0012_task_logs_daily_indexes.sql` is live
+- `task_logs_unique_daily` enforces one Task + Account + WIB date record
+- Once, Daily, Weekly, Monthly, Running, and Recheck schedule behavior is covered in `daily-schedule.ts`
+- No Task Log rows existed when migration `0012` was applied
+- `/daily` reads persisted workspace Tasks and Task Logs outside development preview; mutations use an optimistic local patch guarded per row to prevent duplicate submissions
+- Personal Items remain preview-only Phase 1.5 and must not be mixed into the Task Log implementation
 
 ### Phase 1.5 (do not treat as current Core work)
 
@@ -353,9 +402,11 @@ Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the 
 
 ## Known UI Caveats
 
-- Some preview-only pages (inbox, docs, daily) still have visual-only action buttons
-- Shared dropdown/date picker foundation is now consistent across the audited feature surfaces, but More menus, browser confirm/prompt flows, and disabled preview-only controls still need a later UX activation pass
-- Search/filters inconsistent because data is static on non-wired pages
+- Dashboard Inbox summary, Notes desk, and Recent activity read live data; full Inbox processing is live on `/inbox`
+- Dashboard Quick Capture is still a route shortcut, and most overview/Hunting Pulse values remain fixture-based
+- Settings controls are still visual-only; Gmail integration remains Phase 2
+- Shared dropdown/date picker foundation is consistent across the audited feature surfaces, but some More menus and browser confirm/prompt flows still need a later UX consistency pass
+- Search/filters remain inconsistent on preview-only areas
 - Settings shallow vs future PRD role
 - Trading inactive in sidebar
 - Large preview files make the repo harder to read than the route list suggests, especially `projects-preview.tsx` after adding the assigned-account avatar group
@@ -367,24 +418,24 @@ DONE     1. Projects: create, update, delete, archive, logo upload wired
 DONE     1b. Project Wallets: existing assignment and custom-chain creation wired
 DONE     2. Accounts: create, update, delete wired
 DONE     3. Wallets: create, update, delete wired
-PARTIAL  3b. Wallet Groups: create and delete wired; update action exists but UI pending
+DONE     3b. Wallet Groups: create, rename/description edit, and delete wired
 DONE     4. Archive: restore and permanent delete wired
 DONE     5. Standalone Deadlines: CRUD, Dashboard aggregation, RLS wired
-DONE     6. Tasks: CRUD, assignments, due dates, views, filters, actions wired
-NEXT     7. Task logs / Daily generation
-PENDING  8. Inbox
-PENDING  9. Docs
-PENDING  10. Activity logs
+DONE     6. Tasks: CRUD, assignments, linked Deadlines, views, filters, actions wired
+DONE     7. Task Logs and Daily: real generation, persisted execution, and schedule rules wired
+DONE     8. Inbox: workspace CRUD, search/filter, explicit conversion, and smoke coverage
+DONE     9. Docs: CRUD, folders, pinning, project links, and Markdown textarea wired
+DONE     10. Activity logs: mutation events, recent activity query, and delete-safe FKs
 ```
 
 ## Validation Status
 
-Checked 2026-07-31 after Project Wallet assignment and custom-chain Wallet creation:
+Checked 2026-08-02 after Wallet Group, Activity Log, Dashboard activation, and targeted smoke validation:
 
 ```txt
 pnpm typecheck  # pass
 pnpm lint       # pass, 0 warnings
-pnpm test       # pass, 13 files and 60 tests
+pnpm exec vitest run --passWithNoTests --maxWorkers=1  # pass, 16 files and 71 tests
 pnpm build      # pass
 ```
 
@@ -420,7 +471,15 @@ Browser reload preserved the custom Wallet label, address, Chain, and assignment
 Add Task immediately exposed the assigned custom Project Wallet after selecting its Project
 Project deletion left the Wallet visible in Accounts before explicit smoke cleanup
 0 browser console errors or page errors were captured
+Live migration 0014 verified six Activity Log target constraints use ON DELETE SET NULL
 Production build includes /projects
+Focused Wallet Group and Dashboard smoke:
+Wallet Group create, rename/description edit, reload persistence, live Dashboard activity event, cleanup, and 0 console/page errors passed 1/1
+Focused Docs and Daily smoke:
+Docs CRUD, Daily Task Log execution, reload persistence, cleanup, and 0 console/page errors passed 1/1 after Activity Log delete-FK fix
+Inbox manual-first CRUD smoke:
+Inbox capture/edit/status, Project/Task/Docs conversion, reload persistence, cleanup, hydration-safe capture retry, and 0 console/page errors passed 1/1 after Activity Log delete-FK fix
+Targeted current smoke prefixes (Wallet Group, Docs/Daily, Inbox) left 0 matching database rows
 ```
 
 Focused Deadline regression:
@@ -481,14 +540,14 @@ Database create, assignment, update, and delete smoke passed inside a rolled-bac
 Production build includes /tasks
 ```
 
-Latest full smoke run after migration `0007`:
+Previous full smoke baseline before the 2026-08-02 activation batch:
 
 ```txt
-37 checks passed
-1 known product gap: Wallet Group rename/edit option is missing in the UI
-0 console errors
-Project logo upload and persistence passed
-Account avatar upload, persistence, and fetchability passed
+4 of 8 specs passed: Docs/Daily, Inbox, NFT Wallet, and Project Wallet
+1 stale test selector: account avatar URL input expected an old placeholder
+1 product gap at that time: Wallet Group rename/edit, now fixed
+2 manual recheck specs stopped on the login harness before exercising the app
+The full suite was not rerun after this batch by request; targeted smoke coverage below is current
 ```
 
 Latest focused UI regression after assigned-account avatar group and dropdown consistency work:

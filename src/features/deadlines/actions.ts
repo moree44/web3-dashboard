@@ -23,6 +23,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { deadlines, nftCampaigns, projects, tasks } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
+import { recordActivity } from "@/features/activity/activity-log";
 
 export type DeadlineWithContext = typeof deadlines.$inferSelect & {
   linkedProjectName: string | null;
@@ -248,12 +249,14 @@ export async function createDeadline(data: DeadlineInput): Promise<DeadlineWithC
 
   revalidateDeadlineViews();
   const rows = await getDeadlineRecords(workspaceId);
-  return rows.find((item) => item.id === created.id) ?? {
+  const record = rows.find((item) => item.id === created.id) ?? {
     ...created,
     linkedProjectName: null,
     linkedTaskTitle: null,
     linkedNftCampaignName: null,
   };
+  await recordActivity(workspaceId, "deadline.created", { projectId: record.linkedProjectId, taskId: record.linkedTaskId }, { title: record.title });
+  return record;
 }
 
 export async function updateDeadline(
@@ -290,12 +293,14 @@ export async function updateDeadline(
 
   revalidateDeadlineViews();
   const rows = await getDeadlineRecords(workspaceId);
-  return rows.find((item) => item.id === updated.id) ?? {
+  const record = rows.find((item) => item.id === updated.id) ?? {
     ...updated,
     linkedProjectName: null,
     linkedTaskTitle: null,
     linkedNftCampaignName: null,
   };
+  await recordActivity(workspaceId, "deadline.updated", { projectId: record.linkedProjectId, taskId: record.linkedTaskId }, { title: record.title, status: record.status });
+  return record;
 }
 
 export async function deleteDeadline(id: string): Promise<void> {
@@ -305,5 +310,6 @@ export async function deleteDeadline(id: string): Promise<void> {
     .where(and(eq(deadlines.id, id), eq(deadlines.workspaceId, workspaceId)))
     .returning({ id: deadlines.id });
   if (deleted.length === 0) throw new Error("Deadline not found");
+  await recordActivity(workspaceId, "deadline.deleted", { });
   revalidateDeadlineViews();
 }

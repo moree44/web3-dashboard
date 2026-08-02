@@ -18,6 +18,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
+import { recordActivity } from "@/features/activity/activity-log";
 
 import {
   TASK_FREQUENCIES,
@@ -295,6 +296,7 @@ export async function createTask(input: TaskCreateInput): Promise<TaskRecord> {
   revalidateTaskViews();
   const result = (await loadTaskWorkspaceData(workspaceId)).tasks.find((task) => task.id === taskId);
   if (!result) throw new Error("Task could not be loaded after creation");
+  await recordActivity(workspaceId, "task.created", { taskId: result.id, projectId: result.projectId }, { title: result.title });
   return result;
 }
 
@@ -338,6 +340,7 @@ export async function updateTask(id: string, input: TaskInput): Promise<TaskReco
   revalidateTaskViews();
   const result = (await loadTaskWorkspaceData(workspaceId)).tasks.find((task) => task.id === taskId);
   if (!result) throw new Error("Task could not be loaded after update");
+  await recordActivity(workspaceId, "task.updated", { taskId: result.id, projectId: result.projectId }, { title: result.title, status: result.status });
   return result;
 }
 
@@ -358,6 +361,7 @@ export async function updateTaskStatus(id: string, status: (typeof TASK_STATUSES
   revalidateTaskViews();
   const result = (await loadTaskWorkspaceData(workspaceId)).tasks.find((task) => task.id === taskId);
   if (!result) throw new Error("Task could not be loaded after update");
+  await recordActivity(workspaceId, "task.status_changed", { taskId: result.id, projectId: result.projectId }, { title: result.title, status: result.status });
   return result;
 }
 
@@ -379,5 +383,6 @@ export async function deleteTask(id: string): Promise<void> {
     }
     throw error;
   }
+  await recordActivity(workspaceId, "task.deleted", {}, { id: taskId });
   revalidateTaskViews();
 }

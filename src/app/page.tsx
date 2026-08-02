@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { getDashboardDeadlineData } from "@/features/deadlines/actions";
 import { DashboardPreview } from "@/features/dashboard/components/dashboard-preview";
+import { getDashboardData } from "@/features/dashboard/actions";
 import { requireUser } from "@/lib/auth/session";
 import { getNftCampaignCount } from "@/features/nfts/actions";
 
@@ -11,11 +12,13 @@ export default async function HomePage() {
 
   let deadlineData: Awaited<ReturnType<typeof getDashboardDeadlineData>> | undefined;
   let nftCount: number | undefined;
+  let dashboardData: Awaited<ReturnType<typeof getDashboardData>> | undefined;
   if (!developmentPreview) {
     await requireUser();
-    [deadlineData, nftCount] = await Promise.all([
+    [deadlineData, nftCount, dashboardData] = await Promise.all([
       getDashboardDeadlineData(),
       getNftCampaignCount(),
+      getDashboardData(),
     ]);
   }
 
@@ -27,6 +30,7 @@ export default async function HomePage() {
         deadlineDueCount={deadlineData?.dueCount}
         nftCount={nftCount}
         canManageDeadlines={!developmentPreview}
+        dashboardData={dashboardData}
       />
     </AppShell>
   );

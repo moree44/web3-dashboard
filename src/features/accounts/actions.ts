@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { accounts, projectAccounts, projects, wallets, walletGroups } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
+import { recordActivity } from "@/features/activity/activity-log";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { isHttpUrl, normalizeHttpUrl } from "@/lib/url";
@@ -117,6 +118,7 @@ export async function createAccount(
     .values({ ...data, workspaceId, updatedAt: new Date() })
     .returning();
 
+  await recordActivity(workspaceId, "account.created", { accountId: account.id }, { label: account.label });
   revalidateAccountViews();
 
   return { ...account, walletCount: 0, activeProjects: [] };
@@ -136,6 +138,7 @@ export async function updateAccount(
 
   if (!account) throw new Error("Account not found");
 
+  await recordActivity(workspaceId, "account.updated", { accountId: account.id }, { label: account.label });
   revalidateAccountViews();
 
   const all = await getAccounts();
@@ -150,6 +153,7 @@ export async function deleteAccount(id: string): Promise<void> {
     .delete(accounts)
     .where(and(eq(accounts.id, id), eq(accounts.workspaceId, workspaceId)));
 
+  await recordActivity(workspaceId, "account.deleted", {}, { id });
   revalidateAccountViews();
 }
 
@@ -223,6 +227,7 @@ export async function createWallet(
     .values({ ...data, workspaceId, updatedAt: new Date() })
     .returning();
 
+  await recordActivity(workspaceId, "wallet.created", { walletId: wallet.id }, { label: wallet.label });
   revalidateAccountViews();
 
   return wallet;
@@ -242,6 +247,7 @@ export async function updateWallet(
 
   if (!wallet) throw new Error("Wallet not found");
 
+  await recordActivity(workspaceId, "wallet.updated", { walletId: wallet.id }, { label: wallet.label });
   revalidateAccountViews();
 
   return wallet;
@@ -254,6 +260,7 @@ export async function deleteWallet(id: string): Promise<void> {
     .delete(wallets)
     .where(and(eq(wallets.id, id), eq(wallets.workspaceId, workspaceId)));
 
+  await recordActivity(workspaceId, "wallet.deleted", {}, { id });
   revalidateAccountViews();
 }
 
@@ -278,6 +285,7 @@ export async function createWalletGroup(
     .values({ ...data, workspaceId, updatedAt: new Date() })
     .returning();
 
+  await recordActivity(workspaceId, "wallet_group.created", {}, { name: group.name });
   revalidateAccountViews();
 
   return group;
@@ -297,6 +305,7 @@ export async function updateWalletGroup(
 
   if (!group) throw new Error("Wallet group not found");
 
+  await recordActivity(workspaceId, "wallet_group.updated", {}, { name: group.name });
   revalidateAccountViews();
 
   return group;
@@ -309,5 +318,6 @@ export async function deleteWalletGroup(id: string): Promise<void> {
     .delete(walletGroups)
     .where(and(eq(walletGroups.id, id), eq(walletGroups.workspaceId, workspaceId)));
 
+  await recordActivity(workspaceId, "wallet_group.deleted", {}, { id });
   revalidateAccountViews();
 }

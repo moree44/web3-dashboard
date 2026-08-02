@@ -399,7 +399,12 @@ export const taskLogs = pgTable("task_logs", {
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("task_logs_unique_daily").on(table.taskId, table.accountId, table.loggedDate),
+  index("idx_task_logs_date").on(table.loggedDate),
+  index("idx_task_logs_account_date").on(table.accountId, table.loggedDate),
+  index("idx_task_logs_project").on(table.projectId),
+]);
 
 // ─── Inbox Items ──────────────────────────────────────────────────────────────
 
@@ -466,6 +471,7 @@ export const notes = pgTable("notes", {
       "keys_hint",
     ],
   }),
+  folder: text("folder"),
   pinned: boolean("pinned").default(false),
   linkedProjectId: uuid("linked_project_id").references(() => projects.id),
   linkedTaskId: uuid("linked_task_id").references(() => tasks.id),
@@ -485,12 +491,24 @@ export const activityLogs = pgTable("activity_logs", {
   workspaceId: uuid("workspace_id")
     .notNull()
     .references(() => workspaces.id),
-  projectId: uuid("project_id").references(() => projects.id),
-  taskId: uuid("task_id").references(() => tasks.id),
-  accountId: uuid("account_id").references(() => accounts.id),
-  walletId: uuid("wallet_id").references(() => wallets.id),
-  inboxItemId: uuid("inbox_item_id").references(() => inboxItems.id),
-  noteId: uuid("note_id").references(() => notes.id),
+  projectId: uuid("project_id").references(() => projects.id, {
+    onDelete: "set null",
+  }),
+  taskId: uuid("task_id").references(() => tasks.id, {
+    onDelete: "set null",
+  }),
+  accountId: uuid("account_id").references(() => accounts.id, {
+    onDelete: "set null",
+  }),
+  walletId: uuid("wallet_id").references(() => wallets.id, {
+    onDelete: "set null",
+  }),
+  inboxItemId: uuid("inbox_item_id").references(() => inboxItems.id, {
+    onDelete: "set null",
+  }),
+  noteId: uuid("note_id").references(() => notes.id, {
+    onDelete: "set null",
+  }),
   action: text("action").notNull(),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),

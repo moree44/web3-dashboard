@@ -6,6 +6,7 @@ import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { accounts, projectAccounts, projectWallets, projects, wallets } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
+import { recordActivity } from "@/features/activity/activity-log";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { ARCHIVE_REASONS } from "@/features/projects/project-query";
@@ -326,6 +327,7 @@ export async function createProject(
     return { ...project, assignedAccounts: selectedAccounts, assignedWallets };
   }));
 
+  await recordActivity(workspaceId, "project.created", { projectId: result.id }, { name: result.name });
   revalidateProjectViews();
 
   return result;
@@ -422,6 +424,7 @@ export async function updateProject(
     getWalletAssignments(workspaceId, [project.id]),
   ]);
 
+  await recordActivity(workspaceId, "project.updated", { projectId: project.id }, { name: project.name });
   revalidateProjectViews();
 
   return {
@@ -439,6 +442,7 @@ export async function archiveProject(id: string, reason: string): Promise<void> 
     .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)))
     .returning({ id: projects.id });
   if (!archived) throw new Error("Project not found");
+  await recordActivity(workspaceId, "project.archived", { projectId: archived.id });
   revalidateProjectViews();
 }
 
@@ -448,6 +452,7 @@ export async function restoreProject(id: string): Promise<void> {
     .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)))
     .returning({ id: projects.id }));
   if (restored.length === 0) throw new Error("Project not found");
+  await recordActivity(workspaceId, "project.restored", { projectId: id });
   revalidateProjectViews();
 }
 
@@ -505,5 +510,6 @@ export async function deleteProject(id: string): Promise<void> {
     throw error;
   }
 
+  await recordActivity(workspaceId, "project.deleted", {}, { id });
   revalidateProjectViews();
 }

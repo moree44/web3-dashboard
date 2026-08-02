@@ -21,6 +21,7 @@ import {
   wallets,
 } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
+import { recordActivity } from "@/features/activity/activity-log";
 import { areWalletAndCampaignChainsCompatible } from "@/features/nfts/wallet-compatibility";
 
 export type NftAccountOption = Pick<
@@ -336,8 +337,10 @@ export async function createNftCampaign(
     return created.id;
   });
 
+  const result = await campaignResult(workspaceId, createdId);
+  await recordActivity(workspaceId, "nft_campaign.created", {}, { name: result.name });
   revalidateNftViews();
-  return campaignResult(workspaceId, createdId);
+  return result;
 }
 
 export async function updateNftCampaign(
@@ -459,8 +462,10 @@ export async function updateNftCampaign(
     }
   });
 
+  const result = await campaignResult(workspaceId, id);
+  await recordActivity(workspaceId, "nft_campaign.updated", {}, { name: result.name, status: result.status });
   revalidateNftViews();
-  return campaignResult(workspaceId, id);
+  return result;
 }
 
 export async function deleteNftCampaign(id: string): Promise<void> {
@@ -470,5 +475,6 @@ export async function deleteNftCampaign(id: string): Promise<void> {
     .where(and(eq(nftCampaigns.id, id), eq(nftCampaigns.workspaceId, workspaceId)))
     .returning({ id: nftCampaigns.id });
   if (deleted.length === 0) throw new Error("NFT campaign not found");
+  await recordActivity(workspaceId, "nft_campaign.deleted", {}, { id });
   revalidateNftViews();
 }

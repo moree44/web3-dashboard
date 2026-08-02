@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { CircleUserRound, Copy, CreditCard, FolderOpen, Mail, MoreHorizontal, Plus, Search, ShieldCheck, Upload, WalletCards, X } from "lucide-react";
-import { useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   deleteWalletGroup,
   setAccountAvatarUrl,
   updateAccount,
+  updateWalletGroup,
   updateWallet,
   uploadAccountAvatar,
   type AccountWithStats,
@@ -218,6 +219,7 @@ export function AccountsPreview({
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
   const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<UIGroup | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
   const query = searchQuery.trim().toLowerCase();
@@ -491,6 +493,16 @@ export function AccountsPreview({
     setIsAddGroupOpen(false);
   }
 
+  async function handleUpdateGroup(id: string, data: { name: string; description: string }) {
+    if (developmentPreview) {
+      setGroupItems((items) => items.map((group) => group.id === id ? { ...group, ...data } : group));
+    } else {
+      const updated = await updateWalletGroup(id, { name: data.name, description: data.description || null });
+      setGroupItems((items) => items.map((group) => group.id === id ? dbToUIGroup(updated) : group));
+    }
+    setEditingGroup(null);
+  }
+
   return (
     <div className="min-w-0 py-5 lg:py-7">
       <header className="flex flex-col gap-4 border-b soft-divider px-4 pb-5 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
@@ -543,11 +555,12 @@ export function AccountsPreview({
         />
       ) : null}
       {activeTab === "Wallets" ? <WalletsView walletItems={filteredWallets} onOpenWallet={openWallet} onDeleteWallet={handleDeleteWallet} /> : null}
-      {activeTab === "Groups" ? <GroupsView groups={filteredGroups} onDeleteGroup={handleDeleteGroup} /> : null}
+      {activeTab === "Groups" ? <GroupsView groups={filteredGroups} onDeleteGroup={handleDeleteGroup} onEditGroup={setEditingGroup} /> : null}
 
       <AddAccountDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} onCreate={handleCreateAccount} />
       <AddWalletDialog open={isAddWalletOpen} onClose={() => setIsAddWalletOpen(false)} onCreate={handleCreateWallet} accounts={accountItems} />
       <AddGroupDialog open={isAddGroupOpen} onClose={() => setIsAddGroupOpen(false)} onCreate={handleCreateGroup} />
+      <EditGroupDialog group={editingGroup} onClose={() => setEditingGroup(null)} onSave={handleUpdateGroup} />
       <AccountDetailPanel
         account={selectedAccount}
         walletItems={walletItems}
@@ -1121,20 +1134,20 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount, onUpdate, onDelete,
   );
 }
 
-function GroupsView({ groups: groupItems, onDeleteGroup }: { groups: UIGroup[]; onDeleteGroup: (id: string) => void }) {
+function GroupsView({ groups: groupItems, onDeleteGroup, onEditGroup }: { groups: UIGroup[]; onDeleteGroup: (id: string) => void; onEditGroup: (group: UIGroup) => void }) {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   return (
     <div className="grid gap-3 px-4 py-4 sm:px-6 lg:grid-cols-4 lg:px-8">
       {groupItems.map((group) => (
-        <article key={group.name} className="rounded-xl bg-card/80 p-4 soft-panel">
+        <article key={group.id ?? group.name} className="rounded-xl bg-card/80 p-4 soft-panel">
           <div className="flex items-start justify-between gap-3">
             <span className="grid size-9 place-items-center rounded-lg bg-white/[0.055] text-muted-foreground"><FolderOpen className="size-4" /></span>
             <div className="relative">
-              <button onClick={() => setMenuOpen(menuOpen === group.name ? null : group.name)} aria-label={"More options for " + group.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
-              {menuOpen === group.name ? (
+              <button onClick={() => setMenuOpen(menuOpen === (group.id ?? group.name) ? null : (group.id ?? group.name))} aria-label={"More options for " + group.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+              {menuOpen === (group.id ?? group.name) ? (
                 <div className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                  <button onClick={() => { setMenuOpen(null); if (group.id) onDeleteGroup(group.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+                  <button onClick={() => { setMenuOpen(null); onEditGroup(group); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>\n                  <button onClick={() => { setMenuOpen(null); if (group.id) onDeleteGroup(group.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
                 </div>
               ) : null}
             </div>
@@ -1433,7 +1446,56 @@ function AddGroupDialog({
 </div>
     </div>
   );
-}function Metric({ label, value }: { label: string; value: number }) {
+}
+
+function EditGroupDialog({ group, onClose, onSave }: { group: UIGroup | null; onClose: () => void; onSave: (id: string, data: { name: string; description: string }) => void }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  useEffect(() => {
+    setName(group?.name ?? "");
+    setDescription(group?.description ?? "");
+  }, [group]);
+
+  if (!group) return null;
+  const groupId = group.id;
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!name.trim() || !groupId) return;
+    onSave(groupId, { name: name.trim(), description: description.trim() });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-sm rounded-lg bg-popover shadow-[0_0_0_1px_rgb(255_255_255/0.06),0_24px_48px_-8px_rgb(0_0_0/0.45)]">
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center justify-between px-4 py-3 border-b soft-divider">
+            <h3 className="text-sm font-semibold">Edit Group</h3>
+            <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"><X className="size-4" /></button>
+          </div>
+          <div className="flex flex-col gap-3 px-4 py-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Name *</span>
+              <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Description</span>
+              <input type="text" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Primary wallets owned by personas" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+            </label>
+          </div>
+          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
+            <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+            <Button size="sm" type="submit" disabled={!name.trim()}>Save</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
   return <div className="rounded-lg border border-white/[0.045] bg-white/[0.02] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{value}</p></div>;
 }
 

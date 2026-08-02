@@ -58,8 +58,13 @@ export function AppSelect({
       const rect = buttonRef.current.getBoundingClientRect();
       const width = Math.max(rect.width, 168);
       const viewportPadding = 12;
+      const menuHeight = Math.min(240, 8 + options.length * 32 + (menuHint ? 24 : 0));
+      const fitsBelow = rect.bottom + 6 + menuHeight <= window.innerHeight - viewportPadding;
+      const top = fitsBelow
+        ? rect.bottom + 6
+        : Math.max(viewportPadding, rect.top - menuHeight - 6);
       setMenuRect({
-        top: rect.bottom + 6,
+        top,
         left: Math.min(Math.max(rect.left, viewportPadding), window.innerWidth - width - viewportPadding),
         width,
       });
@@ -94,7 +99,7 @@ export function AppSelect({
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
     };
-  }, [open]);
+  }, [menuHint, open, options.length]);
 
   function selectValue(nextValue: string) {
     onChange(nextValue);
