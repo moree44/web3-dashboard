@@ -1,9 +1,9 @@
 "use client";
 
 import { CalendarClock, Check, MoreHorizontal, Plus, Search, SlidersHorizontal } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { createTask, deleteTask, updateTask, updateTaskStatus } from "@/features/tasks/actions";
+import type { PersonalItemRecord } from "@/features/personal/types";
 import { filterTasks, TASK_BOARD_STATUSES } from "@/features/tasks/task-query";
 import { formatTaskDuration, getJakartaDateValue } from "@/features/tasks/task-duration";
 import type { TaskCreateInput, TaskInput, TaskProjectOption, TaskRecord, TaskStatus, TaskWorkspaceData } from "@/features/tasks/task-types";
@@ -11,6 +11,7 @@ import { formatTaskFrequency, TASK_FREQUENCIES, TASK_PRIORITIES, TASK_STATUSES, 
 
 import { TaskDetailPanel } from "./task-detail-panel";
 import { AddTaskDialog } from "./add-task-dialog";
+import { useTaskWorkspace, useTasksMutations } from "../tasks-query";
 
 import { AppSelect } from "@/components/ui/app-select";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +34,6 @@ const boardGroupOptions: { label: string; value: BoardGroup }[] = [
 ];
 
 export function TasksPreview({ initialData, developmentPreview = false }: { initialData: TaskWorkspaceData; developmentPreview?: boolean }) {
-  const [taskItems, setTaskItems] = useState(initialData.tasks);
   const [view, setView] = useState<TaskView>("list");
   const [boardGroup, setBoardGroup] = useState<BoardGroup>("project");
   const [selectedProject, setSelectedProject] = useState("");
@@ -50,10 +50,24 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [menuTaskId, setMenuTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const [personalOpen, setPersonalOpen] = useState(false);
   const [personalTitle, setPersonalTitle] = useState("");
-  const [personalItems, setPersonalItems] = useState<string[]>([]);
+  const { data: queryData } = useTaskWorkspace(initialData, developmentPreview);
+  const mutations = useTasksMutations({
+    developmentPreview,
+    projects: initialData.projects,
+    onError: (message) => setError(message),
+  });
+  const workspace = queryData ?? initialData;
+  const taskItems = workspace.tasks;
+  const personalItems = workspace.personalItems ?? [];
+  const busy = mutations.createTaskMutation.isPending
+    || mutations.saveTaskMutation.isPending
+    || mutations.statusTaskMutation.isPending
+    || mutations.deleteTaskMutation.isPending
+    || mutations.addPersonalItemMutation.isPending
+    || mutations.togglePersonalItemMutation.isPending
+    || mutations.removePersonalItemMutation.isPending;
 
   useEffect(() => {
     function closeMenu(event: PointerEvent) {
@@ -88,83 +102,66 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
   const recheckTasks = taskItems.filter((task) => task.status === "recheck");
   const boardTasks = filteredTasks.filter((task) => task.status !== "running");
 
-  function runMutation(work: () => Promise<void>) {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await work();
-      } catch (cause: unknown) {
-        setError(cause instanceof Error ? cause.message : "Something went wrong");
-      }
-    });
-  }
-
   async function handleQuickCreate() {
     const title = quickTitle.trim();
-    if (!title || !quickProjectId || isPending) return;
+    if (!title || !quickProjectId || busy) return;
     const input: TaskCreateInput = { projectId: quickProjectId, title, status: "todo", frequency: "once", priority: "medium", startDate: getJakartaDateValue(), accountIds: [] };
-    if (developmentPreview) {
-      const created = makePreviewTask(input, initialData.projects);
-      setTaskItems((items) => [created, ...items]);
+    setError(null);
+    try {
+      await mutations.createTaskMutation.mutateAsync(input);
       setQuickTitle("");
-      return;
+    } catch {
+      // Failure is surfaced through onError into the error banner.
     }
-    const created = await createTask(input);
-    setTaskItems((items) => [created, ...items]);
-    setQuickTitle("");
   }
 
   async function handleCreate(input: TaskCreateInput) {
-    if (developmentPreview) {
-      const created = makePreviewTask(input, initialData.projects);
-      setTaskItems((items) => [created, ...items]);
+    setError(null);
+    try {
+      await mutations.createTaskMutation.mutateAsync(input);
       setAddTaskOpen(false);
-      return;
+    } catch {
+      // Failure is surfaced through onError; the dialog stays open.
     }
-    const created = await createTask(input);
-    setTaskItems((items) => [created, ...items]);
-    setAddTaskOpen(false);
   }
 
-  async function handleSave(input: TaskInput) {
+  function handleSave(input: TaskInput) {
     if (!selectedTask) return;
-    if (developmentPreview) {
-      const updated = updatePreviewTask(selectedTask, input, initialData.projects);
-      setTaskItems((items) => items.map((task) => task.id === updated.id ? updated : task));
-      setSelectedTaskId(null);
-      return;
-    }
-    const updated = await updateTask(selectedTask.id, input);
-    setTaskItems((items) => items.map((task) => task.id === updated.id ? updated : task));
+    setError(null);
+    mutations.saveTaskMutation.mutate({ id: selectedTask.id, input });
     setSelectedTaskId(null);
   }
 
-  async function handleStatus(task: TaskRecord, status: TaskStatus) {
+  function handleStatus(task: TaskRecord, status: TaskStatus) {
     setMenuTaskId(null);
-    if (developmentPreview) {
-      setTaskItems((items) => items.map((item) => item.id === task.id ? {
-        ...item,
-        status,
-        completedAt: status === "done" ? item.completedAt ?? new Date().toISOString() : null,
-      } : item));
-      return;
-    }
-    const updated = await updateTaskStatus(task.id, status);
-    setTaskItems((items) => items.map((item) => item.id === updated.id ? updated : item));
+    setError(null);
+    mutations.statusTaskMutation.mutate({ id: task.id, status });
   }
 
-  async function handleDelete(task: TaskRecord) {
-    if (!developmentPreview) await deleteTask(task.id);
-    setTaskItems((items) => items.filter((item) => item.id !== task.id));
+  function handleDelete(task: TaskRecord) {
     setSelectedTaskId(null);
     setMenuTaskId(null);
+    setError(null);
+    mutations.deleteTaskMutation.mutate(task.id);
   }
 
   function addPersonalItem() {
-    if (!personalTitle.trim()) return;
-    setPersonalItems((items) => [personalTitle.trim(), ...items]);
+    const title = personalTitle.trim();
+    if (!title || busy) return;
+    setError(null);
+    mutations.addPersonalItemMutation.mutate(title);
     setPersonalTitle("");
     setPersonalOpen(false);
+  }
+
+  function togglePersonalItem(item: PersonalItemRecord) {
+    setError(null);
+    mutations.togglePersonalItemMutation.mutate({ id: item.id, status: item.status === "done" ? "todo" : "done" });
+  }
+
+  function removePersonalItem(item: PersonalItemRecord) {
+    setError(null);
+    mutations.removePersonalItemMutation.mutate(item.id);
   }
 
   return (
@@ -175,7 +172,7 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
           <p className="mt-1 text-xs text-muted-foreground">Cross-project work, monitoring, and recheck queue.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setPersonalOpen(true)}>Add personal item <span className="rounded bg-white/[0.06] px-1 py-0.5 text-[9px] text-muted-foreground">Preview</span></Button>
+          <Button variant="secondary" size="sm" onClick={() => setPersonalOpen(true)}>Add personal item</Button>
           <Button variant="ghost" size="sm" onClick={() => setQuickAddOpen(true)} disabled={initialData.projects.length === 0}>Quick add</Button>
           <Button variant="secondary" size="sm" onClick={() => { setError(null); setAddTaskOpen(true); }} disabled={initialData.projects.length === 0}><Plus />Add task</Button>
         </div>
@@ -185,9 +182,9 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
         <div className="border-b soft-divider px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-2 rounded-xl bg-white/[0.025] p-2 sm:flex-row sm:items-center">
             <AppSelect ariaLabel="Quick add project" value={quickProjectId} options={initialData.projects.map((project) => ({ value: project.id, label: project.name }))} onChange={setQuickProjectId} className="w-full sm:w-44" />
-            <input autoFocus value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") runMutation(handleQuickCreate); if (event.key === "Escape") setQuickAddOpen(false); }} className="h-9 min-w-0 flex-1 rounded-lg bg-background px-3 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring" placeholder="Task title, then press Enter..." />
-            <Button variant="secondary" size="sm" onClick={() => setQuickAddOpen(false)} disabled={isPending}>Cancel</Button>
-            <Button size="sm" disabled={!quickTitle.trim() || !quickProjectId || isPending} onClick={() => runMutation(handleQuickCreate)}>{isPending ? "Adding..." : "Add"}</Button>
+            <input autoFocus value={quickTitle} onChange={(event) => setQuickTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void handleQuickCreate(); if (event.key === "Escape") setQuickAddOpen(false); }} className="h-9 min-w-0 flex-1 rounded-lg bg-background px-3 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring" placeholder="Task title, then press Enter..." />
+            <Button variant="secondary" size="sm" onClick={() => setQuickAddOpen(false)} disabled={busy}>Cancel</Button>
+            <Button size="sm" disabled={!quickTitle.trim() || !quickProjectId || busy} onClick={() => void handleQuickCreate()}>{busy ? "Adding..." : "Add"}</Button>
           </div>
           <p className="mt-1.5 px-2 text-[11px] text-muted-foreground">Defaults: Todo, Once, Medium, all project accounts.</p>
         </div>
@@ -196,9 +193,9 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
       {personalOpen ? (
         <div className="border-b soft-divider px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex gap-2 rounded-xl bg-white/[0.025] p-2">
-            <input autoFocus value={personalTitle} onChange={(event) => setPersonalTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addPersonalItem(); if (event.key === "Escape") setPersonalOpen(false); }} className="h-9 min-w-0 flex-1 rounded-lg bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring" placeholder="Personal item preview..." />
+            <input autoFocus value={personalTitle} onChange={(event) => setPersonalTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addPersonalItem(); if (event.key === "Escape") setPersonalOpen(false); }} className="h-9 min-w-0 flex-1 rounded-lg bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring" placeholder="Personal item..." />
             <Button variant="secondary" size="sm" onClick={() => setPersonalOpen(false)}>Cancel</Button>
-            <Button size="sm" disabled={!personalTitle.trim()} onClick={addPersonalItem}>Add item</Button>
+            <Button size="sm" disabled={!personalTitle.trim() || busy} onClick={addPersonalItem}>Add item</Button>
           </div>
         </div>
       ) : null}
@@ -240,23 +237,23 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
       </div>
 
       {error ? <div role="alert" className="mx-4 mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive sm:mx-6 lg:mx-8">{error}</div> : null}
-      {personalItems.length > 0 ? <div className="flex flex-wrap gap-2 border-b soft-divider px-4 py-2.5 sm:px-6 lg:px-8"><span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Personal preview</span>{personalItems.map((item) => <span key={item} className="rounded-full bg-white/[0.04] px-2.5 py-1 text-xs text-muted-foreground">{item}</span>)}</div> : null}
+      {personalItems.length > 0 ? <div className="border-b soft-divider px-4 py-2.5 sm:px-6 lg:px-8"><div className="mb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Personal items</span><span className="text-[11px] text-muted-foreground">{personalItems.filter((item) => item.status === "done").length} done</span></div><div className="flex flex-wrap gap-2">{personalItems.map((item) => <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] px-2.5 py-1 text-xs text-muted-foreground"><button type="button" onClick={() => togglePersonalItem(item)} className={cn("hover:text-foreground", item.status === "done" && "text-foreground line-through")}>{item.title}</button><button type="button" onClick={() => removePersonalItem(item)} className="text-muted-foreground hover:text-destructive" aria-label={"Delete personal item " + item.title}>x</button></span>)}</div></div> : null}
 
       {view === "board" ? (
-        <BoardView tasks={boardTasks} projects={initialData.projects} group={boardGroup} menuTaskId={menuTaskId} onMenu={setMenuTaskId} onOpen={setSelectedTaskId} onDone={(task) => runMutation(() => handleStatus(task, "done"))} />
+        <BoardView tasks={boardTasks} projects={initialData.projects} group={boardGroup} menuTaskId={menuTaskId} onMenu={setMenuTaskId} onOpen={setSelectedTaskId} onDone={(task) => handleStatus(task, "done")} />
       ) : view === "running" ? (
-        <TaskCards title="Running work" tasks={filteredTasks} menuTaskId={menuTaskId} onMenu={setMenuTaskId} onOpen={setSelectedTaskId} onDone={(task) => runMutation(() => handleStatus(task, "done"))} />
+        <TaskCards title="Running work" tasks={filteredTasks} menuTaskId={menuTaskId} onMenu={setMenuTaskId} onOpen={setSelectedTaskId} onDone={(task) => handleStatus(task, "done")} />
       ) : view === "recheck" ? (
-        <TaskCards title="Recheck queue" review tasks={filteredTasks} menuTaskId={menuTaskId} onMenu={setMenuTaskId} onOpen={setSelectedTaskId} onDone={(task) => runMutation(() => handleStatus(task, "done"))} />
+        <TaskCards title="Recheck queue" review tasks={filteredTasks} menuTaskId={menuTaskId} onMenu={setMenuTaskId} onOpen={setSelectedTaskId} onDone={(task) => handleStatus(task, "done")} />
       ) : (
-        <ListView tasks={filteredTasks} menuTaskId={menuTaskId} onMenu={setMenuTaskId} onOpen={setSelectedTaskId} onDone={(task) => runMutation(() => handleStatus(task, "done"))} />
+        <ListView tasks={filteredTasks} menuTaskId={menuTaskId} onMenu={setMenuTaskId} onOpen={setSelectedTaskId} onDone={(task) => handleStatus(task, "done")} />
       )}
 
       {filteredTasks.length === 0 ? <EmptyState hasProjects={initialData.projects.length > 0} onAdd={() => setAddTaskOpen(true)} /> : null}
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8"><span>Showing {filteredTasks.length} task{filteredTasks.length === 1 ? "" : "s"}</span><span /></footer>
 
-      <TaskDetailPanel task={selectedTask} projects={initialData.projects} busy={isPending} error={error} onClose={() => { setSelectedTaskId(null); setError(null); }} onSave={(input) => runMutation(() => handleSave(input))} onDelete={() => { if (selectedTask) runMutation(() => handleDelete(selectedTask)); }} />
-      <AddTaskDialog open={addTaskOpen} projects={initialData.projects} busy={isPending} error={error} onClose={() => { if (!isPending) { setAddTaskOpen(false); setError(null); } }} onCreate={(input) => runMutation(() => handleCreate(input))} />
+      <TaskDetailPanel task={selectedTask} projects={initialData.projects} busy={mutations.saveTaskMutation.isPending || mutations.statusTaskMutation.isPending || mutations.deleteTaskMutation.isPending} error={error} onClose={() => { setSelectedTaskId(null); setError(null); }} onSave={(input) => handleSave(input)} onDelete={() => { if (selectedTask) handleDelete(selectedTask); }} />
+      <AddTaskDialog open={addTaskOpen} projects={initialData.projects} busy={mutations.createTaskMutation.isPending} error={error} onClose={() => { if (!mutations.createTaskMutation.isPending) { setAddTaskOpen(false); setError(null); } }} onCreate={(input) => void handleCreate(input)} />
     </div>
   );
 }
@@ -330,21 +327,4 @@ function formatTaskDate(value: string | null) {
 function TaskTiming({ task, compact = false }: { task: TaskRecord; compact?: boolean }) {
   const duration = formatTaskDuration(task.startDate, task.completedAt);
   return <span className={cn("block text-muted-foreground", compact ? "max-w-32 truncate text-[10px]" : "text-xs")} title={duration ?? undefined}>{duration ?? formatTaskDate(task.startDate)}</span>;
-}
-
-function makePreviewTask(input: TaskInput, projects: TaskProjectOption[]): TaskRecord {
-  const project = projects.find((item) => item.id === input.projectId) ?? projects[0];
-  if (!project) throw new Error("Project not found");
-  const now = new Date().toISOString();
-  const status = input.status ?? "todo";
-  const assignedAccounts = project.accounts.filter((account) => (input.accountIds ?? []).includes(account.id));
-  return { id: "preview-task-" + Date.now(), projectId: project.id, projectName: project.name, projectLogoUrl: project.logoUrl, title: input.title, description: input.description ?? null, status, frequency: input.frequency ?? "once", priority: input.priority ?? "medium", url: input.url || null, sortOrder: 0, startDate: input.startDate || getJakartaDateValue(), completedAt: status === "done" ? now : null, assignedAccounts, effectiveAccounts: assignedAccounts.length ? assignedAccounts : project.accounts, usesProjectAccountFallback: assignedAccounts.length === 0, assignedWallet: project.wallets.find((wallet) => wallet.id === input.walletId) ?? null, createdAt: now, updatedAt: now };
-}
-
-function updatePreviewTask(task: TaskRecord, input: TaskInput, projects: TaskProjectOption[]): TaskRecord {
-  const project = projects.find((item) => item.id === input.projectId);
-  if (!project) throw new Error("Project not found");
-  const assignedAccounts = project.accounts.filter((account) => (input.accountIds ?? []).includes(account.id));
-  const status = input.status ?? "todo";
-  return { ...task, projectId: project.id, projectName: project.name, projectLogoUrl: project.logoUrl, title: input.title.trim(), description: input.description || null, status, frequency: input.frequency ?? "once", priority: input.priority ?? "medium", url: input.url || null, startDate: input.startDate || null, completedAt: status === "done" ? task.completedAt ?? new Date().toISOString() : null, assignedAccounts, effectiveAccounts: assignedAccounts.length ? assignedAccounts : project.accounts, usesProjectAccountFallback: assignedAccounts.length === 0, assignedWallet: project.wallets.find((wallet) => wallet.id === input.walletId) ?? null, updatedAt: new Date().toISOString() };
 }

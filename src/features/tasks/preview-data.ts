@@ -6,6 +6,7 @@ const accounts = [
 ];
 
 export const taskPreviewData: TaskWorkspaceData = {
+  personalItems: [],
   accounts,
   projects: [
     { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Soundness", logoUrl: null, accounts, wallets: [] },

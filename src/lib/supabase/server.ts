@@ -15,8 +15,8 @@ export async function createClient() {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-        } catch {
-          // Server Components cannot always write cookies. Middleware refreshes them.
+        } catch (err) {
+          console.error("[supabase server] Failed to set session cookies:", err);
         }
       },
     },

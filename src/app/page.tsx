@@ -25,6 +25,7 @@ export default async function HomePage() {
   return (
     <AppShell>
       <DashboardPreview
+        developmentPreview={developmentPreview}
         deadlineItems={deadlineData?.items}
         deadlineOptions={deadlineData?.options}
         deadlineDueCount={deadlineData?.dueCount}

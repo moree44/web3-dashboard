@@ -1,10 +1,10 @@
 "use server";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
-import { activityLogs, inboxItems, notes } from "@/lib/db/schema";
+import { activityLogs, inboxItems, notes, projects, tasks } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 
 export type DashboardInboxItem = {
@@ -28,6 +28,19 @@ export type DashboardActivityItem = {
 };
 
 export type DashboardData = {
+  metrics: {
+    projects: number;
+    active: number;
+    inbox: number;
+    running: number;
+    archived: number;
+  };
+  pulse: {
+    testnet: number;
+    freeHunts: number;
+    retro: number;
+    waitlist: number;
+  };
   inboxItems: DashboardInboxItem[];
   pinnedNotes: DashboardNoteItem[];
   recentNotes: DashboardNoteItem[];
@@ -85,6 +98,10 @@ function activityText(action: string, metadata: unknown) {
     "nft_campaign.created": "Created NFT campaign",
     "nft_campaign.updated": "Updated NFT campaign",
     "nft_campaign.deleted": "Deleted NFT campaign",
+    "personal_item.created": "Created personal item",
+    "personal_item.updated": "Updated personal item",
+    "personal_item.status_changed": "Changed personal item status",
+    "personal_item.deleted": "Deleted personal item",
     "inbox.created": "Captured Inbox item",
     "inbox.updated": "Updated Inbox item",
     "inbox.processed": "Processed Inbox item",
@@ -99,7 +116,24 @@ function activityText(action: string, metadata: unknown) {
 
 export async function getDashboardData(): Promise<DashboardData> {
   const workspaceId = await requireWorkspace();
-  const [inboxRows, pinnedRows, recentRows, activityRows] = await Promise.all([
+  const [projectCounts, taskCounts, inboxCounts, inboxRows, pinnedRows, recentRows, activityRows] = await Promise.all([
+    db.select({
+      projects: sql<number>`count(*) filter (where is_archived = false)::int`,
+      active: sql<number>`count(*) filter (where is_archived = false and status in ('watching', 'in_progress', 'running', 'paused'))::int`,
+      archived: sql<number>`count(*) filter (where is_archived = true)::int`,
+      testnet: sql<number>`count(*) filter (where is_archived = false and exists (select 1 from unnest(coalesce(work_types, ARRAY[]::text[])) as work_type where lower(work_type) = 'testnet'))::int`,
+      freeHunts: sql<number>`count(*) filter (where is_archived = false and hunt_type = 'free_hunts')::int`,
+      retro: sql<number>`count(*) filter (where is_archived = false and hunt_type = 'retro')::int`,
+      waitlist: sql<number>`count(*) filter (where is_archived = false and hunt_type = 'waitlist')::int`,
+    })
+      .from(projects)
+      .where(eq(projects.workspaceId, workspaceId)),
+    db.select({ running: sql<number>`count(*)::int` })
+      .from(tasks)
+      .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.status, "running"))),
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(inboxItems)
+      .where(and(eq(inboxItems.workspaceId, workspaceId), inArray(inboxItems.status, ["new", "reviewing"]))),
     db.select({ id: inboxItems.id, title: inboxItems.title, source: inboxItems.source, status: inboxItems.status, updatedAt: inboxItems.updatedAt })
       .from(inboxItems)
       .where(and(eq(inboxItems.workspaceId, workspaceId), inArray(inboxItems.status, ["new", "reviewing"])))
@@ -122,7 +156,24 @@ export async function getDashboardData(): Promise<DashboardData> {
       .limit(5),
   ]);
 
+  const projectCount = projectCounts[0] ?? { projects: 0, active: 0, archived: 0, testnet: 0, freeHunts: 0, retro: 0, waitlist: 0 };
+  const taskCount = taskCounts[0]?.running ?? 0;
+  const inboxCount = inboxCounts[0]?.count ?? 0;
+
   return {
+    metrics: {
+      projects: projectCount.projects,
+      active: projectCount.active,
+      inbox: inboxCount,
+      running: taskCount,
+      archived: projectCount.archived,
+    },
+    pulse: {
+      testnet: projectCount.testnet,
+      freeHunts: projectCount.freeHunts,
+      retro: projectCount.retro,
+      waitlist: projectCount.waitlist,
+    },
     inboxItems: inboxRows.map((row) => ({
       id: row.id,
       title: row.title,

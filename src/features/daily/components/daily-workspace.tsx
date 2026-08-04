@@ -6,6 +6,8 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDailyPageData, upsertDailyTaskLog } from "@/features/daily/actions";
+import { updatePersonalItemStatus } from "@/features/personal/actions";
+import type { PersonalItemRecord } from "@/features/personal/types";
 import { formatTaskFrequency, TASK_STATUS_LABELS } from "@/features/tasks/task-types";
 import type { DailyChecklistItem, DailyLogStatus, DailyPageData } from "@/features/daily/daily-types";
 import { isHttpUrl, normalizeHttpUrl } from "@/lib/url";
@@ -25,12 +27,25 @@ export function DailyWorkspace({ initialData, developmentPreview = false }: { in
   const [error, setError] = useState<string | null>(null);
   const groups = useMemo(() => groupItems(data.items, data.accounts, view, query, hideDone), [data.accounts, data.items, hideDone, query, view]);
   const checklist = data.items.filter((item) => item.kind === "checklist");
+  const visiblePersonalItems = useMemo(() => (data.personalItems ?? []).filter((item) => isPersonalScheduled(item, data.selectedDate) && (!hideDone || item.status !== "done") && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase()))), [data.personalItems, data.selectedDate, hideDone, query]);
   const done = checklist.filter((item) => item.log?.status === "done").length;
 
   async function changeDate(date: string) {
     if (loadingDate || date === data.selectedDate) return;
     setLoadingDate(true);
     try { setData(await getDailyPageData(date)); setDetail(null); } finally { setLoadingDate(false); }
+  }
+
+  async function togglePersonalItem(item: PersonalItemRecord) {
+    if (developmentPreview || busyIds.has("personal:" + item.id)) return;
+    const busyId = "personal:" + item.id;
+    setBusyIds((current) => new Set(current).add(busyId));
+    try {
+      const updated = await updatePersonalItemStatus(item.id, item.status === "done" ? "todo" : "done");
+      setData((current) => ({ ...current, personalItems: (current.personalItems ?? []).map((row) => row.id === updated.id ? updated : row) }));
+    } finally {
+      setBusyIds((current) => { const next = new Set(current); next.delete(busyId); return next; });
+    }
   }
 
   async function saveLog(item: DailyChecklistItem, status: DailyLogStatus, fields?: { txHash?: string; proofUrl?: string; notes?: string }) {
@@ -59,10 +74,28 @@ export function DailyWorkspace({ initialData, developmentPreview = false }: { in
       <div className="flex h-9 items-center gap-1 rounded-lg border soft-divider-strong bg-card p-1"><label className="flex h-7 min-w-0 items-center gap-2 px-2 sm:w-56"><Search className="size-3.5 text-muted-foreground" /><input aria-label="Search daily tasks" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground" placeholder="Search today…" /></label><button type="button" onClick={() => setHideDone((current) => !current)} className={cn("h-7 rounded-md px-3 text-xs hover:bg-accent hover:text-foreground", hideDone ? "bg-accent text-foreground" : "text-muted-foreground")}>{hideDone ? "Show done" : "Hide done"}</button></div>
     </div>
     {developmentPreview ? <p className="mt-4 rounded-lg bg-info/10 px-3 py-2 text-xs text-info">Preview mode uses sample Tasks. Daily log persistence is available after Supabase is configured.</p> : null}
+    {visiblePersonalItems.length > 0 ? <PersonalItemsCard items={visiblePersonalItems} busyIds={busyIds} onToggle={togglePersonalItem} /> : null}
     {error ? <p role="alert" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
     <div className="mt-5 space-y-4" aria-busy={loadingDate}>{groups.length === 0 ? <p className="rounded-xl border soft-divider-strong bg-card px-4 py-8 text-center text-sm text-muted-foreground">No Daily tasks match this view.</p> : groups.map((group) => <GroupCard key={group.id} group={group} view={view} busyIds={busyIds} onSave={saveLog} onOpen={setDetail} />)}</div>
     <LogDialog item={detail} busy={detail ? busyIds.has(detail.id) : false} readOnly={developmentPreview || detail?.kind === "monitoring"} onClose={() => setDetail(null)} onSave={(item, fields) => void saveLog(item, item.log?.status ?? "pending", fields)} />
   </div>;
+}
+
+function PersonalItemsCard({ items, busyIds, onToggle }: { items: PersonalItemRecord[]; busyIds: Set<string>; onToggle: (item: PersonalItemRecord) => Promise<void> }) {
+  return <section className="overflow-hidden rounded-xl border soft-divider-strong bg-card soft-panel"><div className="flex items-center justify-between px-4 py-3"><div><h2 className="text-sm font-semibold">Personal items</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Standalone checklist, not tied to a Project.</p></div><span className="text-[11px] text-muted-foreground">{items.filter((item) => item.status === "done").length}/{items.length}</span></div><div className="border-t soft-divider px-4 py-2">{items.map((item) => { const done = item.status === "done"; const busy = busyIds.has("personal:" + item.id); return <div key={item.id} className="flex min-h-12 items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/30"><button type="button" role="checkbox" aria-checked={done} aria-label={(done ? "Mark pending: " : "Mark done: ") + item.title} disabled={busy} onClick={() => void onToggle(item)} className={cn("grid size-5 shrink-0 place-items-center rounded-[6px] border disabled:opacity-50", done ? "border-white bg-white text-background" : "soft-divider bg-background text-muted-foreground hover:border-white/25")}><span className="text-xs">{done ? "✓" : ""}</span></button><span className={cn("min-w-0 flex-1 truncate text-[13px] font-medium", done && "text-muted-foreground line-through")}>{item.title}</span><span className="text-[10px] text-muted-foreground">{item.frequency}</span></div>; })}</div></section>;
+}
+
+function isPersonalScheduled(item: PersonalItemRecord, selectedDate: string) {
+  if (item.status === "dropped") return false;
+  const createdDate = item.createdAt?.slice(0, 10);
+  if (createdDate && selectedDate < createdDate) return false;
+  if (item.frequency === "daily" || item.frequency === "custom") return true;
+  if (item.frequency === "once") return item.status !== "done" || selectedDate === createdDate;
+  if (!createdDate) return true;
+  const created = new Date(createdDate + "T00:00:00Z");
+  const selected = new Date(selectedDate + "T00:00:00Z");
+  if (item.frequency === "weekly") return created.getUTCDay() === selected.getUTCDay();
+  return created.getUTCDate() === selected.getUTCDate();
 }
 
 function GroupCard({ group, view, busyIds, onSave, onOpen }: { group: DailyGroup; view: ViewMode; busyIds: Set<string>; onSave: (item: DailyChecklistItem, status: DailyLogStatus) => Promise<void>; onOpen: (item: DailyChecklistItem) => void }) {

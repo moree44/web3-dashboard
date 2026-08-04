@@ -1,3 +1,5 @@
+import type { PersonalItemRecord } from "@/features/personal/types";
+
 export const TASK_STATUSES = [
   "todo",
   "in_progress",
@@ -66,6 +68,7 @@ export type TaskRecord = {
 
 export type TaskWorkspaceData = {
   tasks: TaskRecord[];
+  personalItems?: PersonalItemRecord[];
   projects: TaskProjectOption[];
   accounts: TaskAccountOption[];
 };

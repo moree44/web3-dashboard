@@ -1,16 +1,16 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-08-02
+Last updated: 2026-08-04
 
 ## Current Position
 
-Web3 Hunting OS is in **Phase 1 Core, CRUD mostly wired**.
+Web3 Hunting OS is in **Phase 1 Core, CRUD wired**.
 
 The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
 
-**Data foundation is in place:** Drizzle ORM schema (19 tables), 14 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0014_activity_logs_set_null_targets.sql have been applied to the live database; the notes.folder column, folder index, and Activity Log delete behavior were verified live. RLS is enabled on all 19 application tables. **CRUD server actions now exist for Projects, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
+**Data foundation is in place:** Drizzle ORM schema (20 tables), 15 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0015_add_personal_items.sql have been applied to the live database; the notes.folder column, folder index, and Activity Log delete behavior were verified live. RLS is enabled on all 20 application tables. **CRUD server actions now exist for Projects, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
 
-**Remaining gap:** Gmail remains Phase 2 because it requires OAuth and an email connector. Dashboard Quick Capture is still a route shortcut, while overview and Hunting Pulse metrics remain fixture-based except for live deadlines and NFT count. Personal Items remain explicit Phase 1.5 preview scaffolding. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
+**Remaining gap:** Gmail remains Phase 2 because it requires OAuth and an email connector. Settings basic profile/workspace CRUD and Personal Items persistence are now live. Core Dashboard Quick Capture, overview metrics, and Hunting Pulse categories now read live workspace data. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
 
 ## Active Source of Truth
 
@@ -70,7 +70,7 @@ Current implementation should align with:
 ### Data Foundation
 
 - **Drizzle ORM** installed and configured (`drizzle-orm`, `drizzle-kit`, `pg`)
-- **Schema** (src/lib/db/schema.ts): 19 tables matching PRD v3.4
+- **Schema** (src/lib/db/schema.ts): 20 tables matching the current Core plus Personal Items scope
   - `workspaces`, `workspace_members`
   - `accounts`, `wallet_groups`, `wallets`
   - `projects`, `project_accounts`, `project_wallets`
@@ -214,7 +214,7 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Notes desk reads pinned and recent persisted Docs records outside development preview
 - Inbox to process reads new and reviewing persisted Inbox records outside development preview
 - Recent activity reads persisted Activity Log records with workspace scoping and relative timestamps
-- Quick Capture remains a route shortcut strip; it does not yet persist directly from Dashboard
+- Quick Capture is a live Inbox capture form with Project, Watchlist, Note, and Inbox intent labels; raw captures persist as Inbox items for triage
 - Upcoming deadlines now reads persisted Deadline records regardless of whether they link to a Project, Task, or NFT Campaign
 - The Due metric uses the complete upcoming Deadline count and Open navigates to `/deadlines`
 
@@ -238,8 +238,9 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Row/card More menu supports Edit and Mark done; Recheck Review opens the same edit drawer
 - Account assignments use stored avatars with initials fallback. Empty explicit assignment consistently resolves through project_accounts
 - Marking a Task Done records `completed_at`; reopening clears it, and the UI derives human completion duration from Start date
-- Personal Item creation remains visibly marked Preview and local-only because persistence belongs to Phase 1.5
+- Personal Item creation, completion toggle, and delete now persist through the workspace-scoped Personal Items table
 - Task Logs are persisted through the Daily execution surface; Activity Logs remain separate
+- **TanStack Query + optimistic UI pilot (2026-08-04):** Tasks and Personal Items now run through React Query instead of blocking `await serverAction() → setState`. Status change, edit save, delete, and Personal Item mutations apply optimistically (UI updates instantly, server syncs in background, rollback on error). Task creation stays commit-waiting ("Creating..." until the server returns) so the direct-SQL e2e smoke never races the insert. Cache is keyed `["tasks"]`; preview mode never refetches, real mode refetches on mount (`staleTime 0`) to reconcile with fresh RSC initialData.
 
 ### Daily — persisted execution
 
@@ -248,7 +249,7 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Keeps Running and Recheck tasks visible as monitoring rows
 - Persists Done, Skip, Pending reset, transaction hash, proof URL, and notes through `task_logs`
 - Date navigation, account/project grouping, search, and Hide done filters are functional
-- Personal Items remain preview-only Phase 1.5
+- Personal Items are persisted with create, done/pending, delete, and Daily recurrence visibility
 
 ### Inbox — manual-first CRUD
 
@@ -276,11 +277,11 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Mobile card layout with restore/delete parity
 - Server actions revalidate `/projects`, `/archive`, `/daily`, and `/tasks` on every mutation
 
-### Settings Preview
+### Settings CRUD
 
-- Profile, workspace, security, accounts, MVP boundary cards
-- Save disabled until real editing exists
-- Integrations are Phase 1.5
+- Profile display name and workspace name can be edited and persisted
+- Username, login method, timezone, workspace counts, and security boundaries remain read-only by design
+- Settings Integrations remain Phase 1.5
 
 ## Maintainability Snapshot
 
@@ -288,7 +289,7 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 
 | Area | Rough size | CRUD Status |
 | --- | --- | --- |
-| `tasks-preview.tsx` | ~316 lines | CRUD wired; Personal Item remains preview |
+| `tasks-preview.tsx` | ~330 lines | CRUD wired; Personal Item CRUD is persisted; React Query + optimistic mutations (`tasks-query.ts` holds the hooks) |
 | `accounts-preview.tsx` | ~1600+ lines | CRUD wired (identities, wallets, groups) |
 | `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation |
 | `archive-preview.tsx` | ~278 lines | CRUD wired (restore, delete) |
@@ -346,13 +347,24 @@ The 2026-08-01 Phase 1 Core batch includes:
 - Live migration `0014_activity_logs_set_null_targets.sql` with `ON DELETE SET NULL` Activity Log target FKs verified live
 - Wallet Group rename/description edit dialog wired to the existing update action with reload persistence
 - Workspace-scoped Activity Log mutation events wired across Core CRUD, Daily Task Logs, Inbox, Docs, Deadlines, and NFT Campaigns
-- Dashboard Inbox, Notes desk, and Recent activity panels activated from live workspace data; Quick Capture remains a route shortcut
+- Dashboard Inbox, Notes desk, Recent activity, overview metrics, Hunting Pulse categories, and Quick Capture are activated from live workspace data
+- Settings profile and workspace name editing with owner validation and persisted Supabase display metadata
+- Live migration `0015_add_personal_items.sql` with workspace RLS, Personal Items CRUD, and Daily recurrence visibility
 - Workspace-scoped Docs CRUD with Markdown textarea, folder, pin, project link, search, safe-secret validation, and delete confirmation
 - Manual-first Inbox capture, edit, filters, explicit Project/Task/Docs conversion, link actions, and reload persistence smoke coverage
 - Shared AppSelect viewport-aware positioning so Inbox and other feature menus stay inside the visible browser surface
 - PRD v3.4 and DESIGN v2.16 alignment
 - Targeted Wallet Group/Dashboard, Docs/Daily, and Inbox Playwright smoke coverage
 - Updated implementation and validation status
+
+The 2026-08-04 TanStack Query pilot batch includes:
+
+- `@tanstack/react-query` v5 installed; root layout wrapped with a client `QueryProvider` (defaults: staleTime 5 min, no refetch-on-window-focus, retry 1)
+- New `src/features/tasks/tasks-query.ts` with query keys, pure optimistic record builders (`optimisticTask`, `applyTaskEdit`, `optimisticPersonalItem`), `useTaskWorkspace`, and `useTasksMutations` (create/save/status/delete + Personal Item add/toggle/remove)
+- Tasks and Personal Items refactored from blocking `await serverAction() → setState` to optimistic React Query mutations with cancel-and-snapshot `onMutate`, rollback `onError`, and merge `onSuccess`; create stays commit-waiting for e2e direct-SQL safety
+- Preview mode (`developmentPreview`) uses locally-built records with `staleTime: Infinity` and no invalidation; real mode refetches on mount to reconcile with RSC `initialData`
+- `tasks-preview.tsx` no longer holds task/personal-item state; busy states aggregate mutation `isPending`
+- Unit tests updated with a `QueryClientProvider` render wrapper and preview-mode action mocks; full verification passed (typecheck, lint 0 warnings, 71 unit tests, production build, and both e2e specs)
 
 Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the source release.
 
@@ -363,13 +375,13 @@ Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the 
 | Priority | Area | Current state | Work still required |
 | --- | --- | --- | --- |
 | 1 | Task Logs | **Wired**: workspace-scoped reads and unique daily upserts validate Task, Project, Account, and Wallet relations | Daily execution remains separate from the mutation Activity Log feed |
-| 2 | Daily | **Wired**: real Tasks, effective Account assignments, Task Logs, date navigation, execution actions, and filters | Personal Items remain preview-only Phase 1.5 |
+| 2 | Daily | **Wired**: real Tasks, effective Account assignments, Task Logs, date navigation, execution actions, filters, and persisted Personal Items | Advanced Personal Item editing can expand later if needed |
 | 3 | Inbox | **Wired**: workspace-scoped capture/edit/status actions, search/filter UI, explicit Project/Task/Docs conversion, and link actions | Gmail remains Phase 2; Dashboard Inbox summary is now live for new and reviewing items |
-| 4 | Docs | **Wired**: Note CRUD, Markdown textarea, folder, pinning, project links, and persisted search | Dashboard Notes desk is live; Quick Capture remains a route shortcut |
+| 4 | Docs | **Wired**: Note CRUD, Markdown textarea, folder, pinning, project links, and persisted search | Dashboard Notes desk is live; Dashboard Quick Capture saves raw captures to Inbox for triage |
 | 5 | Activity Logs | **Wired**: mutation events, recent activity query, and delete-safe target foreign keys | Add pagination and richer history views when the product scope requires them |
 | 6 | Wallet Groups | **Wired**: create, rename/description edit, and delete UI | Add richer group management only if the product scope expands |
-| 7 | Dashboard activation | **Partially live**: Inbox, Notes desk, Recent activity, Deadlines, and NFT count are live | Persist Dashboard Quick Capture and replace remaining overview/pulse fixtures with aggregate queries |
-| 8 | Settings | **Preview only** | Wire approved profile, workspace, and security settings; Integrations remain Phase 1.5 |
+| 7 | Dashboard activation | **Wired**: Quick Capture, Inbox, Notes desk, Recent activity, Deadlines, overview metrics, and Hunting Pulse categories use workspace data | Keep Dashboard as a lightweight overview; add richer aggregation only when product scope requires it |
+| 8 | Settings | **Wired**: profile display name and workspace name CRUD with workspace ownership validation | Integrations and deeper security controls remain Phase 1.5 |
 
 ### Task Logs and Daily implementation notes
 
@@ -380,7 +392,7 @@ Task Logs and Daily are now implemented on top of the completed foundation:
 - Once, Daily, Weekly, Monthly, Running, and Recheck schedule behavior is covered in `daily-schedule.ts`
 - No Task Log rows existed when migration `0012` was applied
 - `/daily` reads persisted workspace Tasks and Task Logs outside development preview; mutations use an optimistic local patch guarded per row to prevent duplicate submissions
-- Personal Items remain preview-only Phase 1.5 and must not be mixed into the Task Log implementation
+- Personal Items remain separate from Task Logs, but now persist in `personal_items` and appear in the Daily workspace by recurrence
 
 ### Phase 1.5 (do not treat as current Core work)
 
@@ -388,7 +400,7 @@ Task Logs and Daily are now implemented on top of the completed foundation:
 - Trade Log + FIFO realized PnL
 - Portfolio holdings and transfers
 - Token watchlist
-- Personal Items database and persistent logs
+- Advanced Personal Item fields and richer history views
 - Settings Integrations forms and storage
 
 ### Out of scope unless PRD/user explicitly approves
@@ -403,8 +415,8 @@ Task Logs and Daily are now implemented on top of the completed foundation:
 ## Known UI Caveats
 
 - Dashboard Inbox summary, Notes desk, and Recent activity read live data; full Inbox processing is live on `/inbox`
-- Dashboard Quick Capture is still a route shortcut, and most overview/Hunting Pulse values remain fixture-based
-- Settings controls are still visual-only; Gmail integration remains Phase 2
+- Dashboard Quick Capture persists raw input to Inbox and overview/Hunting Pulse values use workspace-scoped aggregate queries
+- Settings profile and workspace controls are live; Integrations remain Phase 1.5 and Gmail remains Phase 2
 - Shared dropdown/date picker foundation is consistent across the audited feature surfaces, but some More menus and browser confirm/prompt flows still need a later UX consistency pass
 - Search/filters remain inconsistent on preview-only areas
 - Settings shallow vs future PRD role
@@ -430,7 +442,18 @@ DONE     10. Activity logs: mutation events, recent activity query, and delete-s
 
 ## Validation Status
 
-Checked 2026-08-02 after Wallet Group, Activity Log, Dashboard activation, and targeted smoke validation:
+TanStack Query + optimistic UI Tasks pilot checked 2026-08-04:
+
+```txt
+pnpm typecheck  # pass
+pnpm lint       # pass, 0 warnings
+pnpm test       # pass, 16 files and 71 tests
+pnpm build      # pass
+docs-daily-smoke.spec.ts       # pass, 1.6m
+delete-linked-fk.spec.ts       # pass, 2.4m (added page.reload() after /docs goto to defeat Chromium bfcache staleness)
+```
+
+Checked 2026-08-03 after Core Dashboard activation and targeted static validation:
 
 ```txt
 pnpm typecheck  # pass
@@ -439,12 +462,19 @@ pnpm exec vitest run --passWithNoTests --maxWorkers=1  # pass, 16 files and 71 t
 pnpm build      # pass
 ```
 
+Core Dashboard activation in this batch was additionally checked with:
+
+```txt
+pnpm typecheck  # pass
+pnpm lint       # pass, 0 warnings
+```
+
 Live database metadata verification:
 
 ```txt
-Application tables found             19
-Tables with RLS enabled              19
-Application policies                21
+Application tables found             20
+Tables with RLS enabled              20
+Application policies                22
 user_workspace_ids SECURITY DEFINER true
 user_workspace_ids search_path      public
 Owner-visible workspaces             1
@@ -453,6 +483,7 @@ Avatar upload ownership policy       present
 Project logo ownership policy        present
 Deadline workspace policy            present
 project_wallets RLS                  enabled, 1 workspace policy
+personal_items RLS                  enabled, 1 workspace policy
 ```
 
 Focused Project Wallet regression:
@@ -480,6 +511,8 @@ Docs CRUD, Daily Task Log execution, reload persistence, cleanup, and 0 console/
 Inbox manual-first CRUD smoke:
 Inbox capture/edit/status, Project/Task/Docs conversion, reload persistence, cleanup, hydration-safe capture retry, and 0 console/page errors passed 1/1 after Activity Log delete-FK fix
 Targeted current smoke prefixes (Wallet Group, Docs/Daily, Inbox) left 0 matching database rows
+Personal Items: migration 0015 applied, RLS enabled with one workspace policy
+Settings: profile display name and workspace name use persisted server actions
 ```
 
 Focused Deadline regression:

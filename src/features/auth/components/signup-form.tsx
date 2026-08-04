@@ -23,7 +23,7 @@ export function SignupForm() {
   });
 
   return (
-    <form className="space-y-4" onSubmit={onSubmit} noValidate>
+    <form className="space-y-4" method="POST" onSubmit={onSubmit} noValidate>
       <Field label="Username" hint="Lowercase letters, numbers, and underscores" error={errors.username?.message}>
         <input {...register("username")} className={inputClass} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="moree" />
       </Field>

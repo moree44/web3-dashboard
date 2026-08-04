@@ -1,3 +1,4 @@
+import type { PersonalItemRecord } from "@/features/personal/types";
 import type { TaskAccountOption, TaskFrequency, TaskPriority, TaskRecord, TaskStatus } from "@/features/tasks/task-types";
 
 export const DAILY_LOG_STATUSES = ["done", "skip", "pending"] as const;
@@ -37,6 +38,7 @@ export type DailyChecklistItem = {
 
 export type DailyPageData = {
   selectedDate: string;
+  personalItems?: PersonalItemRecord[];
   items: DailyChecklistItem[];
   accounts: TaskAccountOption[];
 };

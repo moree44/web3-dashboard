@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
@@ -24,10 +25,7 @@ export async function getUserWorkspace(userId: string) {
   return workspace[0] ?? null;
 }
 
-export async function ensureDefaultWorkspace(
-  userId: string,
-  workspaceName = "My Workspace",
-) {
+export const ensureDefaultWorkspace = cache(async (userId: string, workspaceName = "My Workspace") => {
   const existing = await getUserWorkspace(userId);
 
   if (existing) return existing;
@@ -62,4 +60,4 @@ export async function ensureDefaultWorkspace(
 
     return workspace;
   });
-}
+});

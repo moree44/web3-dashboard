@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TasksPreview } from "@/features/tasks/components/tasks-preview";
@@ -6,11 +8,31 @@ import { createTask } from "@/features/tasks/actions";
 import { taskPreviewData } from "@/features/tasks/preview-data";
 
 vi.mock("@/features/tasks/actions", () => ({
+  // The real-mode query refetches on mount (staleTime 0). A bare stub is fine:
+  // TasksPreview falls back to initialData when the query data is undefined.
+  getTaskWorkspaceData: vi.fn(async () => undefined),
   createTask: vi.fn(),
   updateTask: vi.fn(),
   updateTaskStatus: vi.fn(),
   deleteTask: vi.fn(),
 }));
+
+vi.mock("@/features/personal/actions", () => ({
+  createPersonalItem: vi.fn(),
+  deletePersonalItem: vi.fn(),
+  updatePersonalItemStatus: vi.fn(),
+}));
+
+function renderWithQuery(ui: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+function renderTasksPreview(props: { developmentPreview?: boolean } = {}) {
+  return renderWithQuery(
+    <TasksPreview initialData={taskPreviewData} developmentPreview={props.developmentPreview} />,
+  );
+}
 
 describe("TasksPreview", () => {
   afterEach(() => {
@@ -19,7 +41,7 @@ describe("TasksPreview", () => {
   });
 
   it("quick adds a task with project-account fallback in development preview", async () => {
-    render(<TasksPreview initialData={taskPreviewData} developmentPreview />);
+    renderTasksPreview({ developmentPreview: true });
 
     fireEvent.click(screen.getByRole("button", { name: "Quick add" }));
     const input = screen.getByPlaceholderText("Task title, then press Enter...");
@@ -38,7 +60,7 @@ describe("TasksPreview", () => {
       startDate: "2026-07-29",
     };
     vi.mocked(createTask).mockResolvedValue(created);
-    render(<TasksPreview initialData={taskPreviewData} />);
+    renderTasksPreview();
 
     fireEvent.click(screen.getByRole("button", { name: "Add task" }));
     expect(screen.getByRole("dialog", { name: "Add task" })).toBeInTheDocument();
@@ -60,7 +82,7 @@ describe("TasksPreview", () => {
   });
 
   it("opens the edit drawer and persists a local preview edit", async () => {
-    render(<TasksPreview initialData={taskPreviewData} developmentPreview />);
+    renderTasksPreview({ developmentPreview: true });
 
     fireEvent.click(screen.getAllByRole("button", { name: /Submit proof after address generated/ })[0]);
     expect(screen.getByRole("dialog", { name: "Edit task" })).toBeInTheDocument();
@@ -78,7 +100,7 @@ describe("TasksPreview", () => {
   });
 
   it("activates advanced filters and Review opens the same edit drawer", () => {
-    render(<TasksPreview initialData={taskPreviewData} developmentPreview />);
+    renderTasksPreview({ developmentPreview: true });
 
     fireEvent.click(screen.getByRole("button", { name: "More filters" }));
     expect(screen.getByLabelText("Filter tasks by status")).toBeInTheDocument();
@@ -90,7 +112,7 @@ describe("TasksPreview", () => {
   });
 
   it("closes a nested dropdown before closing the Task drawer", async () => {
-    render(<TasksPreview initialData={taskPreviewData} developmentPreview />);
+    renderTasksPreview({ developmentPreview: true });
     fireEvent.click(screen.getAllByRole("button", { name: /Submit proof after address generated/ })[0]);
 
     fireEvent.click(screen.getByLabelText("Status"));

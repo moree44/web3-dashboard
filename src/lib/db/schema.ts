@@ -304,6 +304,32 @@ export const tasks = pgTable("tasks", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// ─── Personal Items ───────────────────────────────────────────────────────────
+
+export const personalItems = pgTable(
+  "personal_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id),
+    title: text("title").notNull(),
+    frequency: text("frequency", {
+      enum: ["once", "daily", "weekly", "monthly", "custom"],
+    }).notNull().default("once"),
+    status: text("status", {
+      enum: ["todo", "done", "dropped"],
+    }).notNull().default("todo"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("personal_items_workspace_status_idx").on(table.workspaceId, table.status),
+    index("personal_items_workspace_updated_idx").on(table.workspaceId, table.updatedAt),
+  ],
+);
+
 // ─── Deadlines ────────────────────────────────────────────────────────────────
 
 export const deadlines = pgTable(

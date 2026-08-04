@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
-import { notes, projects } from "@/lib/db/schema";
+import { inboxItems, notes, projects } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { recordActivity } from "@/features/activity/activity-log";
 
@@ -112,8 +112,11 @@ export async function updateDocsNote(id: string, input: DocsNoteInput): Promise<
 export async function deleteDocsNote(id: string): Promise<void> {
   const workspaceId = await requireWorkspace();
   const noteId = z.string().uuid().parse(id);
-  const [deleted] = await db.delete(notes).where(and(eq(notes.id, noteId), eq(notes.workspaceId, workspaceId))).returning({ id: notes.id });
-  if (!deleted) throw new Error("Document not found");
+  await db.transaction(async (tx) => {
+    await tx.update(inboxItems).set({ linkedNoteId: null }).where(eq(inboxItems.linkedNoteId, noteId));
+    const [deleted] = await tx.delete(notes).where(and(eq(notes.id, noteId), eq(notes.workspaceId, workspaceId))).returning({ id: notes.id });
+    if (!deleted) throw new Error("Document not found");
+  });
   await recordActivity(workspaceId, "note.deleted", {}, { id: noteId });
   revalidateDocsViews();
 }

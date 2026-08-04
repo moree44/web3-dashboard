@@ -13,7 +13,7 @@ type AuthShellProps = {
 
 export function AuthShell({ eyebrow, title, description, children, className }: AuthShellProps) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
+    <main className="flex min-h-screen items-center justify-center px-4 py-10 text-foreground">
       <section className={cn("w-full max-w-[420px]", className)}>
         <div className="mb-7">
           <span className="grid size-11 place-items-center rounded-xl border soft-divider bg-secondary text-foreground">

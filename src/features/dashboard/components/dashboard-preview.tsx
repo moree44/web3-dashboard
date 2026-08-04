@@ -5,36 +5,40 @@ import {
   ClipboardList,
   FileText,
   Inbox,
-  Plus,
   RadioTower,
   StickyNote,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { DashboardQuickCapture } from "@/features/dashboard/components/dashboard-quick-capture";
+
 import type { DeadlineOptions, UpcomingDeadlineItem } from "@/features/deadlines/actions";
 import type { DashboardData, DashboardInboxItem, DashboardNoteItem } from "@/features/dashboard/actions";
 import { DeadlineCreateButton } from "@/features/deadlines/components/deadline-create-button";
 import { formatDeadlineDueLabel, formatDeadlineTime, getDeadlineDayDifference, getJakartaDateValue, shiftDateValue } from "@/features/deadlines/deadline-utils";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const overviewMetrics = [
-  { label: "Projects", value: "38" },
-  { label: "Active", value: "31" },
-  { label: "Inbox", value: "4" },
-  { label: "Due", value: "6" },
-  { label: "Running", value: "3" },
-  { label: "Archived", value: "7" },
+type OverviewMetricKey = keyof DashboardData["metrics"] | "due";
+
+const overviewMetrics: Array<{ key: OverviewMetricKey; label: string; value: string; href: string }> = [
+  { key: "projects", label: "Projects", value: "38", href: "/projects" },
+  { key: "active", label: "Active", value: "31", href: "/projects" },
+  { key: "inbox", label: "Inbox", value: "4", href: "/inbox" },
+  { key: "due", label: "Due", value: "6", href: "/deadlines" },
+  { key: "running", label: "Running", value: "3", href: "/tasks?status=running" },
+  { key: "archived", label: "Archived", value: "7", href: "/archive" },
 ];
 
-const pulseItems = [
-  { label: "Testnet", value: "12", href: "/projects" },
-  { label: "Free Hunt", value: "14", href: "/projects?hunt=free_hunts" },
-  { label: "Retro", value: "6", href: "/projects?hunt=retro" },
-  { label: "NFT", value: "5", href: "/nfts" },
-  { label: "Waitlist", value: "8", href: "/projects?hunt=waitlist" },
+type PulseKey = keyof DashboardData["pulse"] | "nft";
+
+const pulseItems: Array<{ key: PulseKey; label: string; value: string; href: string }> = [
+  { key: "testnet", label: "Testnet", value: "12", href: "/projects" },
+  { key: "freeHunts", label: "Free Hunt", value: "14", href: "/projects?hunt=free_hunts" },
+  { key: "retro", label: "Retro", value: "6", href: "/projects?hunt=retro" },
+  { key: "nft", label: "NFT", value: "5", href: "/nfts" },
+  { key: "waitlist", label: "Waitlist", value: "8", href: "/projects?hunt=waitlist" },
 ];
 
 const inboxItems = [
@@ -70,6 +74,7 @@ export function DashboardPreview({
   nftCount,
   canManageDeadlines = false,
   dashboardData,
+  developmentPreview = false,
 }: {
   deadlineItems?: UpcomingDeadlineItem[];
   deadlineOptions?: DeadlineOptions;
@@ -77,15 +82,20 @@ export function DashboardPreview({
   nftCount?: number;
   canManageDeadlines?: boolean;
   dashboardData?: DashboardData;
+  developmentPreview?: boolean;
 } = {}) {
   const { dateLabel, headline, motivation } = getDashboardGreeting();
   const deadlines = deadlineItems ?? getFallbackDeadlines();
-  const metrics = overviewMetrics.map((metric) => metric.label === "Due" && deadlineDueCount !== undefined
-    ? { ...metric, value: String(deadlineDueCount) }
-    : metric);
-  const categories = pulseItems.map((item) => item.label === "NFT" && nftCount !== undefined
-    ? { ...item, value: String(nftCount) }
-    : item);
+  const metrics = overviewMetrics.map((metric) => {
+    if (metric.key === "due" && deadlineDueCount !== undefined) return { ...metric, value: String(deadlineDueCount) };
+    const liveValue = metric.key === "due" ? undefined : dashboardData?.metrics[metric.key];
+    return liveValue === undefined ? metric : { ...metric, value: String(liveValue) };
+  });
+  const categories = pulseItems.map((item) => {
+    if (item.key === "nft" && nftCount !== undefined) return { ...item, value: String(nftCount) };
+    const liveValue = item.key === "nft" ? undefined : dashboardData?.pulse[item.key];
+    return liveValue === undefined ? item : { ...item, value: String(liveValue) };
+  });
   const dashboardInboxItems = dashboardData?.inboxItems ?? inboxItems;
   const dashboardPinnedNotes = dashboardData?.pinnedNotes ?? pinnedNotes;
   const dashboardRecentNotes = dashboardData?.recentNotes ?? recentNotes;
@@ -102,18 +112,7 @@ export function DashboardPreview({
       </header>
 
 
-      <section className="soft-panel mt-3 grid gap-2 rounded-xl border border-white/[0.06] bg-card p-2 xl:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="soft-inset flex min-w-0 items-center gap-3 rounded-lg border border-white/[0.055] bg-input px-3 py-2.5">
-          <Plus className="size-4 text-muted-foreground" />
-          <span className="truncate text-[13px] text-muted-foreground">Capture project link, Twitter watchlist, note, or inbox item...</span>
-        </div>
-        <div className="grid grid-cols-4 gap-2 xl:flex">
-          <Link href="/projects" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "soft-control")}>Project</Link>
-          <Link href="/projects?view=watchlist" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "soft-control")}>Watchlist</Link>
-          <Link href="/docs" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "soft-control")}>Note</Link>
-          <Link href="/inbox" className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "soft-control")}>Inbox</Link>
-        </div>
-      </section>
+      <DashboardQuickCapture developmentPreview={developmentPreview} />
       <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_350px] 2xl:grid-cols-[minmax(420px,1fr)_minmax(340px,0.82fr)_350px]">
         <DashboardPanel icon={StickyNote} title="Notes desk" href="/docs">
           <SectionLabel label="Pinned notes" />
@@ -234,7 +233,7 @@ function SimpleRow({ title, meta }: { title: string; meta: string }) {
 
 function MetricTile({ item }: { item: (typeof overviewMetrics)[number] }) {
   return (
-    <Link href="/projects" className="rounded-lg bg-white/[0.035] px-3 py-2 hover:bg-white/[0.055]">
+    <Link href={item.href} className="rounded-lg bg-white/[0.035] px-3 py-2 hover:bg-white/[0.055]">
       <span className="block text-[11px] text-muted-foreground">{item.label}</span>
       <span className="mt-0.5 block text-[18px] font-semibold leading-none tabular-nums tracking-[-0.025em]">{item.value}</span>
     </Link>

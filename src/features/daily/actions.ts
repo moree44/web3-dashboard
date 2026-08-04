@@ -10,6 +10,7 @@ import { accounts, projectAccounts, projectWallets, taskAccounts, taskLogs, task
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { recordActivity } from "@/features/activity/activity-log";
 import { getTaskWorkspaceData } from "@/features/tasks/actions";
+import { getPersonalItems } from "@/features/personal/actions";
 import { isHttpUrl, normalizeHttpUrl } from "@/lib/url";
 
 import { getJakartaDateValue } from "@/features/tasks/task-duration";
@@ -62,21 +63,25 @@ function parseSelectedDate(value: string | undefined) {
 export async function getDailyPageData(selectedDate?: string): Promise<DailyPageData> {
   const workspaceId = await requireWorkspace();
   const date = parseSelectedDate(selectedDate);
-  const [taskData, dateLogs, completedOnceRows] = await Promise.all([
+  const [taskData, dateLogs, completedOnceRows, personalItems] = await Promise.all([
     getTaskWorkspaceData(),
     db.select().from(taskLogs).where(and(eq(taskLogs.workspaceId, workspaceId), eq(taskLogs.loggedDate, date))),
     db.select({ taskId: taskLogs.taskId, accountId: taskLogs.accountId }).from(taskLogs)
       .innerJoin(tasks, eq(taskLogs.taskId, tasks.id))
       .where(and(eq(taskLogs.workspaceId, workspaceId), eq(taskLogs.status, "done"), eq(tasks.frequency, "once"))),
+    getPersonalItems(),
   ]);
 
-  return buildDailyPageData({
+  return {
+    ...buildDailyPageData({
     tasks: taskData.tasks,
     accounts: taskData.accounts,
     selectedDate: date,
     logs: dateLogs.map(toDailyTaskLogRecord),
     completedOnceLogKeys: new Set(completedOnceRows.flatMap((row) => row.accountId ? [dailyLogKey(row.taskId, row.accountId)] : [])),
-  });
+  }),
+    personalItems,
+  };
 }
 
 async function validateDailyLogRelations(

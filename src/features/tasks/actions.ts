@@ -16,6 +16,7 @@ import {
   tasks,
   taskWallets,
   wallets,
+  personalItems,
 } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { recordActivity } from "@/features/activity/activity-log";
@@ -110,7 +111,7 @@ function hasPostgresCode(error: unknown, code: string) {
 }
 
 async function loadTaskWorkspaceData(workspaceId: string): Promise<TaskWorkspaceData> {
-  const [taskRows, projectRows, accountRows, projectAccountRows, projectWalletRows, taskAccountRows, taskWalletRows] = await Promise.all([
+  const [taskRows, projectRows, accountRows, projectAccountRows, projectWalletRows, taskAccountRows, taskWalletRows, personalRows] = await Promise.all([
     db.select().from(tasks).where(eq(tasks.workspaceId, workspaceId)).orderBy(asc(tasks.sortOrder), desc(tasks.updatedAt)),
     db.select({ id: projects.id, name: projects.name, logoUrl: projects.logoUrl })
       .from(projects)
@@ -140,6 +141,7 @@ async function loadTaskWorkspaceData(workspaceId: string): Promise<TaskWorkspace
       .innerJoin(tasks, eq(taskWallets.taskId, tasks.id))
       .innerJoin(wallets, eq(taskWallets.walletId, wallets.id))
       .where(and(eq(tasks.workspaceId, workspaceId), eq(wallets.workspaceId, workspaceId))),
+    db.select().from(personalItems).where(eq(personalItems.workspaceId, workspaceId)).orderBy(asc(personalItems.status), asc(personalItems.createdAt)),
   ]);
 
   const accountsByProject = new Map<string, TaskAccountOption[]>();
@@ -205,7 +207,17 @@ async function loadTaskWorkspaceData(workspaceId: string): Promise<TaskWorkspace
     }];
   });
 
-  return { tasks: records, projects: projectOptions, accounts: accountRows };
+  const personalRecords = personalRows.map((item) => ({
+    id: item.id,
+    title: item.title,
+    frequency: item.frequency ?? "once",
+    status: item.status ?? "todo",
+    note: item.note,
+    createdAt: item.createdAt?.toISOString() ?? null,
+    updatedAt: item.updatedAt?.toISOString() ?? null,
+  }));
+
+  return { tasks: records, projects: projectOptions, accounts: accountRows, personalItems: personalRecords };
 }
 
 async function validateAssignments(

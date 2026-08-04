@@ -5,7 +5,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db/client";
-import { accounts, projectAccounts, projects, wallets, walletGroups } from "@/lib/db/schema";
+import { accounts, notes, projectAccounts, projectWallets, projects, taskAccounts, taskLogs, taskWallets, wallets, walletGroups } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { recordActivity } from "@/features/activity/activity-log";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -149,9 +149,14 @@ export async function updateAccount(
 export async function deleteAccount(id: string): Promise<void> {
   const { workspaceId } = await requireWorkspace();
 
-  await db
-    .delete(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.workspaceId, workspaceId)));
+  await db.transaction(async (tx) => {
+    await tx.delete(projectAccounts).where(eq(projectAccounts.accountId, id));
+    await tx.delete(taskAccounts).where(eq(taskAccounts.accountId, id));
+    await tx.update(wallets).set({ ownerAccountId: null }).where(eq(wallets.ownerAccountId, id));
+    await tx.update(taskLogs).set({ accountId: null }).where(eq(taskLogs.accountId, id));
+    await tx.update(notes).set({ linkedAccountId: null }).where(eq(notes.linkedAccountId, id));
+    await tx.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.workspaceId, workspaceId)));
+  });
 
   await recordActivity(workspaceId, "account.deleted", {}, { id });
   revalidateAccountViews();
@@ -256,9 +261,13 @@ export async function updateWallet(
 export async function deleteWallet(id: string): Promise<void> {
   const { workspaceId } = await requireWorkspace();
 
-  await db
-    .delete(wallets)
-    .where(and(eq(wallets.id, id), eq(wallets.workspaceId, workspaceId)));
+  await db.transaction(async (tx) => {
+    await tx.delete(projectWallets).where(eq(projectWallets.walletId, id));
+    await tx.delete(taskWallets).where(eq(taskWallets.walletId, id));
+    await tx.update(taskLogs).set({ walletId: null }).where(eq(taskLogs.walletId, id));
+    await tx.update(notes).set({ linkedWalletId: null }).where(eq(notes.linkedWalletId, id));
+    await tx.delete(wallets).where(and(eq(wallets.id, id), eq(wallets.workspaceId, workspaceId)));
+  });
 
   await recordActivity(workspaceId, "wallet.deleted", {}, { id });
   revalidateAccountViews();
@@ -314,9 +323,10 @@ export async function updateWalletGroup(
 export async function deleteWalletGroup(id: string): Promise<void> {
   const { workspaceId } = await requireWorkspace();
 
-  await db
-    .delete(walletGroups)
-    .where(and(eq(walletGroups.id, id), eq(walletGroups.workspaceId, workspaceId)));
+  await db.transaction(async (tx) => {
+    await tx.update(wallets).set({ walletGroupId: null }).where(eq(wallets.walletGroupId, id));
+    await tx.delete(walletGroups).where(and(eq(walletGroups.id, id), eq(walletGroups.workspaceId, workspaceId)));
+  });
 
   await recordActivity(workspaceId, "wallet_group.deleted", {}, { id });
   revalidateAccountViews();
