@@ -33,3 +33,6 @@ next-env.d.ts
 
 # local diagnostic artifacts
 /tmp-*-report.txt
+
+# scratch screenshots (keep out of the repo)
+Screenshot*.png
