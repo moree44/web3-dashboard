@@ -22,8 +22,14 @@ async function goto(page: Page, path: string) {
   await page.waitForTimeout(400);
 }
 
+// Convert any stale-element click into a fast BUG line instead of an unbounded
+// wait that hangs the whole test (Playwright actions default to no timeout).
+test.use({ actionTimeout: 10000 });
+
 test("manual recheck pass", async ({ page }) => {
-  test.setTimeout(180000);
+  // Dev-mode Turbopack is slower than a prod build; the full route + interaction
+  // sweep needs more than 3 minutes.
+  test.setTimeout(360000);
 
   // 1 Shell routes
   const routes = [
@@ -51,27 +57,21 @@ test("manual recheck pass", async ({ page }) => {
     });
   }
 
-  // 2 Dashboard capture links
-  await soft("Dashboard capture → Project", async () => {
+  // 2 Dashboard capture strip (since the Aug 4 pilot these are local intent
+  // toggles, not navigation links — assert the toggle behavior itself)
+  await soft("Dashboard capture strip intents", async () => {
     await goto(page, "/");
-    await page.getByRole("link", { name: "Project", exact: true }).click();
-    await expect(page).toHaveURL(/\/projects$/);
+    for (const label of ["Project", "Watchlist", "Note", "Inbox"]) {
+      const intent = page.getByRole("button", { name: label, exact: true });
+      await expect(intent).toBeVisible();
+      await intent.click();
+      await expect(intent).toHaveAttribute("aria-pressed", "true");
+    }
   });
-  await soft("Dashboard capture → Watchlist", async () => {
+  await soft("Sidebar → Watchlist", async () => {
     await goto(page, "/");
-    // Capture strip uses soft-control; sidebar also has Watchlist.
-    await page.locator("a.soft-control", { hasText: "Watchlist" }).click();
+    await page.getByRole("link", { name: "Watchlist", exact: true }).click();
     await expect(page).toHaveURL(/view=watchlist/);
-  });
-  await soft("Dashboard capture → Note", async () => {
-    await goto(page, "/");
-    await page.getByRole("link", { name: "Note", exact: true }).click();
-    await expect(page).toHaveURL(/\/docs/);
-  });
-  await soft("Dashboard capture → Inbox", async () => {
-    await goto(page, "/");
-    await page.getByRole("link", { name: "Inbox", exact: true }).first().click();
-    await expect(page).toHaveURL(/\/inbox/);
   });
 
   // 3 Projects
@@ -116,10 +116,17 @@ test("manual recheck pass", async ({ page }) => {
     await expect(dialog).toHaveCount(0);
   });
 
-  await soft("Projects dead filters are disabled", async () => {
+  await soft("Projects filters functional", async () => {
     await goto(page, "/projects");
-    await expect(page.getByRole("button", { name: /Status: Active/i })).toBeDisabled();
-    await expect(page.getByRole("button", { name: /More filters/i })).toBeDisabled();
+    // status filter AppSelect opens a portaled listbox
+    await page.getByRole("button", { name: "Filter by status" }).click();
+    await expect(page.getByRole("listbox", { name: "Filter by status" })).toBeVisible();
+    await expect(page.getByRole("option").first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    // More filters toggles the extended filter panel
+    await page.getByRole("button", { name: "More filters" }).click();
+    await expect(page.getByText("Priority").first()).toBeVisible();
   });
 
   // 4 Tasks
@@ -159,19 +166,12 @@ test("manual recheck pass", async ({ page }) => {
   await soft("Tasks detail drawer open/close", async () => {
     await goto(page, "/tasks");
     await page.getByRole("button", { name: /^List/i }).click();
-    // click first task identity-ish button/row
+    // the open handler lives on the task-identity button inside the first row cell
     const row = page.locator("tbody tr").first();
-    if (await row.count()) {
-      await row.click();
-    } else {
-      await page.locator("button, [role='button']").filter({ hasText: /.+/ }).nth(5).click();
-    }
+    await expect(row).toBeVisible();
+    await row.locator("button").first().click();
     const dialog = page.getByRole("dialog");
-    // may need a more reliable open - try clicking task title text area
-    if ((await dialog.count()) === 0) {
-      await page.getByText(/Submit|Daily|Claim|Check/i).first().click();
-    }
-    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
+    await expect(dialog).toBeVisible({ timeout: 5000 });
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
@@ -181,7 +181,6 @@ test("manual recheck pass", async ({ page }) => {
     await goto(page, "/daily");
     await page.getByRole("button", { name: /By account/i }).click();
     await page.getByRole("button", { name: /By project/i }).click();
-    await page.getByRole("button", { name: /Personal/i }).click();
     await page.getByRole("button", { name: /By account/i }).click();
     // expand first section if collapsed
     const section = page.locator("section").filter({ hasText: "Moree" }).first();
@@ -217,38 +216,30 @@ test("manual recheck pass", async ({ page }) => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
-  await soft("Accounts Add account disabled", async () => {
+  await soft("Accounts Add account opens modal", async () => {
     await goto(page, "/accounts");
-    await expect(page.getByRole("button", { name: /Add account/i })).toBeDisabled();
+    await page.getByRole("button", { name: /Add account/i }).click();
+    await expect(page.getByRole("heading", { name: "New Account" })).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("heading", { name: "New Account" })).toHaveCount(0);
   });
 
   // 7 Inbox selection
-  await soft("Inbox row selection updates side panel", async () => {
+  await soft("Inbox empty preview state", async () => {
     await goto(page, "/inbox");
-    const firstTitle = "Waitlist result copied manually";
-    const secondTitle = "Project link from X";
-    await expect(page.getByRole("heading", { name: firstTitle })).toBeVisible();
-    await page.getByRole("button", { name: new RegExp(secondTitle) }).click();
-    await expect(page.getByRole("heading", { name: secondTitle })).toBeVisible();
-    await page.getByRole("button", { name: new RegExp(firstTitle) }).click();
-    await expect(page.getByRole("heading", { name: firstTitle })).toBeVisible();
-  });
-
-  await soft("Inbox dead actions disabled", async () => {
-    await goto(page, "/inbox");
-    await expect(page.getByRole("button", { name: /Capture item/i })).toBeDisabled();
-    // Side panel actions only (list rows also contain "Create task" labels for selection).
-    const side = page.locator("aside").last();
-    await expect(side.getByRole("button", { name: /Create Project/i })).toBeDisabled();
-    await expect(side.getByRole("button", { name: /Create Task/i })).toBeDisabled();
-    await expect(side.getByRole("button", { name: /^Archive$/i })).toBeDisabled();
+    // preview mode renders the empty InboxWorkspace — no items to process
+    await expect(page.getByRole("heading", { name: "Select an item to process it" })).toBeVisible();
+    const capture = page.getByRole("button", { name: /Capture item/i });
+    // toolbar Capture stays disabled (no selection); the empty-state stub is enabled
+    expect(await capture.count()).toBe(2);
+    const disabledCount = await capture.evaluateAll((btns) => btns.filter((b) => (b as HTMLButtonElement).disabled).length);
+    expect(disabledCount).toBe(1);
   });
 
   // 8 Docs honesty
-  await soft("Docs create/filter disabled", async () => {
+  await soft("Docs create disabled in preview", async () => {
     await goto(page, "/docs");
     await expect(page.getByRole("button", { name: /New doc/i })).toBeDisabled();
-    await expect(page.getByRole("button", { name: /Quick add/i })).toBeDisabled();
   });
 
   // 9 Archive restore + search

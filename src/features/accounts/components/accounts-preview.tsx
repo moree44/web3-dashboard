@@ -7,23 +7,13 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/app-select";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import { cn } from "@/lib/utils";
 import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
+import { usePresence } from "@/lib/use-presence";
 import { normalizeHttpUrl } from "@/lib/url";
-import {
-  createAccount,
-  createWallet,
-  createWalletGroup,
-  deleteAccount,
-  deleteWallet,
-  deleteWalletGroup,
-  setAccountAvatarUrl,
-  updateAccount,
-  updateWalletGroup,
-  updateWallet,
-  uploadAccountAvatar,
-  type AccountWithStats,
-} from "@/features/accounts/actions";
+import type { AccountWithStats, AccountsWorkspaceData } from "@/features/accounts/actions";
+import { useAccountsMutations, useAccountsWorkspace } from "@/features/accounts/accounts-query";
 import type { wallets as walletsSchema, walletGroups as walletGroupsSchema } from "@/lib/db/schema";
 
 type DbAccount = AccountWithStats;
@@ -114,114 +104,73 @@ function dbToUIGroup(record: DbWalletGroup): UIGroup {
   };
 }
 
-const fallbackAccounts: Account[] = [
-  {
-    name: "Moree",
-    handle: "@moree",
-    discord: "moree.web3",
-    email: "tracking only",
-    avatar: "M",
-    projects: 12,
-    tasks: 8,
-    wallets: ["Moree EVM Main", "Moree SOL Main", "Moree Burner 01"],
-    activeProjects: ["Soundness", "NexusHQ", "Drosera", "GensynAI"],
-  },
-  {
-    name: "Wdym",
-    handle: "@wdym",
-    discord: "wdym.web3",
-    email: "tracking only",
-    avatar: "W",
-    projects: 9,
-    tasks: 6,
-    wallets: ["Wdym EVM Main", "Wdym SOL Main"],
-    activeProjects: ["Linera", "Huddle01", "Dawn"],
-  },
-  {
-    name: "Wayss",
-    handle: "not linked",
-    discord: "wayss.web3",
-    email: "tracking only",
-    avatar: "W",
-    projects: 4,
-    tasks: 3,
-    wallets: ["Wayss EVM Main"],
-    activeProjects: ["Perle Labs", "Konnex World"],
-  },
-];
-
-const fallbackWallets: Wallet[] = [
-  { label: "Moree EVM Main", owner: "Moree", group: "Main", chain: "EVM", type: "main", used: 14, address: "0x84...91fa", usedIn: ["Soundness", "Drosera", "GensynAI"], recentActivity: ["Marked Soundness proof done", "Added Drosera operator note"] },
-  { label: "Moree SOL Main", owner: "Moree", group: "Main", chain: "Solana", type: "main", used: 5, address: "9xQ...p2L", usedIn: ["Perle Labs", "ORO AI"], recentActivity: ["Saved wallet warm-up note", "Linked to Perle Labs"] },
-  { label: "Wdym EVM Main", owner: "Wdym", group: "Main", chain: "EVM", type: "main", used: 11, address: "0x2b...77ac", usedIn: ["Linera", "Huddle01", "Dawn"], recentActivity: ["Completed Galxe quest", "Checked waitlist result"] },
-  { label: "L1 Wallet 02", owner: "none", group: "L1", chain: "EVM", type: "l1", used: 3, address: "0x51...c19d", usedIn: ["Retro Bridge Alpha", "NFT Mint C"], recentActivity: ["Submitted retro interaction", "Saved proof URL"] },
-  { label: "Soundness Project Wallet", owner: "Moree", group: "Project Specific", chain: "EVM", type: "project_wallet", used: 1, address: "0xae...4410", usedIn: ["Soundness"], recentActivity: ["Generated project address", "Stored key location hint"] },
-];
-
-const fallbackGroups: UIGroup[] = [
-  { name: "Main", description: "Primary wallets owned by personas", wallets: 4, projects: 25 },
-  { name: "L1", description: "Random L1 wallets not tied to a persona", wallets: 8, projects: 6 },
-  { name: "Burner", description: "Temporary wallets for low-trust campaigns", wallets: 3, projects: 2 },
-  { name: "Project Specific", description: "Wallets created for one project", wallets: 5, projects: 5 },
-];
-
 export function AccountsPreview({
-  initialAccounts,
-  initialWallets,
-  initialWalletGroups,
+  initialData,
   developmentPreview,
 }: {
-  initialAccounts: DbAccount[];
-  initialWallets: DbWallet[];
-  initialWalletGroups: DbWalletGroup[];
+  initialData: AccountsWorkspaceData;
   developmentPreview: boolean;
 }) {
+  const { data: queryData } = useAccountsWorkspace(initialData, developmentPreview);
+  const workspace = queryData ?? initialData;
+
+  const [activeTab, setActiveTab] = useState<AccountTab>("Identities");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
+  const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<UIGroup | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutations = useAccountsMutations({
+    developmentPreview,
+    onError: (message) => setError(message),
+  });
+
   const accountNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const a of initialAccounts) map.set(a.id, a.label);
+    for (const account of workspace.accounts) map.set(account.id, account.label);
     return map;
-  }, [initialAccounts]);
+  }, [workspace.accounts]);
 
   const groupNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const g of initialWalletGroups) map.set(g.id, g.name);
+    for (const group of workspace.walletGroups) map.set(group.id, group.name);
     return map;
-  }, [initialWalletGroups]);
+  }, [workspace.walletGroups]);
 
-  const [activeTab, setActiveTab] = useState<AccountTab>("Identities");
   const walletLabelsByAccountId = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const wallet of initialWallets) {
+    for (const wallet of workspace.wallets) {
       if (!wallet.ownerAccountId) continue;
       const current = map.get(wallet.ownerAccountId) ?? [];
       current.push(wallet.label);
       map.set(wallet.ownerAccountId, current);
     }
     return map;
-  }, [initialWallets]);
+  }, [workspace.wallets]);
 
-  const [accountItems, setAccountItems] = useState<Account[]>(() =>
-    developmentPreview
-      ? fallbackAccounts
-      : initialAccounts.map((account) => dbToUI(account, walletLabelsByAccountId.get(account.id) ?? [])),
+  const accountItems = useMemo(
+    () => workspace.accounts.map((account) => dbToUI(account, walletLabelsByAccountId.get(account.id) ?? [])),
+    [workspace.accounts, walletLabelsByAccountId],
   );
-  const [walletItems, setWalletItems] = useState<Wallet[]>(() =>
-    developmentPreview
-      ? fallbackWallets
-      : initialWallets.map((w) => dbToUIWallet(w, accountNameMap, groupNameMap)),
+  const walletItems = useMemo(
+    () => workspace.wallets.map((wallet) => dbToUIWallet(wallet, accountNameMap, groupNameMap)),
+    [workspace.wallets, accountNameMap, groupNameMap],
   );
-  const [groupItems, setGroupItems] = useState<UIGroup[]>(() =>
-    developmentPreview
-      ? fallbackGroups
-      : initialWalletGroups.map(dbToUIGroup),
+  const groupItems = useMemo(() => workspace.walletGroups.map(dbToUIGroup), [workspace.walletGroups]);
+
+  const selectedAccount = useMemo(
+    () => accountItems.find((account) => account.id === selectedAccountId) ?? null,
+    [accountItems, selectedAccountId],
   );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
-  const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<UIGroup | null>(null);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-  const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
+  const selectedWallet = useMemo(
+    () => walletItems.find((wallet) => wallet.id === selectedWalletId) ?? null,
+    [walletItems, selectedWalletId],
+  );
+
   const query = searchQuery.trim().toLowerCase();
 
   const filteredAccounts = useMemo(() => {
@@ -251,255 +200,121 @@ export function AccountsPreview({
   function openAccountByName(name: string) {
     const account = accountItems.find((item) => item.name === name);
     if (account) {
-      setSelectedWallet(null);
-      setSelectedAccount(account);
+      setSelectedWalletId(null);
+      setSelectedAccountId(account.id ?? null);
     }
   }
 
   function openWallet(wallet: Wallet) {
-    setSelectedAccount(null);
-    setSelectedWallet(wallet);
-  }
-
-  function bumpAccountWallet(accountId: string | undefined, accountName: string, walletLabel: string) {
-    setAccountItems((items) =>
-      items.map((account) => {
-        if (account.id !== accountId && account.name !== accountName) return account;
-        if (account.wallets.includes(walletLabel)) return account;
-        return { ...account, wallets: [...account.wallets, walletLabel] };
-      }),
-    );
-    setSelectedAccount((current) => {
-      if (!current) return current;
-      if (current.id !== accountId && current.name !== accountName) return current;
-      if (current.wallets.includes(walletLabel)) return current;
-      return { ...current, wallets: [...current.wallets, walletLabel] };
-    });
+    setSelectedAccountId(null);
+    setSelectedWalletId(wallet.id ?? null);
   }
 
   async function addWalletForAccount(accountName: string, input: { label: string; chain: string; type: string }) {
-    const account = accountItems.find((a) => a.name === accountName);
-    if (account?.id && !developmentPreview) {
-      const created = await createWallet({
+    const account = accountItems.find((item) => item.name === accountName);
+    if (!account?.id) return;
+    await mutations.createWalletMutation.mutateAsync({
+      data: {
         label: input.label,
         address: "pending",
         chainType: input.chain,
         walletType: input.type as "main" | "project_wallet" | "burner" | "l1" | "testnet" | "retro" | "nft" | "other",
         ownerAccountId: account.id,
-      });
-      setWalletItems((items) => [
-        dbToUIWallet(created, accountNameMap, groupNameMap),
-        ...items,
-      ]);
-      bumpAccountWallet(account.id, accountName, created.label);
-    } else {
-      const newWallet: Wallet = {
-        label: input.label,
-        owner: accountName,
-        ownerId: account?.id,
-        group: input.type === "project_wallet" ? "Project Specific" : "Main",
-        chain: input.chain,
-        type: input.type,
-        used: 0,
-        address: "Add address later",
-        usedIn: [],
-        recentActivity: ["Created from account detail"],
-      };
-      setWalletItems((items) => [newWallet, ...items]);
-      bumpAccountWallet(account?.id, accountName, input.label);
-    }
+      },
+    });
   }
 
   async function handleCreateAccount(data: { label: string; xUsername: string; discordUsername: string; email: string }) {
-    if (!developmentPreview) {
-      const created = await createAccount({
+    await mutations.createAccountMutation.mutateAsync({
+      data: {
         label: data.label,
         xUsername: data.xUsername || undefined,
         discordUsername: data.discordUsername || undefined,
         email: data.email || undefined,
         avatarSource: "none",
-      });
-      setAccountItems((items) => [dbToUI(created), ...items]);
-    } else {
-      const newAccount: Account = {
-        name: data.label,
-        handle: data.xUsername || "not linked",
-        discord: data.discordUsername || "",
-        email: data.email || "tracking only",
-        avatar: data.label.slice(0, 1).toUpperCase(),
-        projects: 0,
-        tasks: 0,
-        wallets: [],
-        activeProjects: [],
-      };
-      setAccountItems((items) => [newAccount, ...items]);
-    }
+      },
+    });
     setIsAddOpen(false);
   }
 
   async function handleCreateWallet(data: { label: string; address: string; chainType: string; walletType: string; ownerAccountId?: string }) {
-    if (!developmentPreview) {
-      const created = await createWallet({
+    await mutations.createWalletMutation.mutateAsync({
+      data: {
         label: data.label,
         address: data.address,
         chainType: data.chainType || undefined,
         walletType: data.walletType as "main" | "project_wallet" | "burner" | "l1" | "testnet" | "retro" | "nft" | "other",
         ownerAccountId: data.ownerAccountId || undefined,
-      });
-      setWalletItems((items) => [
-        dbToUIWallet(created, accountNameMap, groupNameMap),
-        ...items,
-      ]);
-    } else {
-      const newWallet: Wallet = {
-        label: data.label,
-        owner: data.ownerAccountId ? (accountNameMap.get(data.ownerAccountId) ?? "none") : "none",
-        group: "uncategorized",
-        chain: data.chainType || "EVM",
-        type: data.walletType || "main",
-        used: 0,
-        address: data.address,
-        usedIn: [],
-        recentActivity: [],
-      };
-      setWalletItems((items) => [newWallet, ...items]);
-    }
+      },
+    });
     setIsAddWalletOpen(false);
   }
 
   async function handleDeleteAccount(id: string) {
-    if (!id || !confirm("Delete this account?")) return;
-    if (!developmentPreview) await deleteAccount(id);
-    setAccountItems((items) => items.filter((a) => a.id !== id));
-    setSelectedAccount(null);
-  }
-
-  function applyAccountUpdate(updated: DbAccount) {
-    const walletLabels = walletItems
-      .filter((wallet) => wallet.ownerId === updated.id)
-      .map((wallet) => wallet.label);
-    const mapped = dbToUI(updated, walletLabels);
-    setAccountItems((items) => items.map((a) => (a.id === updated.id ? mapped : a)));
-    setSelectedAccount((current) => (current?.id === updated.id ? mapped : current));
-    return mapped;
+    if (!id) return;
+    try {
+      await mutations.deleteAccountMutation.mutateAsync(id);
+    } catch {
+      // Error is surfaced through the mutation onError handler; keep the
+      // drawer open so the user can retry.
+      return;
+    }
+    setSelectedAccountId(null);
   }
 
   async function handleUpdateAccount(
     id: string,
     data: { label?: string; xUsername?: string; discordUsername?: string; email?: string },
   ) {
-    if (developmentPreview) {
-      setAccountItems((items) =>
-        items.map((account) =>
-          account.id === id
-            ? {
-                ...account,
-                name: data.label ?? account.name,
-                handle: data.xUsername ?? account.handle,
-                discord: data.discordUsername ?? account.discord,
-                email: data.email ?? account.email,
-                avatar: (data.label ?? account.name).slice(0, 1).toUpperCase(),
-              }
-            : account,
-        ),
-      );
-      setSelectedAccount((current) =>
-        current?.id === id
-          ? {
-              ...current,
-              name: data.label ?? current.name,
-              handle: data.xUsername ?? current.handle,
-              discord: data.discordUsername ?? current.discord,
-              email: data.email ?? current.email,
-              avatar: (data.label ?? current.name).slice(0, 1).toUpperCase(),
-            }
-          : current,
-      );
-      return;
-    }
-
-    const updated = await updateAccount(id, data);
-    applyAccountUpdate(updated);
+    await mutations.updateAccountMutation.mutateAsync({ id, data });
   }
 
   async function handleUploadAvatar(id: string, file: File) {
-    if (developmentPreview) {
-      const previewUrl = URL.createObjectURL(file);
-      setAccountItems((items) =>
-        items.map((account) => (account.id === id ? { ...account, avatarUrl: previewUrl } : account)),
-      );
-      setSelectedAccount((current) =>
-        current?.id === id ? { ...current, avatarUrl: previewUrl } : current,
-      );
-      return;
-    }
-    const updated = await uploadAccountAvatar(id, (() => {
-      const formData = new FormData();
-      formData.set("file", file);
-      return formData;
-    })());
-    applyAccountUpdate(updated);
+    await mutations.uploadAccountAvatarMutation.mutateAsync({ id, file });
   }
 
   async function handleSetAvatarUrl(id: string, url: string) {
-    const normalized = normalizeHttpUrl(url);
-    if (developmentPreview) {
-      setAccountItems((items) =>
-        items.map((account) => (account.id === id ? { ...account, avatarUrl: normalized || undefined } : account)),
-      );
-      setSelectedAccount((current) =>
-        current?.id === id ? { ...current, avatarUrl: normalized || undefined } : current,
-      );
-      return;
-    }
-    const updated = await setAccountAvatarUrl(id, normalized);
-    applyAccountUpdate(updated);
+    await mutations.setAccountAvatarUrlMutation.mutateAsync({ id, url: normalizeHttpUrl(url) });
   }
 
   async function handleDeleteWallet(id: string) {
-    if (!id || !confirm("Delete this wallet?")) return;
-    await deleteWallet(id);
-    setWalletItems((items) => items.filter((w) => w.id !== id));
-    setSelectedWallet(null);
+    if (!id) return;
+    try {
+      await mutations.deleteWalletMutation.mutateAsync(id);
+    } catch {
+      // Error is surfaced through the mutation onError handler; keep the
+      // drawer open so the user can retry.
+      return;
+    }
+    setSelectedWalletId(null);
   }
 
   async function handleUpdateWallet(id: string, data: Partial<Omit<typeof walletsSchema.$inferInsert, "workspaceId">>) {
-    const updated = await updateWallet(id, data);
-    setWalletItems((items) => items.map((w) => (w.id === id ? dbToUIWallet(updated, accountNameMap, groupNameMap) : w)));
-    if (selectedWallet?.id === id) {
-      setSelectedWallet(dbToUIWallet(updated, accountNameMap, groupNameMap));
-    }
+    await mutations.updateWalletMutation.mutateAsync({ id, data });
   }
 
   async function handleDeleteGroup(id: string) {
-    if (!id || !confirm("Delete this group?")) return;
-    await deleteWalletGroup(id);
-    setGroupItems((items) => items.filter((g) => g.id !== id));
+    if (!id) return;
+    try {
+      await mutations.deleteWalletGroupMutation.mutateAsync(id);
+    } catch {
+      // Error is surfaced through the mutation onError handler; the row stays
+      // in place so the user can retry.
+    }
   }
 
   async function handleCreateGroup(data: { name: string; description: string }) {
-    if (!developmentPreview) {
-      const created = await createWalletGroup({
+    await mutations.createWalletGroupMutation.mutateAsync({
+      data: {
         name: data.name,
         description: data.description || undefined,
-      });
-      setGroupItems((items) => [dbToUIGroup(created), ...items]);
-    } else {
-      setGroupItems((items) => [
-        { name: data.name, description: data.description, wallets: 0, projects: 0 },
-        ...items,
-      ]);
-    }
+      },
+    });
     setIsAddGroupOpen(false);
   }
 
   async function handleUpdateGroup(id: string, data: { name: string; description: string }) {
-    if (developmentPreview) {
-      setGroupItems((items) => items.map((group) => group.id === id ? { ...group, ...data } : group));
-    } else {
-      const updated = await updateWalletGroup(id, { name: data.name, description: data.description || null });
-      setGroupItems((items) => items.map((group) => group.id === id ? dbToUIGroup(updated) : group));
-    }
+    await mutations.updateWalletGroupMutation.mutateAsync({ id, data: { name: data.name, description: data.description || null } });
     setEditingGroup(null);
   }
 
@@ -511,6 +326,8 @@ export function AccountsPreview({
         </div>
         <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add account</Button>
       </header>
+
+      {error ? <div role="alert" className="mx-4 mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive sm:mx-6 lg:mx-8">{error}</div> : null}
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
         <div className="scrollbar-subtle flex gap-1 overflow-x-auto py-2.5">
@@ -548,7 +365,7 @@ export function AccountsPreview({
       {activeTab === "Identities" ? (
         <IdentitiesView
           accounts={filteredAccounts}
-          onOpenAccount={setSelectedAccount}
+          onOpenAccount={(account) => setSelectedAccountId(account.id ?? null)}
           onDeleteAccount={handleDeleteAccount}
           onUploadAvatar={handleUploadAvatar}
           onSetAvatarUrl={handleSetAvatarUrl}
@@ -564,7 +381,7 @@ export function AccountsPreview({
       <AccountDetailPanel
         account={selectedAccount}
         walletItems={walletItems}
-        onClose={() => setSelectedAccount(null)}
+        onClose={() => setSelectedAccountId(null)}
         onOpenWallet={openWallet}
         onAddWallet={addWalletForAccount}
         onUpdateAccount={handleUpdateAccount}
@@ -572,7 +389,7 @@ export function AccountsPreview({
         onUploadAvatar={handleUploadAvatar}
         onSetAvatarUrl={handleSetAvatarUrl}
       />
-      <WalletDetailPanel wallet={selectedWallet} onClose={() => setSelectedWallet(null)} onOpenAccount={openAccountByName} onUpdate={handleUpdateWallet} onDelete={handleDeleteWallet} accountItems={accountItems} groupItems={groupItems} />
+      <WalletDetailPanel wallet={selectedWallet} onClose={() => setSelectedWalletId(null)} onOpenAccount={openAccountByName} onUpdate={handleUpdateWallet} onDelete={handleDeleteWallet} accountItems={accountItems} groupItems={groupItems} />
     </div>
   );
 }
@@ -616,7 +433,7 @@ function TiltCard({ children, className, onClick }: { children: ReactNode; class
   }
 
   return (
-    <div ref={wrapperRef} className="t-tilt" onPointerMove={handlePointerMove} onPointerLeave={handlePointerLeave}>
+    <div ref={wrapperRef} className="t-tilt row-enter-in" onPointerMove={handlePointerMove} onPointerLeave={handlePointerLeave}>
       <article ref={cardRef} onClick={onClick} className={cn("t-tilt-card cursor-pointer rounded-xl bg-card/80 p-4 soft-panel transition-colors hover:bg-white/[0.032]", className)}>
         {children}
         <span className="t-tilt-glare" aria-hidden="true" />
@@ -649,8 +466,8 @@ function IdentitiesView({
               <div className="relative">
                 <button onClick={(event) => { event.stopPropagation(); setMenuOpen(menuOpen === account.name ? null : account.name); }} aria-label={"More options for " + account.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
                 {menuOpen === account.name ? (
-                  <div className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                    <button onClick={(event) => { event.stopPropagation(); setMenuOpen(null); if (account.id) onDeleteAccount(account.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+                  <div onClick={(event) => event.stopPropagation()} className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
+                    <ConfirmDelete onConfirm={() => { setMenuOpen(null); if (account.id) onDeleteAccount(account.id); }} className="px-3 py-1.5" />
                   </div>
                 ) : null}
               </div>
@@ -715,7 +532,7 @@ function WalletsView({ walletItems, onOpenWallet, onDeleteWallet }: { walletItem
 function WalletRow({ wallet, onOpen, onDelete }: { wallet: Wallet; onOpen: () => void; onDelete: (id: string) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <tr onClick={onOpen} className="h-[58px] cursor-pointer border-b border-white/[0.035] hover:bg-white/[0.025]">
+    <tr onClick={onOpen} className="row-enter-in h-[58px] cursor-pointer border-b border-white/[0.035] hover:bg-white/[0.025]">
       <td className="px-4 lg:px-8">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/[0.065] text-[11px] font-bold text-[#c4cad3]"><CreditCard className="size-4" /></span>
@@ -734,8 +551,8 @@ function WalletRow({ wallet, onOpen, onDelete }: { wallet: Wallet; onOpen: () =>
         <div className="relative">
           <button onClick={(event) => { event.stopPropagation(); setMenuOpen(!menuOpen); }} aria-label={"More options for " + wallet.label} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
           {menuOpen ? (
-            <div className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-              <button onClick={(event) => { event.stopPropagation(); setMenuOpen(false); if (wallet.id) onDelete(wallet.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+            <div onClick={(event) => event.stopPropagation()} className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
+              <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (wallet.id) onDelete(wallet.id); }} className="px-3 py-1.5" />
             </div>
           ) : null}
         </div>
@@ -779,8 +596,15 @@ function AccountDetailPanel({
 
   useDrawerDismiss(onClose, Boolean(account));
 
-  if (!account) return null;
-  const current = account;
+  const lastAccount = useRef<Account | null>(account);
+  useEffect(() => {
+    if (account) lastAccount.current = account;
+  }, [account]);
+  const { mounted, closing } = usePresence(Boolean(account), 260);
+  if (!mounted) return null;
+  const currentCandidate = account ?? lastAccount.current;
+  if (!currentCandidate) return null;
+  const current: Account = currentCandidate;
 
   const accountName = current.name;
   const ownedWallets = walletItems.filter((wallet) =>
@@ -821,14 +645,14 @@ function AccountDetailPanel({
 
   return (
     <div
-      className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]"
+      className={cn("fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]", closing ? "drawer-backdrop-out" : "drawer-backdrop-in")}
       role="dialog"
       aria-modal="true"
       aria-labelledby="account-detail-title"
       onClick={onClose}
     >
       <aside
-        className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle"
+        className={cn("h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle", closing ? "drawer-panel-out" : "drawer-panel-in")}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
@@ -838,15 +662,7 @@ function AccountDetailPanel({
               <button onClick={() => setMenuOpen((open) => !open)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="More options"><MoreHorizontal className="size-4" /></button>
               {menuOpen ? (
                 <div className="absolute right-0 top-10 z-50 w-36 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      if (current.id) onDeleteAccount(current.id);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]"
-                  >
-                    Delete
-                  </button>
+                  <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (current.id) onDeleteAccount(current.id); }} className="px-3 py-1.5" />
                 </div>
               ) : null}
             </div>
@@ -976,8 +792,15 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount, onUpdate, onDelete,
   const [editWalletGroupId, setEditWalletGroupId] = useState("");
   const [editOwnerAccountId, setEditOwnerAccountId] = useState("");
 
-  if (!wallet) return null;
-  const w = wallet;
+  const lastWallet = useRef<Wallet | null>(wallet);
+  useEffect(() => {
+    if (wallet) lastWallet.current = wallet;
+  }, [wallet]);
+  const { mounted, closing } = usePresence(Boolean(wallet), 260);
+  if (!mounted) return null;
+  const wCandidate = wallet ?? lastWallet.current;
+  if (!wCandidate) return null;
+  const w: Wallet = wCandidate;
 
   function enterEdit() {
     setEditLabel(w.label);
@@ -1012,14 +835,14 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount, onUpdate, onDelete,
 
   return (
     <div
-      className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]"
+      className={cn("fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]", closing ? "drawer-backdrop-out" : "drawer-backdrop-in")}
       role="dialog"
       aria-modal="true"
       aria-labelledby="wallet-detail-title"
       onClick={onClose}
     >
       <aside
-        className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle"
+        className={cn("h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle", closing ? "drawer-panel-out" : "drawer-panel-in")}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
@@ -1030,7 +853,7 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount, onUpdate, onDelete,
               {menuOpen ? (
                 <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
                   <button onClick={enterEdit} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>
-                  <button onClick={() => { setMenuOpen(false); if (w.id) onDelete(w.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+                  <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (w.id) onDelete(w.id); }} className="px-3 py-1.5" />
                 </div>
               ) : null}
             </div>
@@ -1140,14 +963,15 @@ function GroupsView({ groups: groupItems, onDeleteGroup, onEditGroup }: { groups
   return (
     <div className="grid gap-3 px-4 py-4 sm:px-6 lg:grid-cols-4 lg:px-8">
       {groupItems.map((group) => (
-        <article key={group.id ?? group.name} className="rounded-xl bg-card/80 p-4 soft-panel">
+        <article key={group.id ?? group.name} className="row-enter-in rounded-xl bg-card/80 p-4 soft-panel">
           <div className="flex items-start justify-between gap-3">
             <span className="grid size-9 place-items-center rounded-lg bg-white/[0.055] text-muted-foreground"><FolderOpen className="size-4" /></span>
             <div className="relative">
               <button onClick={() => setMenuOpen(menuOpen === (group.id ?? group.name) ? null : (group.id ?? group.name))} aria-label={"More options for " + group.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
               {menuOpen === (group.id ?? group.name) ? (
                 <div className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                  <button onClick={() => { setMenuOpen(null); onEditGroup(group); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>\n                  <button onClick={() => { setMenuOpen(null); if (group.id) onDeleteGroup(group.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]">Delete</button>
+                  <button onClick={() => { setMenuOpen(null); onEditGroup(group); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>
+                  <ConfirmDelete onConfirm={() => { setMenuOpen(null); if (group.id) onDeleteGroup(group.id); }} className="px-3 py-1.5" />
                 </div>
               ) : null}
             </div>
@@ -1274,7 +1098,7 @@ function EditableAvatar({
                 onBlur={() => setDraftUrl((value) => normalizeHttpUrl(value))}
                 disabled={isSaving || !onSetUrl}
                 className="h-8 min-w-0 flex-1 rounded-lg bg-background px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
-                placeholder="image.example.com/avatar.png"
+                placeholder="https://..."
               />
               <button
                 type="button"

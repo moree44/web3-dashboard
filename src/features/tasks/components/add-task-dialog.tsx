@@ -24,6 +24,7 @@ import {
 import { normalizeHttpUrl } from "@/lib/url";
 import { cn } from "@/lib/utils";
 import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
+import { usePresence } from "@/lib/use-presence";
 
 type Props = {
   open: boolean;
@@ -72,7 +73,8 @@ export function AddTaskDialog({ open, projects, busy, error, onClose, onCreate }
     setDeadlineNotes("");
   }, [open, projects]);
 
-  if (!open) return null;
+  const { mounted, closing } = usePresence(open, 160);
+  if (!mounted) return null;
 
   const project = projects.find((item) => item.id === projectId);
   const canCreate = Boolean(title.trim() && project && startDate && (!addDeadline || deadlineDate) && !busy);
@@ -117,8 +119,8 @@ export function AddTaskDialog({ open, projects, busy, error, onClose, onCreate }
   }
 
   return (
-    <div className="modal-backdrop-in fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 py-5 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="add-task-title" onClick={() => { if (!busy) onClose(); }}>
-      <div className="modal-card-in soft-panel flex max-h-full w-full max-w-[720px] flex-col overflow-hidden rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45" onClick={(event) => event.stopPropagation()}>
+    <div className={cn("fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 py-5 backdrop-blur-[2px]", closing ? "modal-backdrop-out" : "modal-backdrop-in")} role="dialog" aria-modal="true" aria-labelledby="add-task-title" onClick={() => { if (!busy) onClose(); }}>
+      <div className={cn("soft-panel flex max-h-full w-full max-w-[720px] flex-col overflow-hidden rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45", closing ? "modal-card-out" : "modal-card-in")} onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 px-4 py-3.5">
           <div>
             <h2 id="add-task-title" className="text-base font-semibold tracking-[-0.02em]">Add task</h2>

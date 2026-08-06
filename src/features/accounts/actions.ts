@@ -106,6 +106,21 @@ export async function getAccounts(): Promise<AccountWithStats[]> {
   }));
 }
 
+export type AccountsWorkspaceData = {
+  accounts: AccountWithStats[];
+  wallets: Array<typeof wallets.$inferSelect>;
+  walletGroups: Array<typeof walletGroups.$inferSelect>;
+};
+
+export async function getAccountsWorkspaceData(): Promise<AccountsWorkspaceData> {
+  const [accountsData, walletsData, walletGroupsData] = await Promise.all([
+    getAccounts(),
+    getWallets(),
+    getWalletGroups(),
+  ]);
+  return { accounts: accountsData, wallets: walletsData, walletGroups: walletGroupsData };
+}
+
 // ─── Mutations ───────────────────────────────────────────────────────────────
 
 export async function createAccount(

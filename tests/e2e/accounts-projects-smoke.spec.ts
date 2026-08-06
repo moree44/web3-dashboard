@@ -176,7 +176,10 @@ test("accounts + projects smoke", async ({ page }) => {
     });
     await panel.getByRole("button", { name: "More options" }).click();
     await panel.getByRole("button", { name: "Archive" }).click();
-    await page.waitForTimeout(1200);
+    // The drawer closes only after the archive server action has committed to
+    // the DB (commit-waiting). Waiting for the drawer to unmount instead of a
+    // fixed sleep ensures the in-flight action isn't aborted by the goto below.
+    await expect(dialog(page)).toHaveCount(0, { timeout: 20000 });
     await page.goto("/projects", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(600);
     await expect(page.getByText(finalProjectName, { exact: true })).toHaveCount(0, { timeout: 10000 });

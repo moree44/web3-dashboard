@@ -1,6 +1,6 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-08-04
+Last updated: 2026-08-06
 
 ## Current Position
 
@@ -290,13 +290,13 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | Area | Rough size | CRUD Status |
 | --- | --- | --- |
 | `tasks-preview.tsx` | ~330 lines | CRUD wired; Personal Item CRUD is persisted; React Query + optimistic mutations (`tasks-query.ts` holds the hooks) |
-| `accounts-preview.tsx` | ~1600+ lines | CRUD wired (identities, wallets, groups) |
-| `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation |
+| `accounts-preview.tsx` | ~1600+ lines | CRUD wired (identities, wallets, groups); React Query + optimistic mutations (`accounts-query.ts` holds the hooks) |
+| `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation; React Query + optimistic mutations (`projects-query.ts` holds the hooks) |
 | `archive-preview.tsx` | ~278 lines | CRUD wired (restore, delete) |
 | `daily-workspace.tsx` | ~300+ lines | Task Log and Daily execution wired |
 | `docs-workspace.tsx` | ~300+ lines | Docs CRUD wired |
 
-Unit tests: 16 files, 71 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, and Recheck Review coverage, and Daily per-account generation coverage.
+Unit tests: 18 files, 78 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, and new Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
 
 E2E diagnostics now include focused Accounts/Projects, Project Wallet assignment, NFT Wallet participation, Docs/Daily, Inbox, and a full application smoke suite. The latest focused Project Wallet browser smoke passed login, custom-chain Wallet creation, reload persistence, Project unlink behavior, Wallet survival, cleanup, and captured no console or page errors.
 
@@ -365,6 +365,14 @@ The 2026-08-04 TanStack Query pilot batch includes:
 - Preview mode (`developmentPreview`) uses locally-built records with `staleTime: Infinity` and no invalidation; real mode refetches on mount to reconcile with RSC `initialData`
 - `tasks-preview.tsx` no longer holds task/personal-item state; busy states aggregate mutation `isPending`
 - Unit tests updated with a `QueryClientProvider` render wrapper and preview-mode action mocks; full verification passed (typecheck, lint 0 warnings, 71 unit tests, production build, and both e2e specs)
+
+The 2026-08-06 Projects/Accounts React Query + motion + delete batch includes:
+
+- **Projects React Query** (`src/features/projects/projects-query.ts`, `preview-data.ts`): `getProjectsWorkspaceData` action combines projects, account options, wallet options, and NFT count; page and preview now run entirely through the query cache. Create stays commit-waiting ("Creating..."); edit/archive/delete are optimistic with rollback; logo upload is not optimistic (needs the server publicUrl) and merges on success.
+- **Accounts React Query** (`src/features/accounts/accounts-query.ts`, `preview-data.ts`): `getAccountsWorkspaceData` combines accounts, wallets, and wallet groups; accounts/wallets/groups all follow the same create-commit-waiting / update-optimistic / delete-optimistic split, with avatar upload/URL merging on success.
+- **CSS-only motion infrastructure** (`src/lib/use-presence.ts` + `globals.css`): exit keyframes (modal/drawer backdrop + card/panel), dropdown `popup-in` entrance on `AppSelect`/`AppDatePicker` and the Projects hand-rolled dropdowns, and `row-enter-in` row entrance on Projects/Accounts lists. All sit under the existing reduced-motion kill switch. Drawers/modals/dialogs across Projects, Accounts, Tasks, NFTs, Deadlines, and Docs now animate out via the presence hook (Docs editor gained its missing entrance classes).
+- **Standardized inline two-step delete** (`src/components/ui/confirm-delete.tsx`): replaced the remaining native `confirm()` calls in Projects (project delete) and Accounts (account/wallet/group deletes) with an armed "Confirm delete" button that auto-disarms; e2e specs updated to the second click.
+- **Recheck specs brought up to date** (`manual-recheck.spec.ts`, `prod-menu-recheck.spec.ts`): capture-strip intent toggles, tasks drawer identity-button click target, functional Projects filters / Accounts Add modal, empty-preview Inbox state, and removed the vanished Docs Quick add assertion; `actionTimeout` prevents stale-selector hangs.
 
 Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the source release.
 
@@ -441,6 +449,27 @@ DONE     10. Activity logs: mutation events, recent activity query, and delete-s
 ```
 
 ## Validation Status
+
+Projects/Accounts React Query + motion + delete batch checked 2026-08-06:
+
+```txt
+pnpm typecheck  # pass
+pnpm lint       # pass, 0 warnings
+pnpm test       # pass, 18 files and 78 tests
+pnpm build      # pass, production build includes all routes
+Real-mode smoke suite (real DB, test/test1234) — all 8 pass:
+accounts-projects-smoke.spec.ts        # pass
+project-wallet-smoke.spec.ts           # pass
+wallet-group-dashboard-smoke.spec.ts   # pass
+delete-linked-fk.spec.ts               # pass
+full-smoke.spec.ts                     # pass
+nft-wallet-smoke.spec.ts               # pass
+docs-daily-smoke.spec.ts               # pass
+inbox-smoke.spec.ts                    # pass
+Preview-mode recheck specs (dev server, no auth) — both pass, 0 BUG lines:
+manual-recheck.spec.ts    # pass, all OK incl. route sweep + interactions + screenshots
+prod-menu-recheck.spec.ts # pass, first visits 1.1–1.8s, warm 1.2–1.4s, client nav 0.3–0.5s — no perf regression
+```
 
 TanStack Query + optimistic UI Tasks pilot checked 2026-08-04:
 

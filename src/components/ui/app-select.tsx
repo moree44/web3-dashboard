@@ -114,7 +114,7 @@ export function AppSelect({
           role="listbox"
           aria-label={ariaLabel ?? label ?? placeholder}
           className={cn(
-            "fixed z-[120] max-h-60 overflow-y-auto rounded-xl bg-[#18181a]/[0.98] p-1 text-left shadow-2xl shadow-black/45 ring-1 ring-white/[0.055] backdrop-blur scrollbar-subtle",
+            "popup-in fixed z-[120] max-h-60 overflow-y-auto rounded-xl bg-[#18181a]/[0.98] p-1 text-left shadow-2xl shadow-black/45 ring-1 ring-white/[0.055] backdrop-blur scrollbar-subtle",
             menuClassName,
           )}
           style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}

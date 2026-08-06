@@ -10,19 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { AppDatePicker } from "@/components/ui/app-date-picker";
 import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/app-select";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import { cn } from "@/lib/utils";
 import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
+import { usePresence } from "@/lib/use-presence";
 import { normalizeHttpUrl } from "@/lib/url";
 import {
-  archiveProject,
-  createProject,
-  deleteProject,
-  updateProject,
-  uploadProjectLogo,
   type ProjectAccountOption,
   type ProjectWalletOption,
   type ProjectWithAccounts,
+  type ProjectsWorkspaceData,
 } from "@/features/projects/actions";
+import { useProjectsMutations, useProjectsWorkspace } from "@/features/projects/projects-query";
 import type { ProjectAssignmentInput, ProjectWalletDraft } from "@/features/projects/project-schema";
 import type { projects as projectsSchema } from "@/lib/db/schema";
 import { ARCHIVE_REASONS, filterAndSortProjects, isWatchlistProject, parseProjectQuery, PROJECT_COLUMNS, PROJECT_PRIORITIES, PROJECT_SORTS, PROJECT_STATUSES, STAGE_PRESETS, type ProjectColumn } from "@/features/projects/project-query";
@@ -132,136 +131,44 @@ type Project = {
   updatedAt?: string;
 };
 
-const fallbackProjects: Project[] = [
-  {
-    name: "Soundness",
-    mark: "S",
-    logoClass: "bg-white/[0.065] text-[#c4cad3]",
-    status: "In progress",
-    priority: "High",
-    hunt: "Free Hunts",
-    stage: "Submitted proof",
-    work: ["Testnet registration", "Testnet", "Submit proof"],
-    type: ["ZK", "Verif layer"],
-    accounts: ["Moree", "Wdym"],
-    progress: 50,
-    date: "Mar 23",
-    activity: "8m",
-  },
-  {
-    name: "NexusHQ",
-    mark: "N",
-    logoClass: "bg-white/[0.065] text-[#c4cad3]",
-    status: "Running",
-    priority: "Medium",
-    hunt: "Free Hunts",
-    stage: "Node running",
-    work: ["CLI running", "Point system"],
-    type: ["Prover", "Node"],
-    accounts: ["Moree"],
-    progress: 72,
-    date: "Oct 10",
-    activity: "1h",
-  },
-  {
-    name: "Linera",
-    mark: "L",
-    logoClass: "bg-white/[0.065] text-[#c4cad3]",
-    status: "In progress",
-    priority: "High",
-    hunt: "Free Hunts",
-    stage: "Role farming",
-    work: ["Farm role", "Testnet", "Galxe"],
-    type: ["L1"],
-    accounts: ["Wdym"],
-    progress: 33,
-    date: "Apr 18",
-    activity: "2h",
-  },
-  {
-    name: "Huddle01",
-    mark: "H",
-    logoClass: "bg-white/[0.065] text-[#c4cad3]",
-    status: "Recheck",
-    priority: "Medium",
-    hunt: "Waitlist",
-    stage: "Waiting result",
-    work: ["Early access", "Collect badge"],
-    type: ["L2", "Meet to earn"],
-    accounts: ["Moree"],
-    progress: 60,
-    date: "Apr 19",
-    activity: "5h",
-  },
-  {
-    name: "Drosera",
-    mark: "D",
-    logoClass: "bg-white/[0.065] text-[#c4cad3]",
-    status: "Paused",
-    priority: "High",
-    hunt: "Retro",
-    stage: "Needs recheck",
-    work: ["Node", "Testnet"],
-    type: ["Security"],
-    accounts: ["Moree"],
-    progress: 18,
-    date: "Apr 15",
-    activity: "1d",
-  },
-  {
-    name: "Dawn",
-    mark: "D",
-    logoClass: "bg-white/[0.065] text-[#c4cad3]",
-    status: "Watching",
-    priority: "Medium",
-    hunt: "Waitlist",
-    stage: "Waiting result",
-    work: ["Early access", "Extension"],
-    type: ["DePIN"],
-    accounts: ["Wdym"],
-    progress: 10,
-    date: "Nov 11",
-    activity: "2d",
-  },
-];
-
-const previewAccountOptions: ProjectAccountOption[] = [
-  { id: "preview-moree", label: "Moree", avatarUrl: null },
-  { id: "preview-wdym", label: "Wdym", avatarUrl: null },
-  { id: "preview-wayss", label: "Wayss", avatarUrl: null },
-];
-
 export function ProjectsPreview({
   view = "all",
-  initialProjects = [],
+  initialData,
   developmentPreview = false,
-  accountOptions = [],
-  walletOptions = [],
-  nftCount = 0,
 }: {
   view?: "all" | "watchlist";
-  initialProjects?: DbProject[];
+  initialData: ProjectsWorkspaceData;
   developmentPreview?: boolean;
-  accountOptions?: ProjectAccountOption[];
-  walletOptions?: ProjectWalletOption[];
-  nftCount?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryState = parseProjectQuery(searchParams);
-  const [projectItems, setProjectItems] = useState<Project[]>(() => developmentPreview ? fallbackProjects : initialProjects.map(dbToUIProject));
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
-  const availableAccountOptions = developmentPreview && accountOptions.length === 0 ? previewAccountOptions : accountOptions;
+  const [error, setError] = useState<string | null>(null);
+  const { data: queryData } = useProjectsWorkspace(initialData, developmentPreview);
+  const workspace = queryData ?? initialData;
+  const mutations = useProjectsMutations({
+    developmentPreview,
+    accountOptions: workspace.accountOptions,
+    walletOptions: workspace.walletOptions,
+    onError: (message) => setError(message),
+  });
+  const projectItems = useMemo(() => workspace.projects.map(dbToUIProject), [workspace.projects]);
+  const selectedProject = useMemo(
+    () => projectItems.find((project) => project.id === selectedProjectId) ?? null,
+    [projectItems, selectedProjectId],
+  );
+  const nftCount = workspace.nftCount;
+  const availableAccountOptions = workspace.accountOptions;
   const availableWalletOptions = useMemo(() => {
-    const byId = new Map(walletOptions.map((wallet) => [wallet.id, wallet]));
+    const byId = new Map(workspace.walletOptions.map((wallet) => [wallet.id, wallet]));
     projectItems.flatMap((project) => project.walletDetails ?? []).forEach((wallet) => byId.set(wallet.id, wallet));
     return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label));
-  }, [projectItems, walletOptions]);
-
+  }, [projectItems, workspace.walletOptions]);
   function updateUrl(updates: Record<string, string | number | null>, keepPage = false) {
     const next = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(updates)) {
@@ -306,12 +213,10 @@ export function ProjectsPreview({
   }
 
   async function handleCreateProject(project: Project, assignments: ProjectAssignmentInput, context?: { logoFile?: File | null }) {
-    if (developmentPreview) {
-      setProjectItems((items) => [{ ...project, id: `preview-${Date.now()}` }, ...items]);
-    } else {
-      const hasFileUpload = Boolean(context?.logoFile);
-      const externalLogoUrl = hasFileUpload || (project.logoUrl?.startsWith("blob:") || project.logoUrl?.startsWith("data:")) ? undefined : project.logoUrl;
-      let created = await createProject({
+    const hasFileUpload = Boolean(context?.logoFile);
+    const externalLogoUrl = hasFileUpload || (project.logoUrl?.startsWith("blob:") || project.logoUrl?.startsWith("data:")) ? undefined : project.logoUrl;
+    await mutations.createProjectMutation.mutateAsync({
+      data: {
         name: project.name,
         huntType: (reverseHuntLabels[project.hunt] ?? "free_hunts") as typeof projectsSchema.$inferInsert.huntType,
         status: (reverseStatusLabels[project.status] ?? "watching") as typeof projectsSchema.$inferInsert.status,
@@ -324,20 +229,10 @@ export function ProjectsPreview({
         notes: project.notes || undefined,
         logoUrl: externalLogoUrl,
         logoSource: externalLogoUrl ? "external_url" : "none",
-      }, assignments);
-      let logoUploadError = "";
-      if (context?.logoFile) {
-        const formData = new FormData();
-        formData.set("file", context.logoFile);
-        try {
-          created = await uploadProjectLogo(created.id, formData);
-        } catch (error) {
-          logoUploadError = error instanceof Error ? error.message : "Unable to upload project logo";
-        }
-      }
-      setProjectItems((items) => [dbToUIProject(created), ...items]);
-      if (logoUploadError) window.alert(`Project created, but the logo was not uploaded. ${logoUploadError}`);
-    }
+      },
+      assignments,
+      logoFile: context?.logoFile ?? null,
+    });
     setIsAddOpen(false);
   }
 
@@ -351,34 +246,33 @@ export function ProjectsPreview({
       window.alert("Choose a valid archive reason: " + ARCHIVE_REASONS.join(", "));
       return;
     }
-    if (!developmentPreview) await archiveProject(id, reason);
-    setProjectItems((items) => items.filter((item) => item.id !== id));
-    setSelectedProject(null);
+    try {
+      await mutations.archiveProjectMutation.mutateAsync({ id, reason });
+    } catch {
+      // Error is surfaced through the mutation onError handler; keep the
+      // drawer open so the user can retry.
+      return;
+    }
+    setSelectedProjectId(null);
   }
 
   async function handleDeleteProject(id: string) {
-    if (!confirm("Permanently delete this project? This cannot be undone.")) return;
     try {
-      if (!developmentPreview) await deleteProject(id);
-      setProjectItems((items) => items.filter((item) => item.id !== id));
-      setSelectedProject(null);
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Unable to delete project");
+      await mutations.deleteProjectMutation.mutateAsync(id);
+    } catch {
+      // Error is surfaced through the mutation onError handler; keep the
+      // drawer open so the user can retry.
+      return;
     }
+    setSelectedProjectId(null);
   }
 
   async function handleUpdateProject(id: string, data: Partial<Omit<typeof projectsSchema.$inferInsert, "workspaceId">>, assignments?: ProjectAssignmentInput) {
-    const updated = await updateProject(id, data, assignments);
-    const mapped = dbToUIProject(updated);
-    setProjectItems((items) => items.map((item) => item.id === id ? mapped : item));
-    setSelectedProject(mapped);
-    return mapped;
+    await mutations.updateProjectMutation.mutateAsync({ id, data, assignments });
   }
 
-  async function handleLogoUploaded(id: string, updated: ProjectWithAccounts) {
-    const mapped = dbToUIProject(updated);
-    setProjectItems((items) => items.map((item) => (item.id === id ? mapped : item)));
-    setSelectedProject((current) => (current?.id === id ? mapped : current));
+  async function handleLogoUploaded(id: string, formData: FormData) {
+    await mutations.uploadProjectLogoMutation.mutateAsync({ id, formData });
   }
 
   const columnLabels: Record<ProjectColumn, string> = { status: "Status", priority: "Priority", work: "Work type", type: "Project type", accounts: "Account", completion: "Completion", date: "Date start" };
@@ -389,6 +283,8 @@ export function ProjectsPreview({
         <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Projects</h1>
         <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add project</Button>
       </header>
+
+      {error ? <div role="alert" className="mx-4 mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive sm:mx-6 lg:mx-8">{error}</div> : null}
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8"><div className="flex items-center gap-2 py-2.5">
         <div className="scrollbar-subtle flex min-w-0 flex-1 gap-1 overflow-x-auto">
@@ -456,13 +352,13 @@ export function ProjectsPreview({
 
       <div className="hidden overflow-x-auto lg:block"><table className="w-full min-w-[1120px] table-fixed border-collapse text-left"><colgroup><col className="w-[300px]" />{visibleColumns.has("status") && <col className="w-[115px]" />}{visibleColumns.has("priority") && <col className="w-[110px]" />}{visibleColumns.has("work") && <col className="w-[180px]" />}{visibleColumns.has("type") && <col className="w-[150px]" />}{visibleColumns.has("accounts") && <col className="w-[110px]" />}{visibleColumns.has("completion") && <col className="w-[140px]" />}{visibleColumns.has("date") && <col className="w-[105px]" />}<col className="w-[48px]" /></colgroup>
         <thead className="sticky top-0 z-10 bg-background text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground"><tr><th className="sticky left-0 z-20 border-b border-white/[0.045] bg-background px-4 py-3 lg:px-8">Project</th>{PROJECT_COLUMNS.map((column) => visibleColumns.has(column) ? <th key={column} className="border-b border-white/[0.045] px-3 py-3">{columnLabels[column]}</th> : null)}<th className="border-b border-white/[0.045] px-3 py-3"><span className="sr-only">Actions</span></th></tr></thead>
-        <tbody>{visibleProjects.map((project, index) => <ProjectRow key={project.id ?? `${project.name}-${index}`} project={project} visibleColumns={visibleColumns} onOpen={() => setSelectedProject(project)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</tbody>
+        <tbody>{visibleProjects.map((project, index) => <ProjectRow key={project.id ?? `${project.name}-${index}`} project={project} visibleColumns={visibleColumns} onOpen={() => setSelectedProjectId(project.id ?? null)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</tbody>
       </table></div>
-      <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project, index) => <ProjectCard key={project.id ?? `${project.name}-${index}`} project={project} onOpen={() => setSelectedProject(project)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</div>
+      <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project, index) => <ProjectCard key={project.id ?? `${project.name}-${index}`} project={project} onOpen={() => setSelectedProjectId(project.id ?? null)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</div>
       <div className="flex min-h-12 items-center justify-between px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8"><span>Showing {filteredProjects.length} {filteredProjects.length === 1 ? "project" : "projects"}</span><div className="flex items-center gap-2"><AppSelect ariaLabel="Projects per page" value={String(queryState.pageSize)} options={[{ value: "10", label: "10 per page" }, { value: "25", label: "25 per page" }, { value: "50", label: "50 per page" }]} onChange={(pageSize) => updateUrl({ pageSize, page: 1 }, true)} className="w-[120px]" size="xs" /><Button variant="secondary" size="sm" disabled={currentPage <= 1} onClick={() => updateUrl({ page: currentPage - 1 }, true)}>Previous</Button><span>{currentPage} / {totalPages}</span><Button variant="secondary" size="sm" disabled={currentPage >= totalPages} onClick={() => updateUrl({ page: currentPage + 1 }, true)}>Next</Button></div></div>
 
       <AddProjectDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} onCreate={handleCreateProject} accountOptions={availableAccountOptions} walletOptions={availableWalletOptions} />
-      <ProjectDetailPanel project={selectedProject} onClose={() => setSelectedProject(null)} onUpdate={handleUpdateProject} onLogoUploaded={handleLogoUploaded} onArchive={handleArchiveProject} onDelete={handleDeleteProject} accountOptions={availableAccountOptions} walletOptions={availableWalletOptions} />
+      <ProjectDetailPanel project={selectedProject} onClose={() => setSelectedProjectId(null)} onUpdate={handleUpdateProject} onLogoUploaded={handleLogoUploaded} onArchive={handleArchiveProject} onDelete={handleDeleteProject} accountOptions={availableAccountOptions} walletOptions={availableWalletOptions} />
     </div>
   );
 }
@@ -515,7 +411,7 @@ function ProjectRow({
   }
 
   return (
-    <tr className="group h-[58px] align-middle border-b border-white/[0.035] hover:bg-white/[0.025]">
+    <tr className="row-enter-in group h-[58px] align-middle border-b border-white/[0.035] hover:bg-white/[0.025]">
       <td className="sticky left-0 z-[1] bg-background px-4 group-hover:bg-[#121214] lg:px-8">
         <ProjectIdentity project={project} onOpen={onOpen} />
       </td>
@@ -532,7 +428,7 @@ function ProjectRow({
           {menuOpen && typeof document !== "undefined" ? createPortal(
             <div className="fixed z-[100] w-44 rounded-xl border border-white/[0.08] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45" style={menuPosition} onClick={(event) => event.stopPropagation()}>
               <button onClick={() => { setMenuOpen(false); if (project.id) onArchive(project.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
-              <button onClick={() => { setMenuOpen(false); if (project.id) onDelete(project.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-red-400 hover:bg-white/[0.055]"><Trash2 className="size-3.5" />Delete permanently</button>
+              <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (project.id) onDelete(project.id); }} label="Delete permanently"><Trash2 className="size-3.5" /></ConfirmDelete>
             </div>,
             document.body,
           ) : null}
@@ -859,7 +755,7 @@ function ProjectCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <article className="px-4 py-4 hover:bg-accent/25 sm:px-6">
+    <article className="row-enter-in px-4 py-4 hover:bg-accent/25 sm:px-6">
       <div className="flex items-start justify-between gap-3">
         <ProjectIdentity project={project} onOpen={onOpen} />
         <div className="relative">
@@ -867,7 +763,7 @@ function ProjectCard({
           {menuOpen ? (
             <div className="absolute right-0 top-8 z-50 w-44 rounded-xl border border-white/[0.08] bg-[#18181a] p-1 shadow-xl">
               <button onClick={(event) => { event.stopPropagation(); setMenuOpen(false); if (project.id) onArchive(project.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
-              <button onClick={(event) => { event.stopPropagation(); setMenuOpen(false); if (project.id) onDelete(project.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-red-400 hover:bg-white/[0.055]"><Trash2 className="size-3.5" />Delete permanently</button>
+              <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (project.id) onDelete(project.id); }} label="Delete permanently"><Trash2 className="size-3.5" /></ConfirmDelete>
             </div>
           ) : null}
         </div>
@@ -896,7 +792,7 @@ function ProjectDetailPanel({
     data: Partial<Omit<typeof projectsSchema.$inferInsert, "workspaceId">>,
     assignments?: ProjectAssignmentInput,
   ) => Promise<void | Project>;
-  onLogoUploaded: (id: string, updated: ProjectWithAccounts) => void;
+  onLogoUploaded: (id: string, formData: FormData) => Promise<void>;
   onArchive: (id: string) => void;
   onDelete: (id: string) => void;
   accountOptions: ProjectAccountOption[];
@@ -926,8 +822,15 @@ function ProjectDetailPanel({
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [openEditSelect, setOpenEditSelect] = useState<string | null>(null);
 
-  if (!project) return null;
-  const p = project;
+  const lastProject = useRef<Project | null>(project);
+  useEffect(() => {
+    if (project) lastProject.current = project;
+  }, [project]);
+  const { mounted, closing } = usePresence(Boolean(project), 260);
+  if (!mounted) return null;
+  const pCandidate = project ?? lastProject.current;
+  if (!pCandidate) return null;
+  const p: Project = pCandidate;
 
   function enterEdit() {
     setEditName(p.name);
@@ -1006,8 +909,7 @@ function ProjectDetailPanel({
     try {
       const formData = new FormData();
       formData.set("file", file);
-      const updated = await uploadProjectLogo(p.id, formData);
-      onLogoUploaded(p.id, updated);
+      await onLogoUploaded(p.id, formData);
       setEditLogoPreview("");
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Unable to upload logo");
@@ -1035,14 +937,14 @@ function ProjectDetailPanel({
 
   return (
     <div
-      className="drawer-backdrop-in fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]"
+      className={cn("fixed inset-y-0 right-0 z-50 flex w-full justify-end bg-black/35 backdrop-blur-[2px]", closing ? "drawer-backdrop-out" : "drawer-backdrop-in")}
       role="dialog"
       aria-modal="true"
       aria-labelledby="project-detail-title"
       onClick={onClose}
     >
       <aside
-        className="drawer-panel-in h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle"
+        className={cn("h-full w-full max-w-[520px] overflow-y-auto border-l soft-divider bg-card shadow-2xl shadow-black/50 scrollbar-subtle", closing ? "drawer-panel-out" : "drawer-panel-in")}
         onClick={(event) => event.stopPropagation()}
         onPaste={(event) => {
           if (!isEditing || isUploadingLogo) return;
@@ -1062,15 +964,15 @@ function ProjectDetailPanel({
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <div className="min-w-0">
-            <h2 id="project-detail-title" className="truncate text-base font-semibold">{project.name}</h2>
+            <h2 id="project-detail-title" className="truncate text-base font-semibold">{p.name}</h2>
           </div>
           <div className="flex items-center gap-1">
             <div className="relative">
               <button onClick={() => setMenuOpen(!menuOpen)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="More options"><MoreHorizontal className="size-4" /></button>
               {menuOpen ? (
                 <div className="absolute right-0 top-10 z-50 w-44 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                  <button onClick={() => { setMenuOpen(false); if (project.id) onArchive(project.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
-                  <button onClick={() => { setMenuOpen(false); if (project.id) onDelete(project.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-white/[0.055]"><Trash2 className="size-3.5" />Delete permanently</button>
+                  <button onClick={() => { setMenuOpen(false); if (p.id) onArchive(p.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
+                  <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (p.id) onDelete(p.id); }} label="Delete permanently" className="px-3 py-1.5"><Trash2 className="size-3.5" /></ConfirmDelete>
                 </div>
               ) : null}
             </div>
@@ -1081,8 +983,8 @@ function ProjectDetailPanel({
         <div className="px-5 py-5">
           <div className="flex items-start gap-3">
             <label className={cn("relative group", isEditing ? "cursor-pointer" : "")}>
-              <span className={cn("grid size-14 shrink-0 place-items-center rounded-2xl bg-cover bg-center text-lg font-bold shadow-sm", project.logoClass)} style={editLogoPreview ? { backgroundImage: `url("${editLogoPreview}")` } : project.logoUrl ? { backgroundImage: `url("${project.logoUrl}")` } : undefined}>
-                {(editLogoPreview || project.logoUrl) ? null : project.mark}
+              <span className={cn("grid size-14 shrink-0 place-items-center rounded-2xl bg-cover bg-center text-lg font-bold shadow-sm", p.logoClass)} style={editLogoPreview ? { backgroundImage: `url("${editLogoPreview}")` } : p.logoUrl ? { backgroundImage: `url("${p.logoUrl}")` } : undefined}>
+                {(editLogoPreview || p.logoUrl) ? null : p.mark}
               </span>
               {isEditing ? (
                 <>
@@ -1109,9 +1011,9 @@ function ProjectDetailPanel({
                   className="w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 py-1 text-2xl font-semibold tracking-[-0.03em] outline-none"
                 />
               ) : (
-                <h3 className="truncate text-2xl font-semibold tracking-[-0.03em]">{project.name}</h3>
+                <h3 className="truncate text-2xl font-semibold tracking-[-0.03em]">{p.name}</h3>
               )}
-              <p className="mt-1 text-xs text-muted-foreground">{isEditing ? `${editHunt} · ${editStage}` : `${project.hunt} · ${project.stage}`}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{isEditing ? `${editHunt} · ${editStage}` : `${p.hunt} · ${p.stage}`}</p>
             </div>
           </div>
 
@@ -1184,11 +1086,11 @@ function ProjectDetailPanel({
                 </>
               ) : (
                 <>
-                  <Property label="Status"><Badge variant={statusVariant(project.status)}>{project.status}</Badge></Property>
-                  <Property label="Stage / result"><span>{project.stage}</span></Property>
-                  <Property label="Priority"><Priority value={project.priority} /></Property>
-                  <Property label="Completion"><Progress value={project.progress} /></Property>
-                  <Property label="Date start"><span>{project.date}</span></Property>
+                  <Property label="Status"><Badge variant={statusVariant(p.status)}>{p.status}</Badge></Property>
+                  <Property label="Stage / result"><span>{p.stage}</span></Property>
+                  <Property label="Priority"><Priority value={p.priority} /></Property>
+                  <Property label="Completion"><Progress value={p.progress} /></Property>
+                  <Property label="Date start"><span>{p.date}</span></Property>
                 </>
               )}
             </div>
@@ -1240,12 +1142,12 @@ function ProjectDetailPanel({
               </>
             ) : (
               <>
-                <PropertyBlock label="Work Type"><Tags tags={project.work} strong max={4} /></PropertyBlock>
-                <PropertyBlock label="Project Type"><Tags tags={project.type} max={4} /></PropertyBlock>
+                <PropertyBlock label="Work Type"><Tags tags={p.work} strong max={4} /></PropertyBlock>
+                <PropertyBlock label="Project Type"><Tags tags={p.type} max={4} /></PropertyBlock>
                 <PropertyBlock label="Accounts">
-                  {project.accounts.length > 0 ? (
+                  {p.accounts.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
-                      {project.accounts.map((account) => (
+                      {p.accounts.map((account) => (
                         <span key={account} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.045] px-2 py-1 text-xs text-muted-foreground">
                           <span className="grid size-5 place-items-center rounded-full bg-background text-[10px] font-semibold">{account[0]}</span>
                           {account}
@@ -1257,9 +1159,9 @@ function ProjectDetailPanel({
                   )}
                 </PropertyBlock>
                 <PropertyBlock label="Project wallets">
-                  {(project.walletDetails?.length ?? 0) > 0 ? (
+                  {(p.walletDetails?.length ?? 0) > 0 ? (
                     <div className="grid w-full gap-1.5 sm:grid-cols-2">
-                      {project.walletDetails?.map((wallet) => {
+                      {p.walletDetails?.map((wallet) => {
                         const owner = accountOptions.find((account) => account.id === wallet.ownerAccountId)?.label ?? "Shared";
                         return <div key={wallet.id} className="flex min-w-0 items-center gap-2 rounded-xl bg-white/[0.025] px-2.5 py-2"><WalletCards className="size-3.5 shrink-0 text-muted-foreground" /><span className="min-w-0"><span className="block truncate text-xs font-medium text-foreground">{wallet.label}</span><span className="block truncate font-mono text-[10px] text-muted-foreground">{shortWalletAddress(wallet.address)} · {wallet.chainType || "Chain not set"} · {owner}</span></span></div>;
                       })}
@@ -1276,27 +1178,27 @@ function ProjectDetailPanel({
               {!isEditing ? <button type="button" onClick={enterEdit} className="text-[11px] text-muted-foreground hover:text-foreground">Edit links</button> : null}
             </div>
             <div className="mt-2 grid gap-2">
-              {project.websiteUrl ? <DetailLink label="Website" value={project.websiteUrl} href={project.websiteUrl} external /> : <p className="text-[11px] text-muted-foreground">No project URL added.</p>}
-              <DetailLink label="Docs" value="Open linked project docs" href={"/docs?project=" + (project.id ?? "")} />
+              {p.websiteUrl ? <DetailLink label="Website" value={p.websiteUrl} href={p.websiteUrl} external /> : <p className="text-[11px] text-muted-foreground">No project URL added.</p>}
+              <DetailLink label="Docs" value="Open linked project docs" href={"/docs?project=" + (p.id ?? "")} />
             </div>
           </section>
 
           <section className="mt-5">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Short note</h4>
-              <Link href={"/docs?project=" + (project.id ?? "")} className="text-[11px] text-muted-foreground hover:text-foreground">Open Docs</Link>
+              <Link href={"/docs?project=" + (p.id ?? "")} className="text-[11px] text-muted-foreground hover:text-foreground">Open Docs</Link>
             </div>
             {isEditing ? (
               <textarea value={editNotes} onChange={(event) => setEditNotes(event.target.value)} className="mt-2 min-h-28 w-full resize-y rounded-xl border border-white/[0.08] bg-[#161618] p-3 text-xs text-foreground outline-none" placeholder="Short project note, result, setup, or reminder..." />
             ) : (
-              <div className="mt-2 rounded-xl bg-white/[0.025] p-3 text-xs leading-5 text-muted-foreground">{project.notes || "No short note added."}</div>
+              <div className="mt-2 rounded-xl bg-white/[0.025] p-3 text-xs leading-5 text-muted-foreground">{p.notes || "No short note added."}</div>
             )}
           </section>
 
           <section className="mt-5">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Tasks</h4>
-              <Link href={"/tasks?project=" + encodeURIComponent(project.name)} className="text-[11px] text-muted-foreground hover:text-foreground">Open Tasks</Link>
+              <Link href={"/tasks?project=" + encodeURIComponent(p.name)} className="text-[11px] text-muted-foreground hover:text-foreground">Open Tasks</Link>
             </div>
             <p className="mt-2 rounded-xl bg-white/[0.025] p-3 text-xs text-muted-foreground">Manage tasks for this project from the Tasks workspace.</p>
           </section>
@@ -1467,7 +1369,8 @@ function AddProjectDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  if (!open) return null;
+  const { mounted, closing } = usePresence(open, 160);
+  if (!mounted) return null;
 
   const canCreate = projectName.trim().length > 0 && !isSubmitting;
 
@@ -1546,8 +1449,8 @@ function AddProjectDialog({
   }
 
   return (
-    <div className="modal-backdrop-in fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="add-project-title">
-      <div className="modal-card-in soft-panel max-h-[calc(100vh-32px)] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle" onPaste={(event) => {
+    <div className={cn("fixed inset-0 z-50 grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]", closing ? "modal-backdrop-out" : "modal-backdrop-in")} role="dialog" aria-modal="true" aria-labelledby="add-project-title">
+      <div className={cn("soft-panel max-h-[calc(100vh-32px)] w-full max-w-[680px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle", closing ? "modal-card-out" : "modal-card-in")} onPaste={(event) => {
         const target = event.target as HTMLElement;
         if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
         const items = event.clipboardData.items;
@@ -1786,7 +1689,7 @@ function SelectPreview({
   const menu = open && menuRect && typeof document !== "undefined"
     ? createPortal(
         <div
-          className="fixed z-[120] max-h-48 overflow-y-auto rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45 backdrop-blur"
+          className="popup-in fixed z-[120] max-h-48 overflow-y-auto rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45 backdrop-blur"
           style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
         >
           <div className="px-2 py-1 text-[10px] text-muted-foreground">Change {label.toLowerCase()}...</div>
@@ -1935,7 +1838,7 @@ function ComboboxPreview({
   const menu = open && menuRect && typeof document !== "undefined"
     ? createPortal(
         <div
-          className="fixed z-[120] max-h-48 overflow-y-auto rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45 backdrop-blur"
+          className="popup-in fixed z-[120] max-h-48 overflow-y-auto rounded-xl border border-white/[0.075] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45 backdrop-blur"
           style={{
             left: menuRect.left,
             width: menuRect.width,

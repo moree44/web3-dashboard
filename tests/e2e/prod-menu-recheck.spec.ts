@@ -25,8 +25,14 @@ async function timedGoto(page: Page, path: string) {
   return { ms, status };
 }
 
+// Convert any stale-element click into a fast BUG line instead of an unbounded
+// wait that hangs the whole test (Playwright actions default to no timeout).
+test.use({ actionTimeout: 10000 });
+
 test("production menu recheck + timings", async ({ page }) => {
-  test.setTimeout(180000);
+  // Dev-mode Turbopack is slower than a prod build; the full route + interaction
+  // sweep needs more than 3 minutes.
+  test.setTimeout(360000);
 
   const routes = [
     ["/", "Dashboard"],
@@ -67,25 +73,21 @@ test("production menu recheck + timings", async ({ page }) => {
   }
 
   // Interaction suite (same as manual recheck core flows)
-  await soft("Dashboard capture → Project", async () => {
+  // Dashboard capture strip became local intent toggles in the Aug 4 pilot;
+  // assert the toggle behavior instead of navigation.
+  await soft("Dashboard capture strip intents", async () => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
-    await page.getByRole("link", { name: "Project", exact: true }).click();
-    await expect(page).toHaveURL(/\/projects$/);
+    for (const label of ["Project", "Watchlist", "Note", "Inbox"]) {
+      const intent = page.getByRole("button", { name: label, exact: true });
+      await expect(intent).toBeVisible();
+      await intent.click();
+      await expect(intent).toHaveAttribute("aria-pressed", "true");
+    }
   });
-  await soft("Dashboard capture → Watchlist", async () => {
+  await soft("Sidebar → Watchlist", async () => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
-    await page.locator("a.soft-control", { hasText: "Watchlist" }).click();
+    await page.getByRole("link", { name: "Watchlist", exact: true }).click();
     await expect(page).toHaveURL(/view=watchlist/);
-  });
-  await soft("Dashboard capture → Note", async () => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-    await page.getByRole("link", { name: "Note", exact: true }).click();
-    await expect(page).toHaveURL(/\/docs/);
-  });
-  await soft("Dashboard capture → Inbox", async () => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
-    await page.getByRole("link", { name: "Inbox", exact: true }).first().click();
-    await expect(page).toHaveURL(/\/inbox/);
   });
 
   await soft("Projects search + create + drawer", async () => {
@@ -118,7 +120,8 @@ test("production menu recheck + timings", async ({ page }) => {
     await page.waitForTimeout(300);
     expect(await page.getByText(title).count()).toBeGreaterThan(0);
     await page.getByRole("button", { name: /^List/i }).click();
-    await page.locator("tbody tr").first().click();
+    // the open handler lives on the task-identity button inside the first row cell
+    await page.locator("tbody tr").first().locator("button").first().click();
     if ((await page.getByRole("dialog").count()) === 0) {
       await page.getByText(/Submit|Daily|Claim|Check/i).first().click();
     }
@@ -129,7 +132,6 @@ test("production menu recheck + timings", async ({ page }) => {
   await soft("Daily views + hide done + search", async () => {
     await page.goto("/daily", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /By project/i }).click();
-    await page.getByRole("button", { name: /Personal/i }).click();
     await page.getByRole("button", { name: /By account/i }).click();
     await page.getByLabel("Search daily tasks").fill("Soundness");
     await page.getByRole("button", { name: /Hide done/i }).click();
@@ -148,13 +150,15 @@ test("production menu recheck + timings", async ({ page }) => {
     await page.keyboard.press("Escape");
   });
 
-  await soft("Inbox select + side actions disabled", async () => {
+  await soft("Inbox empty preview state", async () => {
     await page.goto("/inbox", { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: /Project link from X/ }).click();
-    await expect(page.getByRole("heading", { name: "Project link from X" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Capture item/i })).toBeDisabled();
-    const side = page.locator("aside").last();
-    await expect(side.getByRole("button", { name: /Create Project/i })).toBeDisabled();
+    // preview mode renders the empty InboxWorkspace — no rows to select
+    await expect(page.getByRole("heading", { name: "Select an item to process it" })).toBeVisible();
+    const capture = page.getByRole("button", { name: /Capture item/i });
+    // toolbar Capture stays disabled (no selection); the empty-state stub is enabled
+    expect(await capture.count()).toBe(2);
+    const disabledCount = await capture.evaluateAll((btns) => btns.filter((b) => (b as HTMLButtonElement).disabled).length);
+    expect(disabledCount).toBe(1);
   });
 
   await soft("Docs disabled controls", async () => {

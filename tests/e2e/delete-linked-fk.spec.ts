@@ -204,6 +204,7 @@ test("FK unlink regression — account→project, wallet→group, note←inbox +
     await expect(panel.getByRole("heading", { name: "Account detail" })).toBeVisible({ timeout: 15000 });
     await panel.getByRole("button", { name: "More options" }).click();
     await panel.getByRole("button", { name: "Delete", exact: true }).click();
+    await panel.getByRole("button", { name: "Confirm delete" }).click();
     await expectRemoved(page, page.getByRole("heading", { name: accountLabel, exact: true }), "account");
   });
 
@@ -221,6 +222,7 @@ test("FK unlink regression — account→project, wallet→group, note←inbox +
     await page.getByRole("button", { name: `More options for ${groupName}` }).click();
     await page.waitForTimeout(400);
     await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await page.getByRole("button", { name: "Confirm delete" }).click();
     await expectRemoved(page, page.getByRole("heading", { name: groupName }), "group");
   });
 
@@ -236,6 +238,7 @@ test("FK unlink regression — account→project, wallet→group, note←inbox +
     await expect(panel.locator("#wallet-detail-title")).toBeVisible({ timeout: 15000 });
     await panel.getByRole("button", { name: "More options" }).click();
     await panel.getByRole("button", { name: "Delete", exact: true }).click();
+    await panel.getByRole("button", { name: "Confirm delete" }).click();
     await expectRemoved(page, page.getByText(walletLabel), "wallet");
   });
 
@@ -291,6 +294,7 @@ test("FK unlink regression — account→project, wallet→group, note←inbox +
     await expect(panel.locator("#project-detail-title")).toBeVisible({ timeout: 15000 });
     await panel.getByRole("button", { name: "More options" }).click();
     await panel.getByRole("button", { name: "Delete permanently" }).click();
+    await panel.getByRole("button", { name: "Confirm delete" }).click();
     await expectRemoved(page, page.getByText(projectName, { exact: true }), "project");
   });
 

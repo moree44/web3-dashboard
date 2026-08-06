@@ -9,6 +9,7 @@ import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { recordActivity } from "@/features/activity/activity-log";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { getNftCampaignCount } from "@/features/nfts/actions";
 import { ARCHIVE_REASONS } from "@/features/projects/project-query";
 import {
   parseProjectAssignments,
@@ -30,6 +31,13 @@ export type ProjectWalletOption = Pick<
 export type ProjectWithAccounts = typeof projects.$inferSelect & {
   assignedAccounts: ProjectAccountOption[];
   assignedWallets: ProjectWalletOption[];
+};
+
+export type ProjectsWorkspaceData = {
+  projects: ProjectWithAccounts[];
+  accountOptions: ProjectAccountOption[];
+  walletOptions: ProjectWalletOption[];
+  nftCount: number;
 };
 
 function revalidateProjectViews() {
@@ -231,6 +239,19 @@ export async function getProjectWalletOptions(): Promise<ProjectWalletOption[]> 
     .from(wallets)
     .where(eq(wallets.workspaceId, workspaceId))
     .orderBy(wallets.label);
+}
+
+// Single workspace per session; the query cache key mirrors the page's one-shot
+// load. Kept separate from the loaders so the archive page can keep using
+// getArchivedProjects without pulling nftCount.
+export async function getProjectsWorkspaceData(): Promise<ProjectsWorkspaceData> {
+  const [projects, accountOptions, walletOptions, nftCount] = await Promise.all([
+    getProjects(),
+    getProjectAccountOptions(),
+    getProjectWalletOptions(),
+    getNftCampaignCount(),
+  ]);
+  return { projects, accountOptions, walletOptions, nftCount };
 }
 
 // ─── Mutations ───────────────────────────────────────────────────────────────

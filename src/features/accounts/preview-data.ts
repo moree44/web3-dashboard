@@ -1,0 +1,67 @@
+import type {
+  AccountsWorkspaceData,
+} from "@/features/accounts/actions";
+
+export const accountsPreviewData: AccountsWorkspaceData = {
+  accounts: [
+    {
+      id: "preview-account-moree",
+      workspaceId: "preview-workspace",
+      label: "Moree",
+      avatarUrl: null,
+      avatarSource: "none",
+      color: null,
+      xUsername: "@moree",
+      xUrl: "https://x.com/moree",
+      discordUsername: null,
+      email: null,
+      notes: "Main hunting account.",
+      createdAt: new Date("2025-10-01T02:00:00.000Z"),
+      updatedAt: new Date("2026-07-30T09:00:00.000Z"),
+      walletCount: 1,
+      activeProjects: ["Soundness", "NexusHQ"],
+    },
+    {
+      id: "preview-account-wdym",
+      workspaceId: "preview-workspace",
+      label: "Wdym",
+      avatarUrl: null,
+      avatarSource: "none",
+      color: null,
+      xUsername: null,
+      xUrl: null,
+      discordUsername: "wdym",
+      email: null,
+      notes: null,
+      createdAt: new Date("2026-02-14T02:00:00.000Z"),
+      updatedAt: new Date("2026-07-28T08:00:00.000Z"),
+      walletCount: 0,
+      activeProjects: ["Soundness"],
+    },
+  ],
+  wallets: [
+    {
+      id: "preview-wallet-1",
+      workspaceId: "preview-workspace",
+      ownerAccountId: "preview-account-moree",
+      walletGroupId: null,
+      label: "Moree main",
+      address: "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063",
+      chainType: "EVM",
+      walletType: "main",
+      notes: null,
+      createdAt: new Date("2025-10-01T02:00:00.000Z"),
+      updatedAt: new Date("2026-07-30T09:00:00.000Z"),
+    },
+  ],
+  walletGroups: [
+    {
+      id: "preview-group-default",
+      workspaceId: "preview-workspace",
+      name: "Main wallets",
+      description: "Everyday hunting wallets.",
+      createdAt: new Date("2025-10-01T02:00:00.000Z"),
+      updatedAt: new Date("2026-07-30T09:00:00.000Z"),
+    },
+  ],
+};

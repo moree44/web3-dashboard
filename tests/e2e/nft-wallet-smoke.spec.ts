@@ -109,11 +109,13 @@ test("NFT wallet participation persists partial whitelist outcomes", async ({ pa
   await page.getByRole("button", { name: "Wallets", exact: true }).click();
   await page.getByRole("button", { name: "More options for " + walletLabel }).click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm delete" }).click();
   await expect(page.getByText(walletLabel, { exact: true })).toHaveCount(0, { timeout: 15_000 });
 
   await page.getByRole("button", { name: "Identities", exact: true }).click();
   await page.getByRole("button", { name: "More options for " + accountLabel }).click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm delete" }).click();
   await expect(page.getByRole("heading", { name: accountLabel, exact: true })).toHaveCount(0, { timeout: 15_000 });
 
   expect(consoleErrors).toEqual([]);

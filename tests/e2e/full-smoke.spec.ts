@@ -321,6 +321,7 @@ test("full app smoke — menus, accounts, avatar upload, wallets, groups, projec
     const panel = dialog(page);
     await panel.getByRole("button", { name: "More options" }).click();
     await panel.getByRole("button", { name: "Delete", exact: true }).click();
+    await panel.getByRole("button", { name: "Confirm delete" }).click();
     await page.waitForTimeout(1500);
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForTimeout(900);
@@ -356,6 +357,7 @@ test("full app smoke — menus, accounts, avatar upload, wallets, groups, projec
     await page.waitForTimeout(400);
     groupMenuHasEdit = (await page.getByRole("button", { name: /^(Edit|Rename)$/ }).count()) > 0;
     await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await page.getByRole("button", { name: "Confirm delete" }).click();
     await page.waitForTimeout(1500);
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForTimeout(900);
@@ -444,7 +446,9 @@ test("full app smoke — menus, accounts, avatar upload, wallets, groups, projec
     await expect(panel.locator("#project-detail-title")).toBeVisible({ timeout: 15000 });
     await panel.getByRole("button", { name: "More options" }).click();
     await panel.getByRole("button", { name: "Archive" }).click();
-    await page.waitForTimeout(1500);
+    // Drawer closes only after the archive server action commits; waiting
+    // avoids the goto below aborting the in-flight action.
+    await expect(dialog(page)).toHaveCount(0, { timeout: 20000 });
     await page.goto("/projects", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(800);
     await expect(page.getByText(finalProjectName, { exact: true })).toHaveCount(0, { timeout: 15000 });
@@ -465,7 +469,9 @@ test("full app smoke — menus, accounts, avatar upload, wallets, groups, projec
     } else {
       await row.getByRole("button", { name: /Restore/i }).first().click();
     }
-    await page.waitForTimeout(1800);
+    // The row disappears from /archive only after restore commits; wait for it
+    // instead of a fixed sleep so the goto below can't abort the action.
+    await expect(page.locator("tr, article").filter({ hasText: finalProjectName })).toHaveCount(0, { timeout: 20000 });
     await page.goto("/projects", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1000);
     await expect(page.getByText(finalProjectName).first()).toBeVisible({ timeout: 15000 });
@@ -479,7 +485,11 @@ test("full app smoke — menus, accounts, avatar upload, wallets, groups, projec
     const panel = dialog(page);
     await panel.getByRole("button", { name: "More options" }).click();
     await panel.getByRole("button", { name: "Delete permanently" }).click();
-    await page.waitForTimeout(1800);
+    await panel.getByRole("button", { name: "Confirm delete" }).click();
+    // The drawer closes only after the delete server action has committed to
+    // the DB (commit-waiting). Waiting for the drawer to unmount instead of a
+    // fixed sleep ensures the in-flight action isn't aborted by the goto below.
+    await expect(dialog(page)).toHaveCount(0, { timeout: 20000 });
     await page.goto("/projects", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(900);
     await expect(page.getByText(finalProjectName, { exact: true })).toHaveCount(0, { timeout: 15000 });
@@ -493,7 +503,11 @@ test("full app smoke — menus, accounts, avatar upload, wallets, groups, projec
     await expect(panel.getByRole("heading", { name: "Account detail" })).toBeVisible({ timeout: 15000 });
     await panel.getByRole("button", { name: "More options" }).click();
     await panel.getByRole("button", { name: "Delete", exact: true }).click();
-    await page.waitForTimeout(1800);
+    await panel.getByRole("button", { name: "Confirm delete" }).click();
+    // Same commit-waiting contract as the project delete above: the drawer
+    // closes only after the account delete has committed to the DB, so the
+    // reload below can't abort the in-flight action.
+    await expect(dialog(page)).toHaveCount(0, { timeout: 20000 });
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1000);
     await expect(page.getByRole("heading", { name: accountRenamed, exact: true })).toHaveCount(0, { timeout: 15000 });

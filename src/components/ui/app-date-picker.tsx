@@ -103,7 +103,7 @@ export function AppDatePicker({
         <div
           ref={menuRef}
           data-app-floating-menu="true"
-          className="fixed z-[120] overflow-hidden rounded-xl bg-[#18181a]/[0.98] p-2 text-left shadow-2xl shadow-black/45 ring-1 ring-white/[0.055] backdrop-blur"
+          className="popup-in fixed z-[120] overflow-hidden rounded-xl bg-[#18181a]/[0.98] p-2 text-left shadow-2xl shadow-black/45 ring-1 ring-white/[0.055] backdrop-blur"
           style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
         >
           <div className="flex items-center justify-between gap-2 px-1 pb-2">

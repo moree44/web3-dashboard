@@ -14,7 +14,9 @@ import {
 import { AppDatePicker } from "@/components/ui/app-date-picker";
 import { AppSelect } from "@/components/ui/app-select";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { normalizeHttpUrl } from "@/lib/url";
+import { usePresence } from "@/lib/use-presence";
 
 type DeadlineDialogProps = {
   open: boolean;
@@ -83,7 +85,8 @@ export function DeadlineDialog({
     return options.tasks.filter((task) => task.projectId === linkedProjectId);
   }, [linkedProjectId, options.tasks]);
 
-  if (!open) return null;
+  const { mounted, closing } = usePresence(open, 160);
+  if (!mounted) return null;
 
   const canSave = title.trim().length > 0 && dueDate.length > 0 && !isSaving;
   const projectOptions = [
@@ -164,7 +167,7 @@ export function DeadlineDialog({
 
   return (
     <div
-      className="modal-backdrop-in fixed inset-0 z-[100] grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]"
+      className={cn("fixed inset-0 z-[100] grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]", closing ? "modal-backdrop-out" : "modal-backdrop-in")}
       role="dialog"
       aria-modal="true"
       aria-labelledby="deadline-dialog-title"
@@ -172,7 +175,7 @@ export function DeadlineDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="modal-card-in soft-panel max-h-[calc(100vh-32px)] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle">
+      <div className={cn("soft-panel max-h-[calc(100vh-32px)] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle", closing ? "modal-card-out" : "modal-card-in")}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-card/95 px-5 py-4 backdrop-blur">
           <div>
             <h2 id="deadline-dialog-title" className="text-base font-semibold tracking-[-0.02em]">

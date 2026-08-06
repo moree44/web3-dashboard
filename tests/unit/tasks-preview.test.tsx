@@ -122,6 +122,6 @@ describe("TasksPreview", () => {
     expect(screen.getByRole("dialog", { name: "Edit task" })).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "Edit task" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit task" })).not.toBeInTheDocument());
   });
 });

@@ -77,6 +77,7 @@ test("custom-chain Project Wallet persists and survives Project deletion", async
   const reopenedDetail = page.getByRole("dialog");
   await reopenedDetail.getByRole("button", { name: "More options" }).click();
   await reopenedDetail.getByRole("button", { name: "Delete permanently" }).click();
+  await reopenedDetail.getByRole("button", { name: "Confirm delete" }).click();
   await expect(page.getByText(projectName, { exact: true })).toHaveCount(0, { timeout: 20_000 });
 
   await page.goto("/accounts", { waitUntil: "domcontentloaded" });
@@ -84,6 +85,7 @@ test("custom-chain Project Wallet persists and survives Project deletion", async
   await expect(page.getByText(walletLabel, { exact: true }).first()).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: `More options for ${walletLabel}` }).click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm delete" }).click();
   await expect(page.getByText(walletLabel, { exact: true })).toHaveCount(0, { timeout: 20_000 });
 
   expect(consoleErrors).toEqual([]);

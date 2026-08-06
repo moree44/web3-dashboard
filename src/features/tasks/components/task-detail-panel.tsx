@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AppDatePicker } from "@/components/ui/app-date-picker";
 import { AppSelect } from "@/components/ui/app-select";
@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { isHttpUrl, normalizeHttpUrl } from "@/lib/url";
 import { useDrawerDismiss } from "@/lib/use-drawer-dismiss";
+import { usePresence } from "@/lib/use-presence";
 
 type Props = {
   task: TaskRecord | null;
@@ -57,16 +58,25 @@ export function TaskDetailPanel({ task, projects, busy, error, onClose, onSave, 
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
-    setDraft(task ? emptyInput(task) : null);
-    setConfirmDelete(false);
+    if (task) {
+      setDraft(emptyInput(task));
+      setConfirmDelete(false);
+    }
   }, [task]);
 
-  if (!task || !draft) return null;
+  const lastTask = useRef<TaskRecord | null>(task);
+  useEffect(() => {
+    if (task) lastTask.current = task;
+  }, [task]);
+  const { mounted, closing } = usePresence(Boolean(task), 260);
+  if (!mounted) return null;
+  const activeTask = task ?? lastTask.current;
+  if (!activeTask || !draft) return null;
   const project = projects.find((item) => item.id === draft.projectId);
   const projectAccounts = project?.accounts ?? [];
   const projectWallets = project?.wallets ?? [];
   const canSave = draft.title.trim().length > 0 && Boolean(project) && Boolean(draft.startDate) && !busy;
-  const duration = formatTaskDuration(task.startDate, task.completedAt);
+  const duration = formatTaskDuration(activeTask.startDate, activeTask.completedAt);
 
   function changeProject(projectId: string) {
     setDraft((current) => current ? { ...current, projectId, accountIds: [], walletId: null } : current);
@@ -87,14 +97,14 @@ export function TaskDetailPanel({ task, projects, busy, error, onClose, onSave, 
 
   return (
     <div
-      className="drawer-backdrop-in fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-[2px]"
+      className={cn("fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-[2px]", closing ? "drawer-backdrop-out" : "drawer-backdrop-in")}
       role="dialog"
       aria-modal="true"
       aria-labelledby="task-detail-title"
       onClick={() => { if (!busy) onClose(); }}
     >
       <aside
-        className="drawer-panel-in flex h-full w-full max-w-[560px] flex-col border-l soft-divider bg-card shadow-2xl shadow-black/50"
+        className={cn("flex h-full w-full max-w-[560px] flex-col border-l soft-divider bg-card shadow-2xl shadow-black/50", closing ? "drawer-panel-out" : "drawer-panel-in")}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b soft-divider px-5 py-3">

@@ -117,6 +117,12 @@
   .modal-card-in { animation: modalCardIn 160ms cubic-bezier(.2, .8, .2, 1) both; transform-origin: center; }
   .drawer-backdrop-in { animation: drawerBackdropIn 180ms var(--ease-out) both; }
   .drawer-panel-in { animation: drawerPanelIn 260ms var(--ease-drawer) both; }
+  .modal-backdrop-out { animation: modalBackdropOut 120ms ease-out both; }
+  .modal-card-out { animation: modalCardOut 160ms cubic-bezier(.2, .8, .2, 1) both; transform-origin: center; }
+  .drawer-backdrop-out { animation: drawerBackdropOut 180ms var(--ease-out) both; }
+  .drawer-panel-out { animation: drawerPanelOut 260ms var(--ease-drawer) both; }
+  .popup-in { animation: popupIn 140ms var(--ease-out) both; transform-origin: top; }
+  .row-enter-in { animation: rowIn 200ms var(--ease-out) both; }
   .t-check {
     transition:
       background var(--check-box) var(--check-ease),
@@ -244,6 +250,34 @@
 @keyframes drawerPanelIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes modalBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes modalCardOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(.985); }
+}
+
+@keyframes drawerBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes drawerPanelOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes popupIn {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+}
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(-4px); }
 }
 
 ::selection { background: rgb(113 128 255 / 30%); color: var(--foreground); }

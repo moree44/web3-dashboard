@@ -19,6 +19,7 @@ import { AppSelect } from "@/components/ui/app-select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { normalizeHttpUrl } from "@/lib/url";
+import { usePresence } from "@/lib/use-presence";
 
 const statusLabels: Record<(typeof NFT_STATUSES)[number], string> = {
   watching: "Watching",
@@ -95,7 +96,8 @@ export function NftDialog({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [onClose, open]);
 
-  if (!open) return null;
+  const { mounted, closing } = usePresence(open, 160);
+  if (!mounted) return null;
 
   const hasInvalidWallet = walletAssignments.some((assignment) => {
     const wallet = wallets.find((option) => option.id === assignment.walletId);
@@ -185,7 +187,7 @@ export function NftDialog({
 
   return (
     <div
-      className="modal-backdrop-in fixed inset-0 z-[100] grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]"
+      className={cn("fixed inset-0 z-[100] grid place-items-center bg-black/45 px-4 backdrop-blur-[2px]", closing ? "modal-backdrop-out" : "modal-backdrop-in")}
       role="dialog"
       aria-modal="true"
       aria-labelledby="nft-dialog-title"
@@ -193,7 +195,7 @@ export function NftDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="modal-card-in soft-panel max-h-[calc(100vh-32px)] w-full max-w-[660px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle">
+      <div className={cn("soft-panel max-h-[calc(100vh-32px)] w-full max-w-[660px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle", closing ? "modal-card-out" : "modal-card-in")}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-card/95 px-5 py-4 backdrop-blur">
           <div>
             <h2 id="nft-dialog-title" className="text-base font-semibold tracking-[-0.02em]">
