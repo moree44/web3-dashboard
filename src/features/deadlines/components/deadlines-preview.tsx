@@ -22,6 +22,7 @@ import {
   formatDeadlineTime,
   getDeadlineDayDifference,
 } from "../deadline-utils";
+import { useDeadlinesCache, useDeadlinesWorkspace } from "../deadlines-query";
 import { DeadlineDialog } from "./deadline-dialog";
 
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +50,17 @@ export function DeadlinesPreview({
   options: DeadlineOptions;
   canPersist?: boolean;
 }) {
-  const [deadlines, setDeadlines] = useState(initialDeadlines);
+  const developmentPreview = !canPersist;
+  const initialData = useMemo(
+    () => ({ deadlines: initialDeadlines, options }),
+    [initialDeadlines, options],
+  );
+  const { data: queryData } = useDeadlinesWorkspace(initialData, developmentPreview);
+  const workspace = queryData ?? initialData;
+  const deadlines = workspace.deadlines;
+  const deadlineOptions = workspace.options;
+  const cache = useDeadlinesCache();
+
   const [view, setView] = useState<DeadlineView>("upcoming");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState<DeadlineWithContext | null>(null);
@@ -94,18 +105,13 @@ export function DeadlinesPreview({
   }
 
   function handleSaved(saved: DeadlineWithContext) {
-    setDeadlines((current) => {
-      const exists = current.some((item) => item.id === saved.id);
-      return exists
-        ? current.map((item) => item.id === saved.id ? saved : item)
-        : [saved, ...current];
-    });
+    cache.applySaved(saved);
     setView(saved.status);
     router.refresh();
   }
 
   function handleDeleted(id: string) {
-    setDeadlines((current) => current.filter((item) => item.id !== id));
+    cache.applyDeleted(id);
     router.refresh();
   }
 
@@ -190,7 +196,7 @@ export function DeadlinesPreview({
       <DeadlineDialog
         open={dialogOpen}
         onClose={closeDialog}
-        options={options}
+        options={deadlineOptions}
         deadline={selected}
         onSaved={handleSaved}
         onDeleted={handleDeleted}

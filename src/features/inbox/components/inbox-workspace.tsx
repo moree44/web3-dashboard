@@ -6,16 +6,7 @@ import { useMemo, useState } from "react";
 import { AppSelect } from "@/components/ui/app-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  createInboxItem,
-  createNoteFromInbox,
-  createProjectFromInbox,
-  createTaskFromInbox,
-  getInboxPageData,
-  linkInboxItem,
-  setInboxStatus,
-  updateInboxItem,
-} from "@/features/inbox/actions";
+import { useInboxMutations, useInboxWorkspace } from "@/features/inbox/inbox-query";
 import { INBOX_PRIORITIES, INBOX_STATUSES, type InboxItemInput, type InboxItemRecord, type InboxPageData, type InboxPriority, type InboxStatus } from "@/features/inbox/inbox-types";
 import { isHttpUrl } from "@/lib/url";
 import { cn } from "@/lib/utils";
@@ -64,7 +55,8 @@ function priorityVariant(priority: InboxPriority) {
 }
 
 export function InboxWorkspace({ initialData, developmentPreview = false }: { initialData: InboxPageData; developmentPreview?: boolean }) {
-  const [data, setData] = useState(initialData);
+  const { data: queryData } = useInboxWorkspace(initialData, developmentPreview);
+  const data = queryData ?? initialData;
   const [selectedId, setSelectedId] = useState<string | null>(initialData.items[0]?.id ?? null);
   const [draft, setDraft] = useState<Draft | null>(() => initialData.items[0] ? recordDraft(initialData.items[0]) : null);
   const [query, setQuery] = useState("");
@@ -72,8 +64,14 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
   const [priorityFilter, setPriorityFilter] = useState("");
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionDraft, setActionDraft] = useState<ActionDraft>({ projectName: "", taskTitle: "", projectId: "", linkedProjectId: "" });
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mutations = useInboxMutations({
+    developmentPreview,
+    onError: (message) => setError(message),
+  });
+  const busy = mutations.saveItemMutation.isPending
+    || mutations.statusMutation.isPending
+    || mutations.processMutation.isPending;
 
   const selected = data.items.find((item) => item.id === selectedId) ?? null;
   const filteredItems = useMemo(() => {
@@ -86,8 +84,7 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
     });
   }, [data.items, priorityFilter, query, statusFilter]);
 
-  function applySaved(saved: InboxItemRecord) {
-    setData((current) => ({ ...current, items: current.items.some((item) => item.id === saved.id) ? current.items.map((item) => item.id === saved.id ? saved : item) : [saved, ...current.items] }));
+  function applySavedLocal(saved: InboxItemRecord) {
     setSelectedId(saved.id);
     setDraft(recordDraft(saved));
   }
@@ -108,29 +105,24 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
 
   async function saveDraft() {
     if (!draft || developmentPreview || busy) return;
-    setBusy(true);
     setError(null);
+    const { id, ...input } = draft;
     try {
-      const { id, ...input } = draft;
-      const saved = id ? await updateInboxItem(id, input) : await createInboxItem(input);
-      applySaved(saved);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Inbox item could not be saved");
-    } finally {
-      setBusy(false);
+      const saved = await mutations.saveItemMutation.mutateAsync({ id, input });
+      applySavedLocal(saved);
+    } catch {
+      // Failure is surfaced through onError into the error banner.
     }
   }
 
   async function changeStatus(status: InboxStatus) {
     if (!selected || developmentPreview || busy) return;
-    setBusy(true);
     setError(null);
     try {
-      applySaved(await setInboxStatus(selected.id, status));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Inbox status could not be updated");
-    } finally {
-      setBusy(false);
+      const saved = await mutations.statusMutation.mutateAsync({ id: selected.id, status });
+      applySavedLocal(saved);
+    } catch {
+      // Failure is surfaced through onError into the error banner.
     }
   }
 
@@ -148,24 +140,25 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
 
   async function runAction() {
     if (!selected || !actionMode || developmentPreview || busy) return;
-    setBusy(true);
     setError(null);
     try {
       let saved: InboxItemRecord;
-      if (actionMode === "project") saved = await createProjectFromInbox(selected.id, { projectName: actionDraft.projectName });
-      else if (actionMode === "task") saved = await createTaskFromInbox(selected.id, { projectId: actionDraft.projectId, taskTitle: actionDraft.taskTitle });
-      else if (actionMode === "note") saved = await createNoteFromInbox(selected.id, { title: actionDraft.taskTitle, linkedProjectId: actionDraft.linkedProjectId || null });
-      else if (actionMode === "link-project") saved = await linkInboxItem(selected.id, { type: "project", targetId: actionDraft.linkedProjectId });
-      else saved = await linkInboxItem(selected.id, { type: "task", targetId: actionDraft.projectId });
-      const refreshed = await getInboxPageData();
-      setData(refreshed);
-      setSelectedId(saved.id);
-      setDraft(recordDraft(refreshed.items.find((item) => item.id === saved.id) ?? saved));
+      if (actionMode === "project") {
+        saved = await mutations.processMutation.mutateAsync({ kind: "project", id: selected.id, input: { projectName: actionDraft.projectName } });
+      } else if (actionMode === "task") {
+        saved = await mutations.processMutation.mutateAsync({ kind: "task", id: selected.id, input: { projectId: actionDraft.projectId, taskTitle: actionDraft.taskTitle } });
+      } else if (actionMode === "note") {
+        saved = await mutations.processMutation.mutateAsync({ kind: "note", id: selected.id, input: { title: actionDraft.taskTitle, linkedProjectId: actionDraft.linkedProjectId || null } });
+      } else if (actionMode === "link-project") {
+        saved = await mutations.processMutation.mutateAsync({ kind: "link-project", id: selected.id, targetId: actionDraft.linkedProjectId });
+      } else {
+        saved = await mutations.processMutation.mutateAsync({ kind: "link-task", id: selected.id, targetId: actionDraft.projectId });
+      }
+      // processMutation refreshes full page data; re-bind detail from returned item.
+      applySavedLocal(saved);
       setActionMode(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Inbox action could not be completed");
-    } finally {
-      setBusy(false);
+    } catch {
+      // Failure is surfaced through onError into the error banner.
     }
   }
 

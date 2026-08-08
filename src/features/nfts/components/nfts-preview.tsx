@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 
 import type { NftAccountOption, NftCampaignWithContext, NftWalletOption } from "../actions";
 import { NFT_STATUSES } from "../nft-schema";
+import { useNftsCache, useNftsWorkspace } from "../nfts-query";
 import { NftDialog } from "./nft-dialog";
 
 import { AppSelect } from "@/components/ui/app-select";
@@ -26,7 +27,18 @@ const statusLabels: Record<(typeof NFT_STATUSES)[number], string> = {
 };
 
 export function NftsPreview({ initialCampaigns, accounts, wallets, canPersist = true }: { initialCampaigns: NftCampaignWithContext[]; accounts: NftAccountOption[]; wallets: NftWalletOption[]; canPersist?: boolean }) {
-  const [campaigns, setCampaigns] = useState(initialCampaigns);
+  const developmentPreview = !canPersist;
+  const initialData = useMemo(
+    () => ({ campaigns: initialCampaigns, accounts, wallets }),
+    [accounts, initialCampaigns, wallets],
+  );
+  const { data: queryData } = useNftsWorkspace(initialData, developmentPreview);
+  const workspace = queryData ?? initialData;
+  const campaigns = workspace.campaigns;
+  const accountOptions = workspace.accounts;
+  const walletOptions = workspace.wallets;
+  const cache = useNftsCache();
+
   const [view, setView] = useState<NftView>("all");
   const [query, setQuery] = useState("");
   const [chain, setChain] = useState("");
@@ -56,10 +68,12 @@ export function NftsPreview({ initialCampaigns, accounts, wallets, canPersist = 
   }
 
   function handleSaved(saved: NftCampaignWithContext) {
-    setCampaigns((current) => current.some((campaign) => campaign.id === saved.id)
-      ? current.map((campaign) => campaign.id === saved.id ? saved : campaign)
-      : [saved, ...current]);
+    cache.applySaved(saved);
     setView(saved.status);
+  }
+
+  function handleDeleted(id: string) {
+    cache.applyDeleted(id);
   }
 
   return (
@@ -105,7 +119,7 @@ export function NftsPreview({ initialCampaigns, accounts, wallets, canPersist = 
 
       <div className="flex min-h-12 items-center px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">Showing {visibleCampaigns.length} {visibleCampaigns.length === 1 ? "NFT" : "NFTs"}</div>
 
-      <NftDialog open={dialogOpen} campaign={selected} accounts={accounts} wallets={wallets} onClose={() => setDialogOpen(false)} onSaved={handleSaved} onDeleted={(id) => setCampaigns((current) => current.filter((campaign) => campaign.id !== id))} />
+      <NftDialog open={dialogOpen} campaign={selected} accounts={accountOptions} wallets={walletOptions} onClose={() => setDialogOpen(false)} onSaved={handleSaved} onDeleted={handleDeleted} />
     </div>
   );
 }

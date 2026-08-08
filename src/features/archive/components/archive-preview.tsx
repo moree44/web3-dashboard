@@ -1,9 +1,10 @@
 "use client";
 
 import { Archive, CalendarClock, RotateCcw, Search, ShieldAlert, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { deleteProject, restoreProject, type ProjectWithAccounts } from "@/features/projects/actions";
+import type { ProjectWithAccounts } from "@/features/projects/actions";
+import { useArchiveMutations, useArchiveWorkspace } from "@/features/archive/archive-query";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,11 +55,27 @@ function mapArchivedProject(project: ProjectWithAccounts): ArchivedProject {
 }
 
 export function ArchivePreview({ initialProjects = [], developmentPreview = false }: { initialProjects?: ProjectWithAccounts[]; developmentPreview?: boolean }) {
-  const [items, setItems] = useState<ArchivedProject[]>(() => developmentPreview ? initialArchivedProjects : initialProjects.map(mapArchivedProject));
+  const initialData = useMemo(
+    () => ({ projects: developmentPreview ? [] : initialProjects }),
+    [developmentPreview, initialProjects],
+  );
+  const { data: queryData } = useArchiveWorkspace(initialData, developmentPreview);
+  const workspace = queryData ?? initialData;
+  // Preview fixtures stay local (no server). Real mode maps DB rows from the query cache.
+  const [previewItems, setPreviewItems] = useState(initialArchivedProjects);
+  const items = developmentPreview
+    ? previewItems
+    : workspace.projects.map(mapArchivedProject);
+
   const [actionError, setActionError] = useState("");
   const [activeFilter, setActiveFilter] = useState<ReasonFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(() => new Set());
+  const mutations = useArchiveMutations({
+    developmentPreview,
+    onError: (message) => setActionError(message),
+  });
+  const busy = mutations.restoreMutation.isPending || mutations.deleteMutation.isPending;
   const query = searchQuery.trim().toLowerCase();
 
   const reasonCounts = useMemo(() => {
@@ -108,26 +125,45 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
   }
 
   async function restoreSelected() {
-    if (selectedCount === 0) return;
+    if (selectedCount === 0 || busy) return;
     setActionError("");
+    const ids = [...selectedProjects];
     try {
-      if (!developmentPreview) await Promise.all([...selectedProjects].map((id) => restoreProject(id)));
-      setItems((current) => current.filter((project) => !selectedProjects.has(project.id ?? project.name)));
+      if (developmentPreview) {
+        setPreviewItems((current) => current.filter((project) => !selectedProjects.has(project.id ?? project.name)));
+        setSelectedProjects(new Set());
+        return;
+      }
+      await mutations.restoreMutation.mutateAsync(ids);
       setSelectedProjects(new Set());
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to restore selected projects");
+    } catch {
+      // Failure is surfaced through onError.
     }
   }
 
   async function permanentlyDelete(project: ArchivedProject) {
-    if (!confirm("Permanently delete this archived project? This cannot be undone.")) return;
+    if (busy) return;
     setActionError("");
+    const key = project.id ?? project.name;
     try {
-      if (!developmentPreview && project.id) await deleteProject(project.id);
-      setItems((current) => current.filter((item) => (item.id ?? item.name) !== (project.id ?? project.name)));
-      setSelectedProjects((current) => { const next = new Set(current); next.delete(project.id ?? project.name); return next; });
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to delete project");
+      if (developmentPreview) {
+        setPreviewItems((current) => current.filter((item) => (item.id ?? item.name) !== key));
+        setSelectedProjects((current) => {
+          const next = new Set(current);
+          next.delete(key);
+          return next;
+        });
+        return;
+      }
+      if (!project.id) return;
+      await mutations.deleteMutation.mutateAsync(project.id);
+      setSelectedProjects((current) => {
+        const next = new Set(current);
+        next.delete(project.id!);
+        return next;
+      });
+    } catch {
+      // Failure is surfaced through onError.
     }
   }
 
@@ -137,8 +173,14 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Archive</h1>
         </div>
-        <Button variant="secondary" size="sm" disabled={selectedCount === 0} onClick={restoreSelected} title={selectedCount === 0 ? "Select projects to restore" : "Remove selected from archive preview"}>
-          <RotateCcw />Restore selected
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={selectedCount === 0 || busy}
+          onClick={() => void restoreSelected()}
+          title={selectedCount === 0 ? "Select projects to restore" : "Restore selected projects"}
+        >
+          <RotateCcw />{busy && mutations.restoreMutation.isPending ? "Restoring..." : "Restore selected"}
         </Button>
       </header>
 
@@ -160,7 +202,7 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
         </div>
       </div>
 
-      {actionError ? <p className="px-4 pt-3 text-xs text-danger sm:px-6 lg:px-8">{actionError}</p> : null}
+      {actionError ? <p role="alert" className="px-4 pt-3 text-xs text-destructive sm:px-6 lg:px-8">{actionError}</p> : null}
 
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
@@ -199,11 +241,35 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
               <th className="border-b border-white/[0.045] px-3 py-3"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody>{filtered.map((project) => { const key = project.id ?? project.name; return <ArchiveRow key={key} project={project} selected={selectedProjects.has(key)} onSelect={() => toggleSelected(key)} onDelete={() => permanentlyDelete(project)} />; })}</tbody>
+          <tbody>{filtered.map((project) => {
+            const key = project.id ?? project.name;
+            return (
+              <ArchiveRow
+                key={key}
+                project={project}
+                selected={selectedProjects.has(key)}
+                busy={busy}
+                onSelect={() => toggleSelected(key)}
+                onDelete={() => void permanentlyDelete(project)}
+              />
+            );
+          })}</tbody>
         </table>
       </div>
 
-      <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => { const key = project.id ?? project.name; return <ArchiveMobileCard key={key} project={project} selected={selectedProjects.has(key)} onSelect={() => toggleSelected(key)} onDelete={() => permanentlyDelete(project)} />; })}</div>
+      <div className="divide-y divide-white/[0.045] lg:hidden">{filtered.map((project) => {
+        const key = project.id ?? project.name;
+        return (
+          <ArchiveMobileCard
+            key={key}
+            project={project}
+            selected={selectedProjects.has(key)}
+            busy={busy}
+            onSelect={() => toggleSelected(key)}
+            onDelete={() => void permanentlyDelete(project)}
+          />
+        );
+      })}</div>
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">
         <span>Showing {filtered.length} archived projects</span>
         <span />
@@ -212,7 +278,7 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
   );
 }
 
-function ArchiveRow({ project, selected, onSelect, onDelete }: { project: ArchivedProject; selected: boolean; onSelect: () => void; onDelete: () => void }) {
+function ArchiveRow({ project, selected, busy, onSelect, onDelete }: { project: ArchivedProject; selected: boolean; busy: boolean; onSelect: () => void; onDelete: () => void }) {
   return (
     <tr className="h-[58px] border-b border-white/[0.035] hover:bg-white/[0.025]">
       <td className="px-4 lg:px-8">
@@ -226,20 +292,60 @@ function ArchiveRow({ project, selected, onSelect, onDelete }: { project: Archiv
       <td className="px-3 text-xs text-muted-foreground">{project.result}</td>
       <td className="px-3"><span className="grid size-7 place-items-center rounded-full bg-white/[0.055] text-[10px] font-semibold">{project.account[0]}</span></td>
       <td className="px-3 text-xs text-muted-foreground">{project.archived}</td>
-      <td className="px-3"><button type="button" onClick={onDelete} aria-label={"Delete " + project.name + " permanently"} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-red-400"><Trash2 className="size-4" /></button></td>
+      <td className="px-3">
+        <ArchiveDeleteButton name={project.name} busy={busy} size="sm" onDelete={onDelete} />
+      </td>
     </tr>
   );
 }
 
-function ArchiveMobileCard({ project, selected, onSelect, onDelete }: { project: ArchivedProject; selected: boolean; onSelect: () => void; onDelete: () => void }) {
+function ArchiveMobileCard({ project, selected, busy, onSelect, onDelete }: { project: ArchivedProject; selected: boolean; busy: boolean; onSelect: () => void; onDelete: () => void }) {
   return (
     <article className="px-4 py-4 sm:px-6">
       <div className="flex items-center gap-3">
         <ArchiveCheckbox project={project} selected={selected} onSelect={onSelect} />
         <ArchiveIdentity project={project} />
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2"><div className="flex flex-wrap gap-2"><Reason reason={project.reason} /><Badge variant="secondary">{project.hunt}</Badge><Badge variant="outline">{project.archived}</Badge></div><button type="button" onClick={onDelete} aria-label={"Delete " + project.name + " permanently"} className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-red-400"><Trash2 className="size-4" /></button></div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2"><Reason reason={project.reason} /><Badge variant="secondary">{project.hunt}</Badge><Badge variant="outline">{project.archived}</Badge></div>
+        <ArchiveDeleteButton name={project.name} busy={busy} size="md" onDelete={onDelete} />
+      </div>
     </article>
+  );
+}
+
+/** Compact two-step delete for icon-only table/mobile actions (replaces native confirm). */
+function ArchiveDeleteButton({ name, busy, size, onDelete }: { name: string; busy: boolean; size: "sm" | "md"; onDelete: () => void }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const timeout = window.setTimeout(() => setArmed(false), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [armed]);
+
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      aria-label={armed ? "Confirm permanent delete of " + name : "Delete " + name + " permanently"}
+      onClick={() => {
+        if (!armed) {
+          setArmed(true);
+          return;
+        }
+        setArmed(false);
+        onDelete();
+      }}
+      className={cn(
+        "grid place-items-center rounded-md transition-colors disabled:opacity-50",
+        size === "sm" ? "size-7" : "size-8",
+        armed
+          ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
+          : "text-muted-foreground hover:bg-white/[0.045] hover:text-red-400",
+      )}
+    >
+      <Trash2 className="size-4" />
+    </button>
   );
 }
 

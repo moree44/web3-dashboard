@@ -1,10 +1,10 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-08-06
+Last updated: 2026-08-08
 
 ## Current Position
 
-Web3 Hunting OS is in **Phase 1 Core, CRUD wired**.
+Web3 Hunting OS is in **Phase 1 Core, CRUD wired + Track D React Query**.
 
 The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
 
@@ -292,9 +292,12 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | `tasks-preview.tsx` | ~330 lines | CRUD wired; Personal Item CRUD is persisted; React Query + optimistic mutations (`tasks-query.ts` holds the hooks) |
 | `accounts-preview.tsx` | ~1600+ lines | CRUD wired (identities, wallets, groups); React Query + optimistic mutations (`accounts-query.ts` holds the hooks) |
 | `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation; React Query + optimistic mutations (`projects-query.ts` holds the hooks) |
-| `archive-preview.tsx` | ~278 lines | CRUD wired (restore, delete) |
-| `daily-workspace.tsx` | ~300+ lines | Task Log and Daily execution wired |
-| `docs-workspace.tsx` | ~300+ lines | Docs CRUD wired |
+| `nfts-preview.tsx` | ~200 lines | CRUD wired; React Query cache (`nfts-query.ts`); dialog still owns create/update/delete server calls |
+| `deadlines-preview.tsx` | ~230 lines | CRUD wired; React Query cache (`deadlines-query.ts`); dialog still owns create/update/delete server calls |
+| `docs-workspace.tsx` | ~100 lines | Docs CRUD wired; React Query + commit-waiting save/delete (`docs-query.ts`) |
+| `inbox-workspace.tsx` | ~200 lines | Inbox CRUD wired; React Query + optimistic status + process refresh (`inbox-query.ts`) |
+| `archive-preview.tsx` | ~350 lines | CRUD wired (restore, delete); React Query + commit-waiting mutations (`archive-query.ts`); inline two-step delete |
+| `daily-workspace.tsx` | ~300+ lines | Task Log and Daily execution wired (still local state; not Track D) |
 
 Unit tests: 18 files, 78 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, and new Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
 
