@@ -216,6 +216,61 @@ export function useAccountsMutations(opts: {
     walletGroups: data.walletGroups.map((group) => (group.id === record.id ? record : group)),
   });
 
+  /** Keep account.walletCount in sync when a wallet is added/removed/reassigned. */
+  function bumpWalletCount(
+    accounts: AccountWithStats[],
+    ownerAccountId: string | null | undefined,
+    delta: number,
+  ): AccountWithStats[] {
+    if (!ownerAccountId || delta === 0) return accounts;
+    return accounts.map((account) => (account.id === ownerAccountId
+      ? { ...account, walletCount: Math.max(0, account.walletCount + delta) }
+      : account));
+  }
+
+  function addWalletToWorkspace(
+    data: AccountsWorkspaceData,
+    record: typeof walletsSchema.$inferSelect,
+  ): AccountsWorkspaceData {
+    const alreadyPresent = data.wallets.some((wallet) => wallet.id === record.id);
+    return {
+      ...data,
+      wallets: alreadyPresent
+        ? data.wallets.map((wallet) => (wallet.id === record.id ? record : wallet))
+        : [record, ...data.wallets],
+      accounts: alreadyPresent ? data.accounts : bumpWalletCount(data.accounts, record.ownerAccountId, 1),
+    };
+  }
+
+  function removeWalletFromWorkspace(data: AccountsWorkspaceData, id: string): AccountsWorkspaceData {
+    const removed = data.wallets.find((wallet) => wallet.id === id);
+    if (!removed) return data;
+    return {
+      ...data,
+      wallets: data.wallets.filter((wallet) => wallet.id !== id),
+      accounts: bumpWalletCount(data.accounts, removed.ownerAccountId, -1),
+    };
+  }
+
+  function reassignWalletOwner(
+    data: AccountsWorkspaceData,
+    previous: typeof walletsSchema.$inferSelect,
+    next: typeof walletsSchema.$inferSelect,
+  ): AccountsWorkspaceData {
+    if (previous.ownerAccountId === next.ownerAccountId) {
+      return mergeWalletInto(data, next);
+    }
+    return {
+      ...data,
+      wallets: data.wallets.map((wallet) => (wallet.id === next.id ? next : wallet)),
+      accounts: bumpWalletCount(
+        bumpWalletCount(data.accounts, previous.ownerAccountId, -1),
+        next.ownerAccountId,
+        1,
+      ),
+    };
+  }
+
   // Creates are commit-waiting in real mode (the dialogs show a pending state
   // until the server responds). Preview swaps to the local builders so the
   // optimistic record is the created row.
@@ -336,9 +391,9 @@ export function useAccountsMutations(opts: {
       return createWallet(vars.data);
     },
     applyOptimistic: opts.developmentPreview
-      ? (data, vars) => ({ ...data, wallets: [optimisticWallet(vars), ...data.wallets] })
+      ? (data, vars) => addWalletToWorkspace(data, optimisticWallet(vars))
       : undefined,
-    mergeResult: (data, result) => ({ ...data, wallets: [result, ...data.wallets] }),
+    mergeResult: (data, result) => addWalletToWorkspace(data, result),
   }));
 
   const updateWalletMutation = useMutation(buildAccountMutationOptions<typeof walletsSchema.$inferSelect, WalletUpdateVars>({
@@ -347,11 +402,16 @@ export function useAccountsMutations(opts: {
     developmentPreview: opts.developmentPreview,
     onError: opts.onError,
     mutationFn: ({ id, data }) => updateWallet(id, data),
-    applyOptimistic: (data, { id, data: update }) => ({
-      ...data,
-      wallets: data.wallets.map((wallet) => (wallet.id === id ? applyWalletEdit(wallet, update) : wallet)),
-    }),
-    mergeResult: (data, result) => mergeWalletInto(data, result),
+    applyOptimistic: (data, { id, data: update }) => {
+      const previous = data.wallets.find((wallet) => wallet.id === id);
+      if (!previous) return data;
+      return reassignWalletOwner(data, previous, applyWalletEdit(previous, update));
+    },
+    mergeResult: (data, result) => {
+      const previous = data.wallets.find((wallet) => wallet.id === result.id);
+      if (!previous) return addWalletToWorkspace(data, result);
+      return reassignWalletOwner(data, previous, result);
+    },
   }));
 
   const deleteWalletMutation = useMutation(buildAccountMutationOptions<void, string>({
@@ -364,9 +424,9 @@ export function useAccountsMutations(opts: {
       return deleteWallet(id);
     },
     applyOptimistic: opts.developmentPreview
-      ? (data, id) => ({ ...data, wallets: data.wallets.filter((wallet) => wallet.id !== id) })
+      ? (data, id) => removeWalletFromWorkspace(data, id)
       : undefined,
-    mergeResult: (data, _result, id) => ({ ...data, wallets: data.wallets.filter((wallet) => wallet.id !== id) }),
+    mergeResult: (data, _result, id) => removeWalletFromWorkspace(data, id),
   }));
 
   const createWalletGroupMutation = useMutation(buildAccountMutationOptions<typeof walletGroupsSchema.$inferSelect, WalletGroupCreateVars>({

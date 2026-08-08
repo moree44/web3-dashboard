@@ -11,6 +11,10 @@ import { createPersonalItem, deletePersonalItem, updatePersonalItemStatus } from
 import type { PersonalItemRecord } from "@/features/personal/types";
 import { createTask, deleteTask, getTaskWorkspaceData, updateTask, updateTaskStatus } from "@/features/tasks/actions";
 import { getJakartaDateValue } from "@/features/tasks/task-duration";
+import {
+  buildOptimisticPersonalItem,
+  mergePersonalItemCreate,
+} from "@/features/tasks/personal-items-cache";
 import type {
   TaskCreateInput,
   TaskInput,
@@ -126,18 +130,6 @@ export function applyTaskEdit(task: TaskRecord, input: TaskInput, projects: Task
   };
 }
 
-function optimisticPersonalItem(title: string): PersonalItemRecord {
-  return {
-    id: crypto.randomUUID(),
-    title,
-    frequency: "once",
-    status: "todo",
-    note: null,
-    createdAt: null,
-    updatedAt: null,
-  };
-}
-
 // ─── Query ───────────────────────────────────────────────────────────────────
 
 export function useTaskWorkspace(initialData: TaskWorkspaceData, developmentPreview: boolean) {
@@ -228,9 +220,10 @@ export function useTasksMutations(opts: {
     key,
     developmentPreview: opts.developmentPreview,
     onError: opts.onError,
-    mutationFn: async (title) => (opts.developmentPreview ? optimisticPersonalItem(title) : createPersonalItem({ title, frequency: "once" })),
-    applyOptimistic: (data, title) => ({ ...data, personalItems: [optimisticPersonalItem(title), ...(data.personalItems ?? [])] }),
-    mergeResult: (data, result) => ({ ...data, personalItems: [result, ...(data.personalItems ?? [])] }),
+    mutationFn: async (title) => (opts.developmentPreview ? buildOptimisticPersonalItem(title) : createPersonalItem({ title, frequency: "once" })),
+    applyOptimistic: (data, title) => ({ ...data, personalItems: [buildOptimisticPersonalItem(title), ...(data.personalItems ?? [])] }),
+    // Drop the matching optimistic placeholder so real-mode success does not leave a ghost row.
+    mergeResult: (data, result, title) => mergePersonalItemCreate(data, result, title),
   }));
 
   const togglePersonalItemMutation = useMutation(buildTaskMutationOptions<PersonalItemRecord, { id: string; status: "todo" | "done" }>({

@@ -64,9 +64,9 @@ function dbToUI(record: DbAccount, walletLabels: string[] = []): Account {
     avatarUrl: record.avatarUrl ?? undefined,
     projects: activeProjects.length,
     tasks: 0,
-    wallets: walletLabels.length > 0
-      ? walletLabels
-      : Array.from({ length: record.walletCount ?? 0 }, (_, index) => `Wallet ${index + 1}`),
+    // Always derive labels from the live wallets list. Falling back to
+    // walletCount produced ghost "Wallet 1" rows after the last wallet was deleted.
+    wallets: walletLabels,
     activeProjects,
   };
 }
