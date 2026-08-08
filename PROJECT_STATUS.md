@@ -297,7 +297,7 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | `docs-workspace.tsx` | ~100 lines | Docs CRUD wired; React Query + commit-waiting save/delete (`docs-query.ts`) |
 | `inbox-workspace.tsx` | ~200 lines | Inbox CRUD wired; React Query + optimistic status + process refresh (`inbox-query.ts`) |
 | `archive-preview.tsx` | ~350 lines | CRUD wired (restore, delete); React Query + commit-waiting mutations (`archive-query.ts`); inline two-step delete |
-| `daily-workspace.tsx` | ~300+ lines | Task Log and Daily execution wired (still local state; not Track D) |
+| `daily-workspace.tsx` | ~350 lines | Task Log + Daily execution; React Query date-scoped cache (`daily-workspace-query.ts`) with optimistic Done/Skip and personal toggle; Motion `layout` on checklist rows |
 
 Unit tests: 18 files, 78 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, and new Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
 

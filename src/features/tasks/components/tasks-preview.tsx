@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarClock, Check, MoreHorizontal, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { LayoutGroup, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 
 import type { PersonalItemRecord } from "@/features/personal/types";
@@ -17,6 +18,8 @@ import { AppSelect } from "@/components/ui/app-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+const springLayout = { type: "spring" as const, stiffness: 500, damping: 40, mass: 0.8 };
 
 type TaskView = "list" | "board" | "running" | "recheck";
 type BoardGroup = "project" | "status";
@@ -283,7 +286,40 @@ function BoardView({ tasks, projects, group, ...props }: TaskCollectionProps & {
   const groups = group === "status"
     ? TASK_BOARD_STATUSES.map((status) => ({ id: status, label: TASK_STATUS_LABELS[status], tasks: tasks.filter((task) => task.status === status) }))
     : projects.map((project) => ({ id: project.id, label: project.name, tasks: tasks.filter((task) => task.projectId === project.id) })).filter((item) => item.tasks.length > 0);
-  return <div className="scrollbar-subtle overflow-x-auto p-4 sm:p-6 lg:p-8"><div className="flex min-w-max gap-3">{groups.map((item) => <section key={item.id} className="w-[300px] shrink-0 rounded-xl bg-card/80 soft-panel"><div className="px-3 py-2.5"><h2 className="text-sm font-semibold">{item.label}</h2><p className="mt-0.5 text-[11px] text-muted-foreground">{item.tasks.length} task{item.tasks.length === 1 ? "" : "s"}</p></div><div className="space-y-2 p-2">{item.tasks.map((task) => <article key={task.id} className="rounded-xl bg-white/[0.025] p-2.5 hover:bg-white/[0.04]"><div className="flex items-start justify-between gap-2"><button type="button" onClick={() => props.onOpen(task.id)} className="min-w-0 flex-1 text-left"><TaskIdentity task={task} compact /></button><TaskMenu task={task} open={props.menuTaskId === task.id} onToggle={() => props.onMenu(props.menuTaskId === task.id ? null : task.id)} onEdit={() => props.onOpen(task.id)} onDone={() => props.onDone(task)} /></div><div className="mt-2 flex flex-wrap gap-1.5"><StatusBadge status={task.status} /><Badge variant="outline" className="text-[10px]">{formatTaskFrequency(task.frequency)}</Badge></div><div className="mt-2 flex items-center justify-between"><AccountAvatars task={task} /><span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><CalendarClock className="size-3" /><TaskTiming task={task} compact /></span></div></article>)}</div></section>)}</div></div>;
+  return (
+    <div className="scrollbar-subtle overflow-x-auto p-4 sm:p-6 lg:p-8">
+      <LayoutGroup id="tasks-board">
+        <div className="flex min-w-max gap-3">
+          {groups.map((item) => (
+            <section key={item.id} className="w-[300px] shrink-0 rounded-xl bg-card/80 soft-panel">
+              <div className="px-3 py-2.5">
+                <h2 className="text-sm font-semibold">{item.label}</h2>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{item.tasks.length} task{item.tasks.length === 1 ? "" : "s"}</p>
+              </div>
+              <div className="space-y-2 p-2">
+                {item.tasks.map((task) => (
+                  <motion.article
+                    key={task.id}
+                    layout
+                    layoutId={`task-card-${task.id}`}
+                    transition={springLayout}
+                    className="rounded-xl bg-white/[0.025] p-2.5 hover:bg-white/[0.04]"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <button type="button" onClick={() => props.onOpen(task.id)} className="min-w-0 flex-1 text-left"><TaskIdentity task={task} compact /></button>
+                      <TaskMenu task={task} open={props.menuTaskId === task.id} onToggle={() => props.onMenu(props.menuTaskId === task.id ? null : task.id)} onEdit={() => props.onOpen(task.id)} onDone={() => props.onDone(task)} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5"><StatusBadge status={task.status} /><Badge variant="outline" className="text-[10px]">{formatTaskFrequency(task.frequency)}</Badge></div>
+                    <div className="mt-2 flex items-center justify-between"><AccountAvatars task={task} /><span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"><CalendarClock className="size-3" /><TaskTiming task={task} compact /></span></div>
+                  </motion.article>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </LayoutGroup>
+    </div>
+  );
 }
 
 function TaskMenu({ task, open, onToggle, onEdit, onDone }: { task: TaskRecord; open: boolean; onToggle: () => void; onEdit: () => void; onDone: () => void }) {
