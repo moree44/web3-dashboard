@@ -175,7 +175,7 @@ export function TaskDetailPanel({ task, projects, busy, error, onClose, onSave, 
               <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmDelete(false)}>Cancel</Button>
             </div>
           ) : (
-            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmDelete(true)} className="text-destructive hover:text-destructive"><Trash2 className="size-3.5" />Delete</Button>
+            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmDelete(true)} className="text-foreground hover:bg-white/[0.06]"><Trash2 className="size-3.5" />Delete</Button>
           )}
           <div className="ml-auto flex gap-2">
             <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={onClose}>Cancel</Button>

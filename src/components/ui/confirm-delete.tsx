@@ -51,10 +51,13 @@ export function ConfirmDelete({
       disabled={disabled}
       onClick={handleClick}
       className={cn(
-        "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors",
+        // Keep delete labels white/foreground — red text on dark menus reads harsh
+        // and inconsistent with the rest of the OS. Danger is carried by wording
+        // + a soft armed background, not a red label.
+        "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-foreground transition-colors",
         armed
-          ? "bg-destructive/15 font-semibold text-destructive hover:bg-destructive/25"
-          : "text-red-400 hover:bg-white/[0.055]",
+          ? "bg-white/[0.08] font-semibold hover:bg-white/[0.12]"
+          : "hover:bg-white/[0.055]",
         disabled ? "cursor-not-allowed opacity-45" : "",
         className,
       )}

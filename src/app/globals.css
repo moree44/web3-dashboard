@@ -101,6 +101,10 @@
   }
   button, a { -webkit-tap-highlight-color: transparent; }
   button { cursor: pointer; }
+  /* Thin light caret on dark inputs — avoids the thick "block" caret feel. */
+  input, textarea {
+    caret-color: rgb(255 255 255 / 0.92);
+  }
 }
 
 @layer utilities {
@@ -280,4 +284,5 @@
   from { opacity: 0; transform: translateY(-4px); }
 }
 
-::selection { background: rgb(113 128 255 / 30%); color: var(--foreground); }
+/* Soft selection highlight — less "solid block" than a heavy purple fill. */
+::selection { background: rgb(255 255 255 / 0.14); color: var(--foreground); }

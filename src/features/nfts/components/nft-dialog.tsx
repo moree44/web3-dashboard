@@ -312,7 +312,7 @@ export function NftDialog({
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-card/95 px-5 py-3 backdrop-blur soft-divider">
-          <div>{campaign ? <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={busy} className={deleteArmed ? "text-destructive" : "text-muted-foreground"}><Trash2 className="size-3.5" />{deleteArmed ? "Confirm delete" : "Delete"}</Button> : null}</div>
+          <div>{campaign ? <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={busy} className={deleteArmed ? "bg-white/[0.08] font-semibold text-foreground" : "text-foreground"}><Trash2 className="size-3.5" />{deleteArmed ? "Confirm delete" : "Delete"}</Button> : null}</div>
           <div className="flex gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={busy}>Cancel</Button>
             <Button type="button" size="sm" onClick={save} disabled={!canSave}>{busy ? "Saving..." : campaign ? "Save changes" : "Create NFT"}</Button>

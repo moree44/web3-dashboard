@@ -340,8 +340,8 @@ function ArchiveDeleteButton({ name, busy, size, onDelete }: { name: string; bus
         "grid place-items-center rounded-md transition-colors disabled:opacity-50",
         size === "sm" ? "size-7" : "size-8",
         armed
-          ? "bg-destructive/15 text-destructive hover:bg-destructive/25"
-          : "text-muted-foreground hover:bg-white/[0.045] hover:text-red-400",
+          ? "bg-white/[0.08] text-foreground hover:bg-white/[0.12]"
+          : "text-muted-foreground hover:bg-white/[0.045] hover:text-foreground",
       )}
     >
       <Trash2 className="size-4" />

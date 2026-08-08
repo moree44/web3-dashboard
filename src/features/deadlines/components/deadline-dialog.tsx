@@ -276,7 +276,7 @@ export function DeadlineDialog({
         <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-card/95 px-5 py-3 backdrop-blur soft-divider">
           <div>
             {deadline ? (
-              <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={isSaving} className={deleteArmed ? "text-destructive" : "text-muted-foreground"}>
+              <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={isSaving} className={deleteArmed ? "bg-white/[0.08] font-semibold text-foreground" : "text-foreground"}>
                 <Trash2 className="size-3.5" />
                 {deleteArmed ? "Confirm delete" : "Delete"}
               </Button>
