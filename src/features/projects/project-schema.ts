@@ -35,6 +35,7 @@ export const projectInputSchema = z.object({
   progressEstimate: progressEstimate.optional(),
   dateStart: dateStart.optional(),
   websiteUrl: optionalHttpUrl,
+  twitterUrl: optionalHttpUrl,
   notes: notes.optional(),
   logoUrl: optionalHttpUrl,
   logoPath: logoPath.optional(),
@@ -55,6 +56,7 @@ export const projectUpdateSchema = z.object({
   progressEstimate: progressEstimate.optional(),
   dateStart: dateStart.optional(),
   websiteUrl: optionalHttpUrl,
+  twitterUrl: optionalHttpUrl,
   notes: notes.optional(),
   logoUrl: optionalHttpUrl,
   logoPath: logoPath.optional(),
@@ -87,7 +89,7 @@ export type ProjectWalletDraft = z.infer<typeof projectWalletDraftSchema>;
 
 function validationError(error: z.ZodError) {
   const issue = error.issues[0];
-  if (issue?.path[0] === "websiteUrl" || issue?.path[0] === "logoUrl") {
+  if (issue?.path[0] === "websiteUrl" || issue?.path[0] === "twitterUrl" || issue?.path[0] === "logoUrl") {
     return new Error("Enter a valid URL, for example project.com");
   }
   return new Error(issue?.message ?? "Project details are invalid");

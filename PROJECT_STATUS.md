@@ -155,6 +155,7 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Desktop table and compact mobile cards share the same persisted data
 - Active items support edit and two-step delete; converted items remain read-only history
 - `Start Project` transaction carries name, X URL, thesis, Chain, and Project Type into a new Project without re-entry
+- Project detail displays and can edit the converted Chain and X URL; thesis remains visible in the short note
 - Conversion retains the Watchlist item with `converted_project_id`, is idempotent after completion, and does not create a project logo
 - React Query cache updates create/edit/delete/conversion results without a full page reload
 - Dashboard Quick Capture writes the Watchlist intent directly to this entity
@@ -485,7 +486,7 @@ Dedicated Project Watchlist batches checked 2026-08-10:
 ```txt
 pnpm typecheck  # pass
 pnpm lint       # pass, 0 warnings
-pnpm test       # pass, 21 files and 81 tests
+pnpm test       # pass, 21 files and 82 tests
 Targeted Watchlist, Project query, and Dashboard Quick Capture tests  # pass
 git diff --check  # pass
 Production build and real-DB Playwright are deferred until migration 0016 is applied

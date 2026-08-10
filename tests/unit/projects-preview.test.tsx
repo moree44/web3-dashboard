@@ -70,6 +70,30 @@ describe("ProjectsPreview", () => {
     expect(screen.getAllByText("NexusHQ Prover").length).toBeGreaterThan(0);
   });
 
+  it("shows Watchlist conversion context in the Project drawer", () => {
+    const convertedData = {
+      ...projectsPreviewData,
+      projects: projectsPreviewData.projects.map((project, index) => index === 0 ? {
+        ...project,
+        chains: ["Cosmos"],
+        twitterUrl: "https://x.com/initiaFDN",
+        notes: "Interwoven rollups thesis",
+      } : project),
+    };
+    renderWithQuery(
+      <ProjectsPreview initialData={convertedData} developmentPreview />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Soundness/ })[0]);
+
+    expect(screen.getByText("Cosmos")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /X.*initiaFDN/ })).toHaveAttribute(
+      "href",
+      "https://x.com/initiaFDN",
+    );
+    expect(screen.getByText("Interwoven rollups thesis")).toBeInTheDocument();
+  });
+
   it("deletes a project after inline confirmation in development preview", async () => {
     renderProjectsPreview({ developmentPreview: true });
 

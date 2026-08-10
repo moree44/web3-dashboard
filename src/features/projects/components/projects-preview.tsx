@@ -100,6 +100,8 @@ function dbToUIProject(record: DbProject): Project {
     activity: "now",
     logoUrl: record.logoUrl ?? undefined,
     websiteUrl: record.websiteUrl ?? undefined,
+    twitterUrl: record.twitterUrl ?? undefined,
+    chains: record.chains,
     notes: record.notes ?? undefined,
     updatedAt: record.updatedAt?.toISOString(),
   };
@@ -127,6 +129,8 @@ type Project = {
   activity: string;
   logoUrl?: string;
   websiteUrl?: string;
+  twitterUrl?: string;
+  chains: string[];
   notes?: string;
   updatedAt?: string;
 };
@@ -221,6 +225,8 @@ export function ProjectsPreview({
         stageResult: project.stage,
         dateStart: project.dateValue || undefined,
         websiteUrl: project.websiteUrl ? normalizeHttpUrl(project.websiteUrl) : undefined,
+        twitterUrl: project.twitterUrl ? normalizeHttpUrl(project.twitterUrl) : undefined,
+        chains: project.chains,
         notes: project.notes || undefined,
         logoUrl: externalLogoUrl,
         logoSource: externalLogoUrl ? "external_url" : "none",
@@ -805,10 +811,12 @@ function ProjectDetailPanel({
   const [editDate, setEditDate] = useState("");
   const [editWorkTypes, setEditWorkTypes] = useState<string[]>([]);
   const [editProjectTypes, setEditProjectTypes] = useState<string[]>([]);
+  const [editChains, setEditChains] = useState<string[]>([]);
   const [editAccountIds, setEditAccountIds] = useState<string[]>([]);
   const [editWalletIds, setEditWalletIds] = useState<string[]>([]);
   const [editNewWallets, setEditNewWallets] = useState<ProjectWalletDraft[]>([]);
   const [editWebsiteUrl, setEditWebsiteUrl] = useState("");
+  const [editTwitterUrl, setEditTwitterUrl] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -837,7 +845,9 @@ function ProjectDetailPanel({
     setEditDate(p.dateValue ?? "");
     setEditWorkTypes(p.work);
     setEditProjectTypes(p.type);
+    setEditChains(p.chains);
     setEditWebsiteUrl(p.websiteUrl ?? "");
+    setEditTwitterUrl(p.twitterUrl ?? "");
     setEditNotes(p.notes ?? "");
     setEditAccountIds(
       p.accountIds
@@ -882,7 +892,9 @@ function ProjectDetailPanel({
         dateStart: editDate || undefined,
         workTypes: editWorkTypes,
         projectTypes: editProjectTypes,
+        chains: editChains,
         websiteUrl: normalizeHttpUrl(editWebsiteUrl) || null,
+        twitterUrl: normalizeHttpUrl(editTwitterUrl) || null,
         notes: editNotes || null,
       }, {
         accountIds: editAccountIds,
@@ -1109,6 +1121,13 @@ function ProjectDetailPanel({
                   placeholder="Add project type..."
                   onChange={setEditProjectTypes}
                 />
+                <ComboboxPreview
+                  label="Chain"
+                  values={editChains}
+                  options={[...new Set(["Ethereum", "Solana", "Cosmos", "Base", "Arbitrum", "Optimism", ...editChains])]}
+                  placeholder="Add chain..."
+                  onChange={setEditChains}
+                />
                 <div className="border-t border-white/[0.04] pt-3">
                   <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Accounts</p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1139,6 +1158,9 @@ function ProjectDetailPanel({
               <>
                 <PropertyBlock label="Work Type"><Tags tags={p.work} strong max={4} /></PropertyBlock>
                 <PropertyBlock label="Project Type"><Tags tags={p.type} max={4} /></PropertyBlock>
+                <PropertyBlock label="Chain">
+                  {p.chains.length > 0 ? <Tags tags={p.chains} max={4} /> : <span className="text-[11px] text-muted-foreground/60">Not set</span>}
+                </PropertyBlock>
                 <PropertyBlock label="Accounts">
                   {p.accounts.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
@@ -1174,6 +1196,13 @@ function ProjectDetailPanel({
             </div>
             <div className="mt-2 grid gap-2">
               {p.websiteUrl ? <DetailLink label="Website" value={p.websiteUrl} href={p.websiteUrl} external /> : <p className="text-[11px] text-muted-foreground">No project URL added.</p>}
+              {isEditing ? (
+                <Property label="X URL">
+                  <input type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" value={editTwitterUrl} onChange={(event) => setEditTwitterUrl(event.target.value)} onBlur={() => setEditTwitterUrl((value) => normalizeHttpUrl(value))} className="h-8 w-full rounded-lg border border-white/[0.08] bg-[#161618] px-2 text-xs text-foreground outline-none" placeholder="x.com/project" />
+                </Property>
+              ) : p.twitterUrl ? (
+                <DetailLink label="X" value={p.twitterUrl} href={p.twitterUrl} external />
+              ) : null}
               <DetailLink label="Docs" value="Open linked project docs" href={"/docs?project=" + (p.id ?? "")} />
             </div>
           </section>
@@ -1417,6 +1446,7 @@ function AddProjectDialog({
         stage,
         work: workTypes,
         type: projectTypes,
+        chains: [],
         accounts,
         progress: 0,
         date: dateStart ? formatDateValue(dateStart) : "",

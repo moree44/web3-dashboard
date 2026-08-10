@@ -119,7 +119,7 @@ function optimisticProject(
     dateStart: vars.data.dateStart ?? null,
     dateEnd: null,
     websiteUrl: vars.data.websiteUrl ?? null,
-    twitterUrl: null,
+    twitterUrl: vars.data.twitterUrl ?? null,
     discordUrl: null,
     githubUrl: null,
     docsUrl: null,
