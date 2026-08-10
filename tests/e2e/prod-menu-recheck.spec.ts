@@ -87,7 +87,7 @@ test("production menu recheck + timings", async ({ page }) => {
   await soft("Sidebar → Watchlist", async () => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.getByRole("link", { name: "Watchlist", exact: true }).click();
-    await expect(page).toHaveURL(/view=watchlist/);
+    await expect(page).toHaveURL(/\/watchlist$/);
   });
 
   await soft("Projects search + create + drawer", async () => {

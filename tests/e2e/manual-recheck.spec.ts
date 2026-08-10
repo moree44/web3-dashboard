@@ -71,7 +71,7 @@ test("manual recheck pass", async ({ page }) => {
   await soft("Sidebar → Watchlist", async () => {
     await goto(page, "/");
     await page.getByRole("link", { name: "Watchlist", exact: true }).click();
-    await expect(page).toHaveURL(/view=watchlist/);
+    await expect(page).toHaveURL(/\/watchlist$/);
   });
 
   // 3 Projects

@@ -33,13 +33,6 @@ export const STAGE_PRESETS = [
   "Mint open",
 ] as const;
 
-export const WATCHLIST_STAGE_KEYS = new Set([
-  "watching",
-  "registered",
-  "joined_discord",
-  "waiting_result",
-]);
-
 export const PROJECT_SORTS = ["updated", "name", "date", "priority", "status"] as const;
 export const PROJECT_COLUMNS = [
   "status",
@@ -58,7 +51,6 @@ export type ProjectSort = (typeof PROJECT_SORTS)[number];
 export type ProjectColumn = (typeof PROJECT_COLUMNS)[number];
 
 export type ProjectQueryState = {
-  view: "all" | "watchlist";
   hunt: HuntType | "";
   query: string;
   status: ProjectStatus | "";
@@ -103,10 +95,6 @@ export function normalizeStage(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
-export function isWatchlistProject(project: Pick<FilterableProject, "statusKey" | "stage">) {
-  return project.statusKey === "watching" || WATCHLIST_STAGE_KEYS.has(normalizeStage(project.stage));
-}
-
 export function parseProjectQuery(
   source: Record<string, string | string[] | undefined> | URLSearchParams,
 ): ProjectQueryState {
@@ -122,7 +110,6 @@ export function parseProjectQuery(
   const pageSize = Number.parseInt(get("pageSize") ?? "10", 10);
 
   return {
-    view: get("view") === "watchlist" ? "watchlist" : "all",
     hunt: enumValue(get("hunt"), HUNT_TYPES, ""),
     query: get("q")?.trim() ?? "",
     status: enumValue(get("status"), PROJECT_STATUSES, ""),
@@ -151,7 +138,6 @@ export function filterAndSortProjects<T extends FilterableProject>(
 ) {
   const query = state.query.toLowerCase();
   const filtered = projects.filter((project) => {
-    if (state.view === "watchlist" && !isWatchlistProject(project)) return false;
     if (state.hunt && project.huntKey !== state.hunt) return false;
     if (state.status && project.statusKey !== state.status) return false;
     if (state.priority && project.priorityKey !== state.priority) return false;

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   filterAndSortProjects,
-  isWatchlistProject,
   parseProjectQuery,
   type FilterableProject,
   type ProjectQueryState,
@@ -26,7 +25,6 @@ function project(overrides: Partial<FilterableProject> = {}): FilterableProject 
 
 function state(overrides: Partial<ProjectQueryState> = {}): ProjectQueryState {
   return {
-    view: "all",
     hunt: "",
     query: "",
     status: "",
@@ -47,7 +45,6 @@ function state(overrides: Partial<ProjectQueryState> = {}): ProjectQueryState {
 describe("project URL query state", () => {
   it("parses supported filters, sorting, columns, and pagination", () => {
     const parsed = parseProjectQuery(new URLSearchParams({
-      view: "watchlist",
       hunt: "retro",
       q: "bridge",
       status: "watching",
@@ -64,7 +61,6 @@ describe("project URL query state", () => {
     }));
 
     expect(parsed).toMatchObject({
-      view: "watchlist",
       hunt: "retro",
       query: "bridge",
       status: "watching",
@@ -110,22 +106,6 @@ describe("project URL query state", () => {
   });
 });
 
-describe("project watchlist rules", () => {
-  it.each(["Watching", "Registered", "Joined Discord", "Waiting result"])(
-    "includes pending stage %s",
-    (stage) => expect(isWatchlistProject(project({ stage }))).toBe(true),
-  );
-
-  it("includes watching status regardless of stage", () => {
-    expect(isWatchlistProject(project({ statusKey: "watching", stage: "Accepted" }))).toBe(true);
-  });
-
-  it.each(["Accepted", "Whitelisted", "Claimable", "Mint open"])(
-    "excludes progressed stage %s when status is active",
-    (stage) => expect(isWatchlistProject(project({ statusKey: "in_progress", stage }))).toBe(false),
-  );
-});
-
 describe("project filtering and sorting", () => {
   const records = [
     project(),
@@ -165,11 +145,6 @@ describe("project filtering and sorting", () => {
       dateTo: "2026-07-31",
       query: "depin",
     }));
-    expect(result.map((item) => item.name)).toEqual(["Dawn"]);
-  });
-
-  it("applies the watchlist view independently of hunt type", () => {
-    const result = filterAndSortProjects([...records], state({ view: "watchlist" }));
     expect(result.map((item) => item.name)).toEqual(["Dawn"]);
   });
 

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Check, Loader2, Plus } from "lucide-react";
 
 import { createInboxItem } from "@/features/inbox/actions";
+import { createWatchlistItem } from "@/features/watchlist/actions";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ export function DashboardQuickCapture({ developmentPreview = false }: { developm
   const [intent, setIntent] = useState<CaptureIntent>("inbox");
   const [value, setValue] = useState("");
   const [saved, setSaved] = useState(false);
+  const [savedDestination, setSavedDestination] = useState("Inbox");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -29,11 +31,17 @@ export function DashboardQuickCapture({ developmentPreview = false }: { developm
     setError(null);
     startTransition(async () => {
       try {
-        await createInboxItem({
-          title,
-          content: `${intents.find((item) => item.id === intent)?.label ?? "Inbox"} capture from Dashboard`,
-          priority: "medium",
-        });
+        if (intent === "watchlist") {
+          await createWatchlistItem({ xUrl: title });
+          setSavedDestination("Watchlist");
+        } else {
+          await createInboxItem({
+            title,
+            content: `${intents.find((item) => item.id === intent)?.label ?? "Inbox"} capture from Dashboard`,
+            priority: "medium",
+          });
+          setSavedDestination("Inbox");
+        }
         setValue("");
         setSaved(true);
         window.setTimeout(() => setSaved(false), 2200);
@@ -53,12 +61,12 @@ export function DashboardQuickCapture({ developmentPreview = false }: { developm
         <input
           value={value}
           onChange={(event) => { setValue(event.target.value); setSaved(false); setError(null); }}
-          placeholder="Capture project link, Twitter watchlist, note, or inbox item..."
+          placeholder={intent === "watchlist" ? "Paste an X project profile..." : "Capture project link, note, or inbox item..."}
           disabled={developmentPreview || isPending}
           className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           aria-label="Quick capture"
         />
-        {saved ? <span className="shrink-0 text-[11px] text-emerald-400">Saved to Inbox</span> : error ? <span className="shrink-0 text-[11px] text-destructive">{error}</span> : null}
+        {saved ? <span className="shrink-0 text-[11px] text-emerald-400">Saved to {savedDestination}</span> : error ? <span className="shrink-0 text-[11px] text-destructive">{error}</span> : null}
       </form>
       <div className="grid grid-cols-4 gap-2 xl:flex">
         {intents.map((item) => (

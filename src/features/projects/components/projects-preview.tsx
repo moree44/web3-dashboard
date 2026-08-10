@@ -24,7 +24,7 @@ import {
 import { useProjectsMutations, useProjectsWorkspace } from "@/features/projects/projects-query";
 import type { ProjectAssignmentInput, ProjectWalletDraft } from "@/features/projects/project-schema";
 import type { projects as projectsSchema } from "@/lib/db/schema";
-import { ARCHIVE_REASONS, filterAndSortProjects, isWatchlistProject, parseProjectQuery, PROJECT_COLUMNS, PROJECT_PRIORITIES, PROJECT_SORTS, PROJECT_STATUSES, STAGE_PRESETS, type ProjectColumn } from "@/features/projects/project-query";
+import { ARCHIVE_REASONS, filterAndSortProjects, parseProjectQuery, PROJECT_COLUMNS, PROJECT_PRIORITIES, PROJECT_SORTS, PROJECT_STATUSES, STAGE_PRESETS, type ProjectColumn } from "@/features/projects/project-query";
 
 type DbProject = ProjectWithAccounts;
 
@@ -132,11 +132,9 @@ type Project = {
 };
 
 export function ProjectsPreview({
-  view = "all",
   initialData,
   developmentPreview = false,
 }: {
-  view?: "all" | "watchlist";
   initialData: ProjectsWorkspaceData;
   developmentPreview?: boolean;
 }) {
@@ -185,29 +183,26 @@ export function ProjectsPreview({
     priorityKey: (reversePriorityLabels[project.priority] ?? "medium") as "high" | "medium" | "low",
     huntKey: (reverseHuntLabels[project.hunt] ?? "free_hunts") as "free_hunts" | "retro" | "waitlist",
   })), [projectItems]);
-  const filteredProjects = useMemo(() => filterAndSortProjects(filterable, { ...queryState, view: view === "watchlist" ? "watchlist" : queryState.view }), [filterable, queryState, view]);
+  const filteredProjects = useMemo(() => filterAndSortProjects(filterable, queryState), [filterable, queryState]);
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / queryState.pageSize));
   const currentPage = Math.min(queryState.page, totalPages);
   const visibleProjects = filteredProjects.slice((currentPage - 1) * queryState.pageSize, currentPage * queryState.pageSize);
-  const watchlistCount = filterable.filter(isWatchlistProject).length;
   const counts = { free_hunts: 0, retro: 0, waitlist: 0 };
   for (const project of filterable) counts[project.huntKey] += 1;
   const tabs = [
-    { label: `All ${projectItems.length}`, view: "all", hunt: "" },
-    { label: `Watchlist ${watchlistCount}`, view: "watchlist", hunt: "" },
-    { label: `Free Hunts ${counts.free_hunts}`, view: "all", hunt: "free_hunts" },
-    { label: `Retro ${counts.retro}`, view: "all", hunt: "retro" },
-    { label: `Waitlist ${counts.waitlist}`, view: "all", hunt: "waitlist" },
+    { label: `All ${projectItems.length}`, hunt: "" },
+    { label: `Free Hunts ${counts.free_hunts}`, hunt: "free_hunts" },
+    { label: `Retro ${counts.retro}`, hunt: "retro" },
+    { label: `Waitlist ${counts.waitlist}`, hunt: "waitlist" },
   ];
   const visibleColumns = new Set(queryState.columns);
   const stageOptions = [...new Set([...STAGE_PRESETS, ...projectItems.map((project) => project.stage).filter(Boolean)])];
 
-  function activateTab(tab: { view: string; hunt: string }) {
+  function activateTab(tab: { hunt: string }) {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("view");
     next.delete("hunt");
     next.delete("page");
-    if (tab.view === "watchlist") next.set("view", "watchlist");
     if (tab.hunt) next.set("hunt", tab.hunt);
     router.replace("/projects" + (next.size ? "?" + next.toString() : ""), { scroll: false });
   }
@@ -289,7 +284,7 @@ export function ProjectsPreview({
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8"><div className="flex items-center gap-2 py-2.5">
         <div className="scrollbar-subtle flex min-w-0 flex-1 gap-1 overflow-x-auto">
         {tabs.map((tab) => {
-          const active = (tab.view === "watchlist" ? queryState.view === "watchlist" || view === "watchlist" : queryState.view !== "watchlist" && view !== "watchlist") && queryState.hunt === tab.hunt;
+          const active = queryState.hunt === tab.hunt;
           return <button key={tab.label} type="button" onClick={() => activateTab(tab)} className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-medium", active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}>{tab.label}</button>;
         })}
         </div>
