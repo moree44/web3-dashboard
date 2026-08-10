@@ -20,7 +20,8 @@ export function MobileNav({ active }: { active: AppSection }) {
         aria-label="Mobile navigation"
       >
         {items.map(({ label, href, icon: Icon }) => {
-          const isActive = active === label || (label === "Projects" && active === "NFTs");
+          const isActive = active === label
+            || (label === "Projects" && (active === "Watchlist" || active === "NFTs"));
           return (
             <Link
               key={label}

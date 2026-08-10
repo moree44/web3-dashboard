@@ -33,7 +33,7 @@ const mainNavigation = [
 ] as const;
 
 const projectNavigation = [
-  { label: "Watchlist", href: "/projects?view=watchlist", icon: Eye, active: "Watchlist" },
+  { label: "Watchlist", href: "/watchlist", icon: Eye, active: "Watchlist" },
   { label: "NFTs", href: "/nfts", icon: Sparkles, active: "NFTs" },
   { label: "Daily", href: "/daily", icon: CalendarCheck2, active: "Daily" },
   { label: "Deadlines", href: "/deadlines", icon: CalendarClock, active: "Deadlines" },

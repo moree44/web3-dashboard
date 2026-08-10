@@ -39,7 +39,7 @@ test("production menu recheck + timings", async ({ page }) => {
     ["/inbox", "Inbox"],
     ["/docs", "Docs"],
     ["/projects", "Projects"],
-    ["/projects?view=watchlist", "Watchlist"],
+    ["/watchlist", "Watchlist"],
     ["/daily", "Daily"],
     ["/tasks", "Tasks"],
     ["/accounts", "Accounts"],

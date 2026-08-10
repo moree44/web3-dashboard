@@ -166,7 +166,7 @@ test("full app smoke — menus, accounts, avatar upload, wallets, groups, projec
     ["/inbox", "Inbox"],
     ["/docs", "Docs"],
     ["/projects", "Projects"],
-    ["/projects?view=watchlist", "Watchlist"],
+    ["/watchlist", "Watchlist"],
     ["/daily", "Daily"],
     ["/tasks", "Tasks"],
     ["/accounts", "Accounts"],

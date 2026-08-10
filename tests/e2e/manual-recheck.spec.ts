@@ -37,7 +37,7 @@ test("manual recheck pass", async ({ page }) => {
     ["/inbox", "Inbox"],
     ["/docs", "Docs"],
     ["/projects", "Projects"],
-    ["/projects?view=watchlist", "Watchlist"],
+    ["/watchlist", "Watchlist"],
     ["/daily", "Daily"],
     ["/tasks", "Tasks"],
     ["/accounts", "Accounts"],

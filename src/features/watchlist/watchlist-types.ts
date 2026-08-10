@@ -52,3 +52,8 @@ export type WatchlistConversionResult = {
   item: WatchlistItemRecord;
   project: ConvertedProjectRecord;
 };
+
+export type WatchlistPageData = {
+  activeItems: WatchlistItemRecord[];
+  convertedItems: WatchlistItemRecord[];
+};

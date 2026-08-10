@@ -110,7 +110,7 @@ test("FK unlink regression — account→project, wallet→group, note←inbox +
     ["/inbox", "Inbox"],
     ["/docs", "Docs"],
     ["/projects", "Projects"],
-    ["/projects?view=watchlist", "Watchlist"],
+    ["/watchlist", "Watchlist"],
     ["/daily", "Daily"],
     ["/tasks", "Tasks"],
     ["/accounts", "Accounts"],

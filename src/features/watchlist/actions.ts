@@ -18,6 +18,7 @@ import type {
   WatchlistConversionResult,
   WatchlistInput,
   WatchlistItemRecord,
+  WatchlistPageData,
   WatchlistStatus,
 } from "@/features/watchlist/watchlist-types";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -108,6 +109,21 @@ export async function getWatchlistItems(
     ))
     .orderBy(desc(projectWatchlistItems.updatedAt), desc(projectWatchlistItems.createdAt));
   return rows.map(toRecord);
+}
+
+export async function getWatchlistPageData(): Promise<WatchlistPageData> {
+  const workspaceId = await requireWorkspace();
+  const rows = await db
+    .select()
+    .from(projectWatchlistItems)
+    .where(eq(projectWatchlistItems.workspaceId, workspaceId))
+    .orderBy(desc(projectWatchlistItems.updatedAt), desc(projectWatchlistItems.createdAt));
+  const records = rows.map(toRecord);
+
+  return {
+    activeItems: records.filter((item) => item.status === "active"),
+    convertedItems: records.filter((item) => item.status === "converted"),
+  };
 }
 
 export async function createWatchlistItem(input: WatchlistInput): Promise<WatchlistItemRecord> {
