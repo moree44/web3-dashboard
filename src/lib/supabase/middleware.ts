@@ -1,21 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getSupabaseEnv } from "@/lib/env";
+import { getSupabaseEnv, isDevelopmentPreview } from "@/lib/env";
 
 const AUTH_PATHS = new Set(["/login", "/signup"]);
 let previewWarningShown = false;
 
-function shouldBypassForDevelopmentPreview() {
-  const isDevelopment = process.env.NODE_ENV === "development";
-  const missingUrl = !process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const missingKey = !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-  return isDevelopment && (missingUrl || missingKey);
-}
-
 export async function updateSession(request: NextRequest) {
-  if (shouldBypassForDevelopmentPreview()) {
+  if (isDevelopmentPreview()) {
     if (!previewWarningShown) {
       console.warn(
         "[Web3 Hunting OS] Development preview auth bypass is active because Supabase environment variables are missing. Production remains fail-closed.",

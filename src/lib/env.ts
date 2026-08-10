@@ -20,6 +20,14 @@ function parseEnv<T>(schema: z.ZodSchema<T>, values: Record<string, string | und
   return parsed.data;
 }
 
+export function isDevelopmentPreview() {
+  return (
+    process.env.NODE_ENV === "development" &&
+    (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+  );
+}
+
 export function getSupabaseEnv() {
   const parsed = publicEnvSchema.safeParse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,

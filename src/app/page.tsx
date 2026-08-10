@@ -4,11 +4,10 @@ import { DashboardPreview } from "@/features/dashboard/components/dashboard-prev
 import { getDashboardData } from "@/features/dashboard/actions";
 import { requireUser } from "@/lib/auth/session";
 import { getNftCampaignCount } from "@/features/nfts/actions";
+import { isDevelopmentPreview } from "@/lib/env";
 
 export default async function HomePage() {
-  const developmentPreview =
-    process.env.NODE_ENV === "development" &&
-    (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  const developmentPreview = isDevelopmentPreview();
 
   let deadlineData: Awaited<ReturnType<typeof getDashboardDeadlineData>> | undefined;
   let nftCount: number | undefined;

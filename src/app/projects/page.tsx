@@ -2,13 +2,14 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ProjectsPreview } from "@/features/projects/components/projects-preview";
 import { getProjectsWorkspaceData } from "@/features/projects/actions";
 import { projectsPreviewData } from "@/features/projects/preview-data";
+import { isDevelopmentPreview } from "@/lib/env";
 
 type ProjectsPageProps = {
   searchParams?: Promise<{ view?: string | string[] }>;
 };
 
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
-  const developmentPreview = process.env.NODE_ENV === "development" && (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  const developmentPreview = isDevelopmentPreview();
 
   const data = developmentPreview ? projectsPreviewData : await getProjectsWorkspaceData();
 
