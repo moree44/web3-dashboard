@@ -147,6 +147,7 @@ export const projects = pgTable("projects", {
   priority: text("priority", { enum: ["high", "medium", "low"] }),
   workTypes: text("work_types").array(),
   projectTypes: text("project_types").array(),
+  chains: text("chains").array().notNull().default(sql`'{}'::text[]`),
   progressEstimate: numeric("progress_estimate").default("0"),
   stageResult: text("stage_result"),
   dateStart: date("date_start"),
@@ -166,6 +167,40 @@ export const projects = pgTable("projects", {
   uniqueIndex("projects_workspace_active_name_unique")
     .on(table.workspaceId, sql`lower(trim(${table.name}))`)
     .where(sql`${table.isArchived} = false`),
+]);
+
+// ─── Project Watchlist ────────────────────────────────────────────────────────
+
+export const projectWatchlistItems = pgTable("project_watchlist_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  xUrl: text("x_url").notNull(),
+  thesis: text("thesis"),
+  chain: text("chain"),
+  projectTypes: text("project_types").array().notNull().default(sql`'{}'::text[]`),
+  status: text("status", { enum: ["active", "converted"] })
+    .notNull()
+    .default("active"),
+  convertedProjectId: uuid("converted_project_id").references(() => projects.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("project_watchlist_workspace_status_idx").on(
+    table.workspaceId,
+    table.status,
+    table.updatedAt,
+  ),
+  uniqueIndex("project_watchlist_workspace_active_x_url_unique")
+    .on(table.workspaceId, sql`lower(trim(${table.xUrl}))`)
+    .where(sql`${table.status} = 'active'`),
+  uniqueIndex("project_watchlist_converted_project_unique")
+    .on(table.convertedProjectId)
+    .where(sql`${table.convertedProjectId} IS NOT NULL`),
 ]);
 
 // ─── Project Accounts ─────────────────────────────────────────────────────────

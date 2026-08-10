@@ -18,6 +18,7 @@ describe("Project validation", () => {
       priority: "medium",
       workTypes: [],
       projectTypes: [],
+      chains: [],
       stageResult: "Not applicable",
     });
   });

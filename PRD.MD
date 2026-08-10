@@ -772,6 +772,7 @@ status
 priority
 work_types[]
 project_types[]
+chains[]
 progress_estimate
 stage_result
 date_start
@@ -788,6 +789,44 @@ archived_at
 created_at
 updated_at
 ```
+
+---
+
+## 13A. Project Watchlist Model
+
+Project Watchlist adalah tempat menangkap project yang baru ditemukan sebelum project tersebut benar-benar mulai digarap. Ini adalah entitas dan route tersendiri di `/watchlist`, bukan filter dari tabel Projects dan bukan Token Watchlist di Trading.
+
+Input harus cepat dan tidak meminta logo project. Nama boleh diturunkan dari handle X lalu diedit jika perlu.
+
+### Project Watchlist Fields
+
+```txt
+id
+workspace_id
+name
+x_url
+thesis
+chain
+project_types[]
+status              active | converted
+converted_project_id
+created_at
+updated_at
+```
+
+`chain` dan `project_types[]` menyimpan dua konsep berbeda. Chain menjawab jaringan tempat project berjalan, sedangkan Project Type menjawab kategori atau teknologi project seperti L1, L2, AI, DePIN, ZK, Security, atau Data.
+
+Action `Start Project` harus membuat Project dari item Watchlist tanpa meminta user mengisi ulang data. Mapping awal:
+
+```txt
+name            -> name
+x_url           -> twitter_url
+thesis          -> description dan notes
+chain           -> chains[]
+project_types[] -> project_types[]
+```
+
+Project hasil konversi tidak memiliki logo secara default dan menggunakan initials fallback. Setelah berhasil, item Watchlist tetap disimpan sebagai history dengan status `converted` dan relasi `converted_project_id`. Konversi harus atomic dan tidak boleh membuat Project kedua jika action yang sama dijalankan ulang.
 
 ---
 
@@ -1550,7 +1589,7 @@ Settings
 | Inbox     | Raw input waiting to be processed                         |
 | Docs      | Notes, guides, links, templates, SOP, and safe references |
 | Projects  | Main project database — parent item links directly to the full table, also groups workflow children |
-| Watchlist | Filtered Projects view for stage-pending items, nested under Projects |
+| Watchlist | Dedicated project discovery list at `/watchlist`, nested under Projects |
 | NFTs      | Dedicated collection, whitelist, and mint campaign workspace, nested under Projects |
 | Daily     | Full checklist grouped by account, plus Personal Items (Phase 1.5), nested under Projects |
 | Deadlines | Full chronological reminder and milestone view, nested under Projects |
@@ -1679,7 +1718,7 @@ Note
 Inbox
 ```
 
-Quick Capture should not require a modal for basic capture. Watchlist is a capture intent only and should become an inbox item or docs entry unless a dedicated model is approved later.
+Quick Capture should not require a modal for basic capture. The Watchlist intent creates a dedicated Project Watchlist item from an X profile URL, with the derived name editable and thesis, chain, and Project Type available as optional details.
 
 ### Notes desk
 

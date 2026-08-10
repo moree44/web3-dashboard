@@ -369,7 +369,7 @@ Navigation roles:
 | Inbox     | Raw input waiting to be processed                    |
 | Docs      | Notes, research, links, guides, SOP, access metadata |
 | Projects  | Main project database, workflow group, and direct link to full table |
-| Watchlist | Project watchlist, nested under Projects              |
+| Watchlist | Dedicated project discovery list at `/watchlist`, nested under Projects |
 | NFTs      | Collection, whitelist, and mint campaigns, nested under Projects |
 | Daily     | Full checklist execution, nested under Projects      |
 | Deadlines | Chronological reminders and milestones, nested under Projects |
@@ -566,6 +566,8 @@ Watchlist
 Note
 Inbox
 ```
+
+The Watchlist action should prioritize fast capture from an X profile URL. It may derive the project name from the X handle, then allow optional thesis, chain, and Project Type details without requiring a project logo.
 
 ### Notes desk
 
@@ -840,6 +842,38 @@ Dashboard must not duplicate this full table.
 Avoid vague preview columns such as Activity unless they are backed by a clear activity log or last-updated field. If needed later, use a clearer label such as Last updated.
 
 Mobile should use compact project cards instead of squeezing table columns.
+
+### Watchlist Page Direction
+
+Watchlist is a dedicated list-first workspace at `/watchlist`. It is for early project discovery, before the user decides to actively work on the project.
+
+Primary controls:
+
+```txt
+Active · Converted
+Search watchlist
+Quick add from X URL
+```
+
+The quick-add flow should keep X URL as the primary field. Project name is derived from the X handle and remains editable. Thesis, chain, and Project Type are optional details. Do not request or display a custom project logo in Watchlist.
+
+Desktop rows should show:
+
+```txt
+Generic project icon · Name / X handle · Thesis · Chain · Project Type · Action
+```
+
+Rules:
+
+* use one consistent monochrome project icon, not fetched project logos
+* truncate thesis in the list and keep the full text available in edit/detail UI
+* show chain separately from Project Type
+* render Project Type as muted compact chips
+* keep `Start Project` as the primary row action
+* after conversion, retain the item in Converted history and link it to the created Project
+* a converted Project uses its normal initials fallback until the user adds a logo later
+
+`Start Project` may ask only for Project workflow defaults that do not exist on the Watchlist item, such as hunt type, priority, status, and start date. It must carry over name, X URL, thesis, chain, and Project Type without re-entry.
 
 ### 19A. NFTs Page Direction
 

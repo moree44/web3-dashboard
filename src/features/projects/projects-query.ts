@@ -113,6 +113,7 @@ function optimisticProject(
     priority: vars.data.priority ?? null,
     workTypes: vars.data.workTypes ?? [],
     projectTypes: vars.data.projectTypes ?? [],
+    chains: vars.data.chains ?? [],
     progressEstimate: vars.data.progressEstimate != null ? String(vars.data.progressEstimate) : "0",
     stageResult: vars.data.stageResult ?? null,
     dateStart: vars.data.dateStart ?? null,
