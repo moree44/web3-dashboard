@@ -508,6 +508,24 @@ export const inboxItems = pgTable("inbox_items", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// ─── Docs Folders ─────────────────────────────────────────────────────────────
+
+export const docsFolders = pgTable("docs_folders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  uniqueIndex("docs_folders_workspace_name_unique")
+    .on(table.workspaceId, sql`lower(trim(${table.name}))`),
+  index("docs_folders_workspace_sort_idx").on(table.workspaceId, table.sortOrder, table.name),
+]);
+
 // ─── Notes ────────────────────────────────────────────────────────────────────
 
 export const notes = pgTable("notes", {

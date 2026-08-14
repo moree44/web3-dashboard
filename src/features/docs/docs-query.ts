@@ -3,12 +3,22 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
+  createDocsFolder,
   createDocsNote,
+  deleteDocsFolder,
   deleteDocsNote,
   getDocsPageData,
+  updateDocsFolder,
   updateDocsNote,
 } from "@/features/docs/actions";
-import type { DocsNoteInput, DocsNoteRecord, DocsPageData } from "@/features/docs/docs-types";
+import type {
+  DocsFolderInput,
+  DocsFolderRecord,
+  DocsFolderUpdateResult,
+  DocsNoteInput,
+  DocsNoteRecord,
+  DocsPageData,
+} from "@/features/docs/docs-types";
 
 export const docsKeys = {
   list: ["docs"] as const,
@@ -55,6 +65,10 @@ function sortNotes(notes: DocsNoteRecord[]) {
   return [...notes].sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
 }
 
+function sortFolders(folders: DocsFolderRecord[]) {
+  return [...folders].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+}
+
 export function upsertDocsNote(data: DocsPageData, record: DocsNoteRecord): DocsPageData {
   const exists = data.notes.some((note) => note.id === record.id);
   return {
@@ -69,6 +83,27 @@ export function upsertDocsNote(data: DocsPageData, record: DocsNoteRecord): Docs
 
 export function removeDocsNote(data: DocsPageData, id: string): DocsPageData {
   return { ...data, notes: data.notes.filter((note) => note.id !== id) };
+}
+
+export function upsertDocsFolder(data: DocsPageData, record: DocsFolderRecord): DocsPageData {
+  const exists = data.folders.some((folder) => folder.id === record.id);
+  return {
+    ...data,
+    folders: sortFolders(exists
+      ? data.folders.map((folder) => (folder.id === record.id ? record : folder))
+      : [...data.folders, record]),
+  };
+}
+
+export function removeDocsFolder(data: DocsPageData, id: string): DocsPageData {
+  return { ...data, folders: data.folders.filter((folder) => folder.id !== id) };
+}
+
+export function applyDocsFolderUpdate(data: DocsPageData, result: DocsFolderUpdateResult): DocsPageData {
+  return {
+    ...upsertDocsFolder(data, result.folder),
+    notes: data.notes.map((note) => note.folder === result.previousName ? { ...note, folder: result.folder.name, updatedAt: result.folder.updatedAt } : note),
+  };
 }
 
 export function useDocsWorkspace(initialData: DocsPageData, developmentPreview: boolean) {
@@ -117,5 +152,41 @@ export function useDocsMutations(opts: {
     mergeResult: (data, _result, id) => removeDocsNote(data, id),
   }));
 
-  return { saveNoteMutation, deleteNoteMutation };
+  const createFolderMutation = useMutation(buildDocsMutationOptions<DocsFolderRecord, DocsFolderInput>({
+    queryClient,
+    key,
+    developmentPreview: opts.developmentPreview,
+    onError: opts.onError,
+    mutationFn: async (input) => {
+      if (opts.developmentPreview) throw new Error("Preview mode does not persist Docs folders");
+      return createDocsFolder(input);
+    },
+    mergeResult: (data, result) => upsertDocsFolder(data, result),
+  }));
+
+  const deleteFolderMutation = useMutation(buildDocsMutationOptions<void, string>({
+    queryClient,
+    key,
+    developmentPreview: opts.developmentPreview,
+    onError: opts.onError,
+    mutationFn: async (id) => {
+      if (opts.developmentPreview) throw new Error("Preview mode does not persist Docs folders");
+      return deleteDocsFolder(id);
+    },
+    mergeResult: (data, _result, id) => removeDocsFolder(data, id),
+  }));
+
+  const updateFolderMutation = useMutation(buildDocsMutationOptions<DocsFolderUpdateResult, { id: string; input: DocsFolderInput }>({
+    queryClient,
+    key,
+    developmentPreview: opts.developmentPreview,
+    onError: opts.onError,
+    mutationFn: async ({ id, input }) => {
+      if (opts.developmentPreview) throw new Error("Preview mode does not persist Docs folders");
+      return updateDocsFolder(id, input);
+    },
+    mergeResult: (data, result) => applyDocsFolderUpdate(data, result),
+  }));
+
+  return { saveNoteMutation, deleteNoteMutation, createFolderMutation, updateFolderMutation, deleteFolderMutation };
 }

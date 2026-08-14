@@ -1,6 +1,6 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-08-10
+Last updated: 2026-08-12
 
 ## Current Position
 
@@ -8,9 +8,9 @@ Web3 Hunting OS is in **Phase 1 Core, CRUD wired + Track D React Query**.
 
 The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
 
-**Data foundation is in place:** Drizzle ORM schema (21 tables), 16 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0015_add_personal_items.sql have been applied to the live database. Migration 0016_add_project_watchlist.sql is implemented locally but still needs to be applied before persisted Watchlist testing or deployment. The current live 20-table schema has RLS enabled on every application table; migration 0016 defines workspace RLS for the new table. **CRUD server actions now exist for Projects, Project Watchlist, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
+**Data foundation is in place:** Drizzle ORM schema (22 tables), 17 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0016_add_project_watchlist.sql have been applied to the live database. Migration 0017_add_docs_folders.sql has been applied to the live database. The current live 22-table schema has RLS enabled on every application table, including the Docs folder catalog. **CRUD server actions now exist for Projects, Project Watchlist, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
 
-**Remaining gap:** migration 0016 must be applied to Supabase before the dedicated Watchlist can persist data. Gmail remains Phase 2 because it requires OAuth and an email connector. Settings basic profile/workspace CRUD and Personal Items persistence are now live. Core Dashboard Quick Capture, overview metrics, and Hunting Pulse categories now read live workspace data. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
+Gmail remains Phase 2 because it requires OAuth and an email connector. Settings basic profile/workspace CRUD and Personal Items persistence are now live. Core Dashboard Quick Capture, overview metrics, and Hunting Pulse categories now read live workspace data. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
 
 ## Active Source of Truth
 
@@ -70,14 +70,14 @@ Current implementation should align with:
 ### Data Foundation
 
 - **Drizzle ORM** installed and configured (`drizzle-orm`, `drizzle-kit`, `pg`)
-- **Schema** (src/lib/db/schema.ts): 21 tables matching the current Core plus Personal Items and Project Watchlist scope
+- **Schema** (src/lib/db/schema.ts): 22 tables matching the current Core plus Personal Items, Project Watchlist, and Docs folder scope
   - `workspaces`, `workspace_members`
   - `accounts`, `wallet_groups`, `wallets`
   - `projects`, `project_accounts`, `project_wallets`, `project_watchlist_items`
   - `nft_campaigns`, `nft_campaign_accounts`, `nft_campaign_wallets`
   - `tasks`, `task_accounts`, `task_wallets`, `task_logs`
   - `deadlines`
-  - `inbox_items`, `notes`, `activity_logs`
+  - `inbox_items`, `docs_folders`, `notes`, `activity_logs`
 - **RLS hardening** (`src/lib/db/migrations/0007_enable_rls_and_fix_storage_policies.sql`):
   - Supersedes `0001_rls_policies.sql`, which was not successfully applied and contained a recursive `workspace_members` policy
   - Enables RLS on the original 15 application tables; migration `0008` secures `deadlines`; migrations `0010` and `0011` secure all three NFT tables
@@ -112,7 +112,7 @@ Server actions follow the same workspace-scoped pattern across implemented CRUD 
 | Accounts | `src/features/accounts/actions.ts` | `getAccounts` (with stats), `getWallets`, `getWalletGroups` | `createAccount`, `updateAccount`, `deleteAccount`, `uploadAccountAvatar`, `setAccountAvatarUrl`, `createWallet`, `updateWallet`, `deleteWallet`, `createWalletGroup`, `updateWalletGroup`, `deleteWalletGroup` |
 | Tasks | `src/features/tasks/actions.ts` | `getTaskWorkspaceData` | `createTask`, `updateTask`, `updateTaskStatus`, `deleteTask` |
 | Inbox | `src/features/inbox/actions.ts` | `getInboxPageData` | `createInboxItem`, `updateInboxItem`, `setInboxStatus`, link and conversion actions |
-| Docs | `src/features/docs/actions.ts` | `getDocsPageData` | `createDocsNote`, `updateDocsNote`, `deleteDocsNote` |
+| Docs | `src/features/docs/actions.ts` | `getDocsPageData` | `createDocsNote`, `updateDocsNote`, `deleteDocsNote`, `createDocsFolder`, `updateDocsFolder`, `deleteDocsFolder` |
 | Activity | `src/features/activity/actions.ts` | `getRecentActivity` | `recordActivity` mutation event writes |
 | Dashboard | `src/features/dashboard/actions.ts` | `getDashboardData` | - |
 
@@ -159,7 +159,7 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Conversion retains the Watchlist item with `converted_project_id`, is idempotent after completion, and does not create a project logo
 - React Query cache updates create/edit/delete/conversion results without a full page reload
 - Dashboard Quick Capture writes the Watchlist intent directly to this entity
-- Migration `0016_add_project_watchlist.sql` adds `projects.chains`, the Watchlist table, indexes, constraints, grants, and workspace RLS; it is not yet applied live
+- Migration `0016_add_project_watchlist.sql` adds `projects.chains`, the Watchlist table, indexes, constraints, grants, and workspace RLS; it has been applied live
 
 ### Accounts (Identities) — CRUD wired + avatar upload
 
@@ -281,6 +281,8 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 ### Docs — persisted unified notes
 
 - Workspace-scoped note CRUD with Markdown textarea, folders, pinning, project links, search, and delete confirmation
+- Docs folder catalog supports persisted custom folders, rename, and empty-folder delete; renaming a folder updates notes in that folder atomically
+- Docs page now uses an explorer layout with folder navigation, active-folder notes, pinned rows, empty-folder delete, softened dividers, and a Recent docs rail
 - Safe-secret validation rejects seed phrases, private keys, recovery phrases, and 2FA backup codes
 - Notes can be created directly or from an Inbox item
 
@@ -310,7 +312,7 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation; React Query + optimistic mutations (`projects-query.ts` holds the hooks) |
 | `nfts-preview.tsx` | ~200 lines | CRUD wired; React Query cache (`nfts-query.ts`); dialog still owns create/update/delete server calls |
 | `deadlines-preview.tsx` | ~230 lines | CRUD wired; React Query cache (`deadlines-query.ts`); dialog still owns create/update/delete server calls |
-| `docs-workspace.tsx` | ~100 lines | Docs CRUD wired; React Query + commit-waiting save/delete (`docs-query.ts`) |
+| `docs-workspace.tsx` | ~250 lines | Docs CRUD wired; explorer folder layout, custom folder create/edit/delete, React Query + commit-waiting save/delete/folder mutations (`docs-query.ts`) |
 | `inbox-workspace.tsx` | ~200 lines | Inbox CRUD wired; React Query + optimistic status + process refresh (`inbox-query.ts`) |
 | `archive-preview.tsx` | ~350 lines | CRUD wired (restore, delete); React Query + commit-waiting mutations (`archive-query.ts`); inline two-step delete |
 | `daily-workspace.tsx` | ~350 lines | Task Log + Daily execution; React Query date-scoped cache (`daily-workspace-query.ts`) with optimistic Done/Skip and personal toggle; Motion `layout` on checklist rows |
@@ -369,7 +371,7 @@ The 2026-08-01 Phase 1 Core batch includes:
 - Dashboard Inbox, Notes desk, Recent activity, overview metrics, Hunting Pulse categories, and Quick Capture are activated from live workspace data
 - Settings profile and workspace name editing with owner validation and persisted Supabase display metadata
 - Live migration `0015_add_personal_items.sql` with workspace RLS, Personal Items CRUD, and Daily recurrence visibility
-- Workspace-scoped Docs CRUD with Markdown textarea, folder, pin, project link, search, safe-secret validation, and delete confirmation
+- Workspace-scoped Docs CRUD with Markdown textarea, custom folder create/edit, folder contents view, pin, project link, search, safe-secret validation, and delete confirmation
 - Manual-first Inbox capture, edit, filters, explicit Project/Task/Docs conversion, link actions, and reload persistence smoke coverage
 - Shared AppSelect viewport-aware positioning so Inbox and other feature menus stay inside the visible browser surface
 - PRD v3.4 and DESIGN v2.16 alignment
@@ -385,7 +387,7 @@ The 2026-08-10 dedicated Project Watchlist batch includes:
 - Dashboard Watchlist Quick Capture now calls the Watchlist action directly; other capture intents still go to Inbox
 - Removed the former Projects Watchlist tab, status/stage classifier, `view=watchlist` parsing, and related unit tests
 - Updated sidebar and E2E route expectations to `/watchlist`
-- Migration `0016_add_project_watchlist.sql` remains pending on the live Supabase database
+- Migration `0016_add_project_watchlist.sql` has been applied on the live Supabase database
 
 The 2026-08-04 TanStack Query pilot batch includes:
 
@@ -415,7 +417,7 @@ Local `tmp-*-report.txt` diagnostic outputs are ignored and are not part of the 
 | 1 | Task Logs | **Wired**: workspace-scoped reads and unique daily upserts validate Task, Project, Account, and Wallet relations | Daily execution remains separate from the mutation Activity Log feed |
 | 2 | Daily | **Wired**: real Tasks, effective Account assignments, Task Logs, date navigation, execution actions, filters, and persisted Personal Items | Advanced Personal Item editing can expand later if needed |
 | 3 | Inbox | **Wired**: workspace-scoped capture/edit/status actions, search/filter UI, explicit Project/Task/Docs conversion, and link actions | Gmail remains Phase 2; Dashboard Inbox summary is now live for new and reviewing items |
-| 4 | Docs | **Wired**: Note CRUD, Markdown textarea, folder, pinning, project links, and persisted search | Dashboard Notes desk is live; Note capture remains an Inbox triage item |
+| 4 | Docs | **Wired**: Note CRUD, Markdown textarea, custom folders, folder rename/delete, pinning, project links, and persisted search | Dashboard Notes desk is live; Note capture remains an Inbox triage item |
 | 5 | Activity Logs | **Wired**: mutation events, recent activity query, and delete-safe target foreign keys | Add pagination and richer history views when the product scope requires them |
 | 6 | Wallet Groups | **Wired**: create, rename/description edit, and delete UI | Add richer group management only if the product scope expands |
 | 7 | Dashboard activation | **Wired**: Quick Capture, Inbox, Notes desk, Recent activity, Deadlines, overview metrics, and Hunting Pulse categories use workspace data | Keep Dashboard as a lightweight overview; add richer aggregation only when product scope requires it |
@@ -474,12 +476,22 @@ DONE     5. Standalone Deadlines: CRUD, Dashboard aggregation, RLS wired
 DONE     6. Tasks: CRUD, assignments, linked Deadlines, views, filters, actions wired
 DONE     7. Task Logs and Daily: real generation, persisted execution, and schedule rules wired
 DONE     8. Inbox: workspace CRUD, search/filter, explicit conversion, and smoke coverage
-DONE     9. Docs: CRUD, folders, pinning, project links, and Markdown textarea wired
+DONE     9. Docs: CRUD, custom folders, folder rename, pinning, project links, and Markdown textarea wired
 DONE     10. Activity logs: mutation events, recent activity query, and delete-safe FKs
 DONE     11. Project Watchlist: dedicated CRUD UI, conversion, Dashboard capture, and migration file wired locally
 ```
 
 ## Validation Status
+
+Docs folder polish checked 2026-08-11:
+
+```txt
+pnpm typecheck  # pass
+pnpm lint       # pass, 0 warnings
+pnpm exec vitest run tests/unit/docs-schema.test.ts  # pass, 4 tests
+pnpm test -- tests/unit/docs-schema.test.ts  # failed outside Docs: tests/unit/tasks-preview.test.tsx timed out at 5s
+Migration 0017_add_docs_folders.sql has been applied on the live Supabase database
+```
 
 Dedicated Project Watchlist batches checked 2026-08-10:
 
@@ -489,7 +501,7 @@ pnpm lint       # pass, 0 warnings
 pnpm test       # pass, 21 files and 82 tests
 Targeted Watchlist, Project query, and Dashboard Quick Capture tests  # pass
 git diff --check  # pass
-Production build and real-DB Playwright are deferred until migration 0016 is applied
+Production build and real-DB Playwright for custom Docs folders can run against live migration 0017
 ```
 
 Projects/Accounts React Query + motion + delete batch checked 2026-08-06:
