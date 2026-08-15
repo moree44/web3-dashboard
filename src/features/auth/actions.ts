@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { loginSchema, signupSchema } from "@/features/auth/schemas";
+import { loginSchema } from "@/features/auth/schemas";
 import { toInternalEmail } from "@/lib/auth/username";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { createClient } from "@/lib/supabase/server";
@@ -37,44 +37,9 @@ export async function login(input: unknown): Promise<AuthActionResult> {
   redirect("/");
 }
 
-export async function signup(input: unknown): Promise<AuthActionResult> {
-  const parsed = signupSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return { error: "Check the signup details and try again" };
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email: toInternalEmail(parsed.data.username),
-    password: parsed.data.password,
-    options: {
-      data: {
-        username: parsed.data.username,
-        display_name: parsed.data.displayName,
-      },
-    },
-  });
-
-  if (error) {
-    const duplicate = /already|registered|exists/i.test(error.message);
-    return { error: duplicate ? "Username is already taken" : "Unable to create the account" };
-  }
-
-  if (!data.session) {
-    return {
-      error: "Signup requires email confirmation to be disabled in Supabase settings",
-    };
-  }
-
-  if (data.user) {
-    await ensureDefaultWorkspace(
-      data.user.id,
-      `${parsed.data.displayName || parsed.data.username} Hunting OS`,
-    );
-  }
-
-  redirect("/");
+export async function signup(_input?: unknown): Promise<AuthActionResult> {
+  void _input;
+  return { error: "Signup is closed. Add users manually in Supabase." };
 }
 
 export async function logout() {

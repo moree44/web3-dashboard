@@ -1,7 +1,6 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -32,7 +31,6 @@ export function LoginForm() {
       </Field>
       {serverError ? <p className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive" role="alert">{serverError}</p> : null}
       <Button className="h-10 w-full" type="submit" disabled={isSubmitting}>{isSubmitting ? "Signing in..." : "Sign in"}</Button>
-      <p className="text-center text-xs text-muted-foreground">New here? <Link className="font-medium text-foreground hover:underline" href="/signup">Create an account</Link></p>
     </form>
   );
 }
