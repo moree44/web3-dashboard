@@ -1,6 +1,6 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-08-16
+Last updated: 2026-08-12
 
 ## Current Position
 
@@ -12,18 +12,6 @@ The app has a working Next.js 15 desktop preview shell with routed UI for Dashbo
 
 Gmail remains Phase 2 because it requires OAuth and an email connector. Settings basic profile/workspace CRUD and Personal Items persistence are now live. Core Dashboard Quick Capture, overview metrics, and Hunting Pulse categories now read live workspace data. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
 
-## Production Deployment Notes - 2026-08-16
-
-- Production deploy is now on Vercel from GitHub `main`; latest pushed optimization commit: `2ec105f Tune Vercel region and database pooling`.
-- Public signup is closed in app code: Login no longer links to Signup, `/signup` redirects to `/login`, and the signup server action returns a closed message. Supabase Auth signup should also remain disabled in Dashboard.
-- Supabase project region is Tokyo. Vercel Functions are pinned through `vercel.json` to `hnd1` Tokyo to reduce app-to-database latency.
-- Vercel `DATABASE_URL` must use the Supabase Transaction Pooler URI, not Direct URL or Session Pooler. The earlier production 500 was `EMAXCONNSESSION max clients reached in session mode`.
-- Production DB pool is intentionally conservative for Vercel serverless: `max=1`, `idleTimeoutMillis=10000`, `connectionTimeoutMillis=5000`.
-- Node engine is pinned to `22.x` to avoid Vercel auto-upgrading to a future major Node version.
-- Test auth workspace/user cleanup is complete: `test Hunting OS` was removed and the Supabase Auth test user was deleted manually after FK blockers were cleared.
-- Archive permanent delete now reports linked blockers clearly instead of silently failing; the inline notice is compact and dark-theme aligned.
-- Future notification/toast UI should stay calm and compact: dark translucent surface, subtle border, small icon, status color used softly, no oversized banners.
-- Phase 1.5 candidate: PWA install support for iPhone plus Deadline reminders via Web Push. iOS push requires the PWA to be installed to Home Screen.
 ## Active Source of Truth
 
 Read these before major work:
