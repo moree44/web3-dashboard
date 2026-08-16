@@ -202,7 +202,14 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
         </div>
       </div>
 
-      {actionError ? <p role="alert" className="px-4 pt-3 text-xs text-destructive sm:px-6 lg:px-8">{actionError}</p> : null}
+      {actionError ? (
+        <div className="px-4 pt-3 sm:px-6 lg:px-8">
+          <div role="alert" className="inline-flex max-w-3xl items-start gap-2 rounded-lg border border-destructive/15 bg-destructive/[0.055] px-3 py-2 text-xs leading-5 text-destructive/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)]">
+            <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+            <span>{actionError}</span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">
