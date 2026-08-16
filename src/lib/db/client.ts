@@ -12,8 +12,9 @@ function createPool() {
 
   const pool = new Pool({
     connectionString: getEnv().DATABASE_URL,
-    max: 10,
-    idleTimeoutMillis: 30_000,
+    max: process.env.NODE_ENV === "production" ? 1 : 10,
+    idleTimeoutMillis: process.env.NODE_ENV === "production" ? 10_000 : 30_000,
+    connectionTimeoutMillis: 5_000,
   });
 
   if (process.env.NODE_ENV !== "production") {
