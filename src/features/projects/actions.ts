@@ -4,7 +4,20 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
-import { accounts, projectAccounts, projectWallets, projects, wallets } from "@/lib/db/schema";
+import {
+  accounts,
+  activityLogs,
+  deadlines,
+  inboxItems,
+  notes,
+  projectAccounts,
+  projectWallets,
+  projects,
+  projectWatchlistItems,
+  taskLogs,
+  tasks,
+  wallets,
+} from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 import { recordActivity } from "@/features/activity/activity-log";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -511,6 +524,51 @@ export async function deleteProject(id: string): Promise<void> {
 
       if (!project) throw new Error("Project not found");
 
+      const [
+        taskCount,
+        logCount,
+        docCount,
+        inboxCount,
+        deadlineCount,
+        watchlistCount,
+      ] = await Promise.all([
+        tx.select({ count: sql<number>`count(*)::int` }).from(tasks)
+          .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.projectId, project.id))),
+        tx.select({ count: sql<number>`count(*)::int` }).from(taskLogs)
+          .where(and(eq(taskLogs.workspaceId, workspaceId), eq(taskLogs.projectId, project.id))),
+        tx.select({ count: sql<number>`count(*)::int` }).from(notes)
+          .where(and(eq(notes.workspaceId, workspaceId), eq(notes.linkedProjectId, project.id))),
+        tx.select({ count: sql<number>`count(*)::int` }).from(inboxItems)
+          .where(and(eq(inboxItems.workspaceId, workspaceId), eq(inboxItems.linkedProjectId, project.id))),
+        tx.select({ count: sql<number>`count(*)::int` }).from(deadlines)
+          .where(and(eq(deadlines.workspaceId, workspaceId), eq(deadlines.linkedProjectId, project.id))),
+        tx.select({ count: sql<number>`count(*)::int` }).from(projectWatchlistItems)
+          .where(and(eq(projectWatchlistItems.workspaceId, workspaceId), eq(projectWatchlistItems.convertedProjectId, project.id))),
+      ]);
+
+      const blockers = [
+        ["tasks", taskCount[0]?.count],
+        ["daily logs", logCount[0]?.count],
+        ["docs", docCount[0]?.count],
+        ["inbox items", inboxCount[0]?.count],
+        ["deadlines", deadlineCount[0]?.count],
+        ["watchlist conversions", watchlistCount[0]?.count],
+      ]
+        .map(([label, count]) => ({ label, count: Number(count ?? 0) }))
+        .filter((item) => item.count > 0);
+
+      if (blockers.length > 0) {
+        const details = blockers
+          .map((item) => `${item.count} ${item.label}`)
+          .join(", ");
+        throw new Error(`Cannot permanently delete this project yet. It is still linked to ${details}. Remove or unlink those items first.`);
+      }
+
+      await tx
+        .update(activityLogs)
+        .set({ projectId: null })
+        .where(eq(activityLogs.projectId, project.id));
+
       await tx
         .delete(projectAccounts)
         .where(eq(projectAccounts.projectId, project.id));
@@ -526,7 +584,7 @@ export async function deleteProject(id: string): Promise<void> {
     });
   } catch (error) {
     if (hasPostgresCode(error, "23503")) {
-      throw new Error("This project is still linked to tasks or logs. Archive it instead of deleting it permanently.");
+      throw new Error("Cannot permanently delete this project yet. It still has linked records. Remove or unlink related tasks, docs, deadlines, inbox items, or daily logs first.");
     }
     throw error;
   }
