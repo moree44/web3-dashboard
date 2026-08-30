@@ -107,6 +107,12 @@ function dbToUIProject(record: DbProject): Project {
   };
 }
 
+type ProjectDeleteHandler = (id: string, options?: { forceUnlink?: boolean }) => void;
+
+function toErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Something went wrong";
+}
+
 type Project = {
   id?: string;
   name: string;
@@ -151,6 +157,7 @@ export function ProjectsPreview({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forceDeleteCandidate, setForceDeleteCandidate] = useState<{ id: string; name: string } | null>(null);
   const { data: queryData } = useProjectsWorkspace(initialData, developmentPreview);
   const workspace = queryData ?? initialData;
   const mutations = useProjectsMutations({
@@ -257,14 +264,23 @@ export function ProjectsPreview({
     setSelectedProjectId(null);
   }
 
-  async function handleDeleteProject(id: string) {
+  async function handleDeleteProject(id: string, options: { forceUnlink?: boolean } = {}) {
+    setError(null);
+    if (options.forceUnlink) setForceDeleteCandidate(null);
+
     try {
-      await mutations.deleteProjectMutation.mutateAsync(id);
-    } catch {
-      // Error is surfaced through the mutation onError handler; keep the
-      // drawer open so the user can retry.
+      await mutations.deleteProjectMutation.mutateAsync({ id, forceUnlink: options.forceUnlink });
+    } catch (deleteError) {
+      const message = toErrorMessage(deleteError);
+      setError(message);
+      if (!options.forceUnlink && message.includes("safe force delete")) {
+        const project = projectItems.find((item) => item.id === id);
+        setForceDeleteCandidate({ id, name: project?.name ?? "this project" });
+      }
       return;
     }
+
+    setForceDeleteCandidate(null);
     setSelectedProjectId(null);
   }
 
@@ -287,9 +303,22 @@ export function ProjectsPreview({
 
       {error ? (
         <div className="px-4 pt-3 sm:px-6 lg:px-8">
-          <div role="alert" className="inline-flex max-w-3xl items-start gap-2 rounded-lg border border-destructive/15 bg-destructive/[0.055] px-3 py-2 text-xs leading-5 text-destructive/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)]">
-            <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-            <span>{error}</span>
+          <div role="alert" className="flex max-w-4xl flex-col gap-2 rounded-lg border border-destructive/15 bg-destructive/[0.055] px-3 py-2 text-xs leading-5 text-destructive/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)] sm:inline-flex sm:flex-row sm:items-center">
+            <div className="flex min-w-0 items-start gap-2">
+              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+            {forceDeleteCandidate ? (
+              <ConfirmDelete
+                onConfirm={() => handleDeleteProject(forceDeleteCandidate.id, { forceUnlink: true })}
+                label="Safe force delete"
+                confirmLabel="Confirm unlink + delete"
+                className="w-auto shrink-0 border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5 text-[11px] text-foreground hover:bg-white/[0.08]"
+                disabled={mutations.deleteProjectMutation.isPending}
+              >
+                <Trash2 className="size-3.5" />
+              </ConfirmDelete>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -390,7 +419,7 @@ function ProjectRow({
   visibleColumns: Set<ProjectColumn>;
   onOpen: () => void;
   onArchive: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: ProjectDeleteHandler;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 });
@@ -759,7 +788,7 @@ function ProjectCard({
   project: Project;
   onOpen: () => void;
   onArchive: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: ProjectDeleteHandler;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
@@ -802,7 +831,7 @@ function ProjectDetailPanel({
   ) => Promise<void | Project>;
   onLogoUploaded: (id: string, formData: FormData) => Promise<void>;
   onArchive: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: ProjectDeleteHandler;
   accountOptions: ProjectAccountOption[];
   walletOptions: ProjectWalletOption[];
 }) {

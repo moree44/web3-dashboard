@@ -8,6 +8,7 @@ import { useArchiveMutations, useArchiveWorkspace } from "@/features/archive/arc
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import { cn } from "@/lib/utils";
 
 type ArchivedProject = {
@@ -33,6 +34,10 @@ const initialArchivedProjects: ArchivedProject[] = [
 ];
 
 type ReasonFilter = "all" | "claimed" | "dropped" | "scam_risk" | "expired" | "not_worth" | "duplicate" | "completed" | "other";
+
+function toErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Something went wrong";
+}
 
 function mapArchivedProject(project: ProjectWithAccounts): ArchivedProject {
   return {
@@ -68,6 +73,7 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
     : workspace.projects.map(mapArchivedProject);
 
   const [actionError, setActionError] = useState("");
+  const [forceDeleteCandidate, setForceDeleteCandidate] = useState<ArchivedProject | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReasonFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(() => new Set());
@@ -141,9 +147,10 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
     }
   }
 
-  async function permanentlyDelete(project: ArchivedProject) {
+  async function permanentlyDelete(project: ArchivedProject, options: { forceUnlink?: boolean } = {}) {
     if (busy) return;
     setActionError("");
+    if (options.forceUnlink) setForceDeleteCandidate(null);
     const key = project.id ?? project.name;
     try {
       if (developmentPreview) {
@@ -156,14 +163,19 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
         return;
       }
       if (!project.id) return;
-      await mutations.deleteMutation.mutateAsync(project.id);
+      await mutations.deleteMutation.mutateAsync({ id: project.id, forceUnlink: options.forceUnlink });
+      setForceDeleteCandidate(null);
       setSelectedProjects((current) => {
         const next = new Set(current);
         next.delete(project.id!);
         return next;
       });
-    } catch {
-      // Failure is surfaced through onError.
+    } catch (deleteError) {
+      const message = toErrorMessage(deleteError);
+      setActionError(message);
+      if (!options.forceUnlink && message.includes("safe force delete")) {
+        setForceDeleteCandidate(project);
+      }
     }
   }
 
@@ -204,9 +216,22 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
 
       {actionError ? (
         <div className="px-4 pt-3 sm:px-6 lg:px-8">
-          <div role="alert" className="inline-flex max-w-3xl items-start gap-2 rounded-lg border border-destructive/15 bg-destructive/[0.055] px-3 py-2 text-xs leading-5 text-destructive/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)]">
-            <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-            <span>{actionError}</span>
+          <div role="alert" className="flex max-w-4xl flex-col gap-2 rounded-lg border border-destructive/15 bg-destructive/[0.055] px-3 py-2 text-xs leading-5 text-destructive/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)] sm:inline-flex sm:flex-row sm:items-center">
+            <div className="flex min-w-0 items-start gap-2">
+              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+              <span>{actionError}</span>
+            </div>
+            {forceDeleteCandidate ? (
+              <ConfirmDelete
+                onConfirm={() => void permanentlyDelete(forceDeleteCandidate, { forceUnlink: true })}
+                label="Safe force delete"
+                confirmLabel="Confirm unlink + delete"
+                className="w-auto shrink-0 border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5 text-[11px] text-foreground hover:bg-white/[0.08]"
+                disabled={busy}
+              >
+                <Trash2 className="size-3.5" />
+              </ConfirmDelete>
+            ) : null}
           </div>
         </div>
       ) : null}

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { deleteProject } from "@/features/projects/actions";
 import { ProjectsPreview } from "@/features/projects/components/projects-preview";
 import { projectsPreviewData } from "@/features/projects/preview-data";
 
@@ -92,6 +93,36 @@ describe("ProjectsPreview", () => {
       "https://x.com/initiaFDN",
     );
     expect(screen.getByText("Interwoven rollups thesis")).toBeInTheDocument();
+  });
+
+
+  it("offers safe force delete when a project has linked records", async () => {
+    const deleteProjectMock = vi.mocked(deleteProject);
+    deleteProjectMock
+      .mockResolvedValueOnce({
+        ok: false,
+        error: "Cannot permanently delete this project yet. It is still linked to 1 tasks. Use safe force delete to detach those records and delete only the project.",
+      })
+      .mockResolvedValueOnce({ ok: true });
+
+    renderProjectsPreview();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Soundness/ })[0]);
+    expect(screen.getByRole("dialog", { name: "Soundness" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "More options" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Safe force delete" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Safe force delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm unlink + delete" }));
+
+    await waitFor(() => {
+      expect(deleteProjectMock).toHaveBeenLastCalledWith(expect.any(String), { forceUnlink: true });
+    });
+    await waitFor(() => expect(screen.queryAllByText("Soundness")).toHaveLength(0));
   });
 
   it("deletes a project after inline confirmation in development preview", async () => {

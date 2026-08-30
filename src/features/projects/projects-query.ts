@@ -31,8 +31,13 @@ function toMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong";
 }
 
-async function deleteProjectOrThrow(id: string) {
-  const result = await deleteProject(id);
+export type ProjectDeleteVars = {
+  id: string;
+  forceUnlink?: boolean;
+};
+
+async function deleteProjectOrThrow({ id, forceUnlink = false }: ProjectDeleteVars) {
+  const result = await deleteProject(id, { forceUnlink });
   if (!result.ok) throw new Error(result.error);
 }
 
@@ -268,19 +273,19 @@ export function useProjectsMutations(opts: {
   // and the row is removed only after the server confirms, so a page
   // navigation can never abort the in-flight server action. Preview keeps an
   // optimistic removal since there is no server.
-  const deleteProjectMutation = useMutation(buildProjectMutationOptions<void, string>({
+  const deleteProjectMutation = useMutation(buildProjectMutationOptions<void, ProjectDeleteVars>({
     queryClient,
     key,
     developmentPreview: opts.developmentPreview,
     onError: opts.onError,
-    mutationFn: async (id) => {
+    mutationFn: async (vars) => {
       if (opts.developmentPreview) return;
-      return deleteProjectOrThrow(id);
+      return deleteProjectOrThrow(vars);
     },
     applyOptimistic: opts.developmentPreview
-      ? (data, id) => ({ ...data, projects: data.projects.filter((project) => project.id !== id) })
+      ? (data, vars) => ({ ...data, projects: data.projects.filter((project) => project.id !== vars.id) })
       : undefined,
-    mergeResult: (data, _result, id) => ({ ...data, projects: data.projects.filter((project) => project.id !== id) }),
+    mergeResult: (data, _result, vars) => ({ ...data, projects: data.projects.filter((project) => project.id !== vars.id) }),
   }));
 
   const uploadProjectLogoMutation = useMutation(buildProjectMutationOptions<ProjectWithAccounts, { id: string; formData: FormData }>({

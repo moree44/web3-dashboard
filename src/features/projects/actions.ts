@@ -53,6 +53,10 @@ export type ProjectsWorkspaceData = {
   nftCount: number;
 };
 
+export type ProjectDeleteOptions = {
+  forceUnlink?: boolean;
+};
+
 export type ProjectDeleteResult = { ok: true } | { ok: false; error: string };
 
 function revalidateProjectViews() {
@@ -513,7 +517,7 @@ export async function uploadProjectLogo(id: string, formData: FormData): Promise
   return updateProject(id, { logoPath: path, logoUrl: data.publicUrl, logoSource: "uploaded" });
 }
 
-export async function deleteProject(id: string): Promise<ProjectDeleteResult> {
+export async function deleteProject(id: string, options: ProjectDeleteOptions = {}): Promise<ProjectDeleteResult> {
   const { workspaceId } = await requireWorkspace();
 
   try {
@@ -560,19 +564,53 @@ export async function deleteProject(id: string): Promise<ProjectDeleteResult> {
         .filter((item) => item.count > 0);
 
       if (blockers.length > 0) {
-        const details = blockers
-          .map((item) => `${item.count} ${item.label}`)
-          .join(", ");
-        return {
-          ok: false,
-          error: `Cannot permanently delete this project yet. It is still linked to ${details}. Remove or unlink those items first.`,
-        };
+        if (options.forceUnlink) {
+          const now = new Date();
+
+          await tx
+            .update(tasks)
+            .set({ projectId: null, updatedAt: now })
+            .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.projectId, project.id)));
+
+          await tx
+            .update(taskLogs)
+            .set({ projectId: null, updatedAt: now })
+            .where(and(eq(taskLogs.workspaceId, workspaceId), eq(taskLogs.projectId, project.id)));
+
+          await tx
+            .update(notes)
+            .set({ linkedProjectId: null, updatedAt: now })
+            .where(and(eq(notes.workspaceId, workspaceId), eq(notes.linkedProjectId, project.id)));
+
+          await tx
+            .update(inboxItems)
+            .set({ linkedProjectId: null, updatedAt: now })
+            .where(and(eq(inboxItems.workspaceId, workspaceId), eq(inboxItems.linkedProjectId, project.id)));
+
+          await tx
+            .update(deadlines)
+            .set({ linkedProjectId: null, updatedAt: now })
+            .where(and(eq(deadlines.workspaceId, workspaceId), eq(deadlines.linkedProjectId, project.id)));
+
+          await tx
+            .update(projectWatchlistItems)
+            .set({ convertedProjectId: null, updatedAt: now })
+            .where(and(eq(projectWatchlistItems.workspaceId, workspaceId), eq(projectWatchlistItems.convertedProjectId, project.id)));
+        } else {
+          const details = blockers
+            .map((item) => `${item.count} ${item.label}`)
+            .join(", ");
+          return {
+            ok: false,
+            error: `Cannot permanently delete this project yet. It is still linked to ${details}. Use safe force delete to detach those records and delete only the project.`,
+          };
+        }
       }
 
       await tx
         .update(activityLogs)
         .set({ projectId: null })
-        .where(eq(activityLogs.projectId, project.id));
+        .where(and(eq(activityLogs.workspaceId, workspaceId), eq(activityLogs.projectId, project.id)));
 
       await tx
         .delete(projectAccounts)

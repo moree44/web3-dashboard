@@ -23,8 +23,13 @@ function toMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong";
 }
 
-async function deleteProjectOrThrow(id: string) {
-  const result = await deleteProject(id);
+export type ArchiveDeleteVars = {
+  id: string;
+  forceUnlink?: boolean;
+};
+
+async function deleteProjectOrThrow({ id, forceUnlink = false }: ArchiveDeleteVars) {
+  const result = await deleteProject(id, { forceUnlink });
   if (!result.ok) throw new Error(result.error);
 }
 
@@ -100,19 +105,19 @@ export function useArchiveMutations(opts: {
   }));
 
   // Permanent delete is commit-waiting in real mode for the same reason.
-  const deleteMutation = useMutation(buildArchiveMutationOptions<void, string>({
+  const deleteMutation = useMutation(buildArchiveMutationOptions<void, ArchiveDeleteVars>({
     queryClient,
     key,
     developmentPreview: opts.developmentPreview,
     onError: opts.onError,
-    mutationFn: async (id) => {
+    mutationFn: async (vars) => {
       if (opts.developmentPreview) return;
-      return deleteProjectOrThrow(id);
+      return deleteProjectOrThrow(vars);
     },
     applyOptimistic: opts.developmentPreview
-      ? (data, id) => removeArchivedProjects(data, [id])
+      ? (data, vars) => removeArchivedProjects(data, [vars.id])
       : undefined,
-    mergeResult: (data, _result, id) => removeArchivedProjects(data, [id]),
+    mergeResult: (data, _result, vars) => removeArchivedProjects(data, [vars.id]),
   }));
 
   return { restoreMutation, deleteMutation };
