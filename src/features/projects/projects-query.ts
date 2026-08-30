@@ -31,6 +31,11 @@ function toMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong";
 }
 
+async function deleteProjectOrThrow(id: string) {
+  const result = await deleteProject(id);
+  if (!result.ok) throw new Error(result.error);
+}
+
 // Shared optimistic-mutation wiring: snapshot before, apply the optimistic
 // record, roll back on error, and merge the server-confirmed record on success.
 // In preview mode there is no server, so success just leaves the optimistic
@@ -270,7 +275,7 @@ export function useProjectsMutations(opts: {
     onError: opts.onError,
     mutationFn: async (id) => {
       if (opts.developmentPreview) return;
-      return deleteProject(id);
+      return deleteProjectOrThrow(id);
     },
     applyOptimistic: opts.developmentPreview
       ? (data, id) => ({ ...data, projects: data.projects.filter((project) => project.id !== id) })

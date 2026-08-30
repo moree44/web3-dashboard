@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArrowUpRight, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Upload, WalletCards, X } from "lucide-react";
+import { Archive, ArrowUpRight, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, ShieldAlert, SlidersHorizontal, Trash2, Upload, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -285,7 +285,14 @@ export function ProjectsPreview({
         <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add project</Button>
       </header>
 
-      {error ? <div role="alert" className="mx-4 mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive sm:mx-6 lg:mx-8">{error}</div> : null}
+      {error ? (
+        <div className="px-4 pt-3 sm:px-6 lg:px-8">
+          <div role="alert" className="inline-flex max-w-3xl items-start gap-2 rounded-lg border border-destructive/15 bg-destructive/[0.055] px-3 py-2 text-xs leading-5 text-destructive/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)]">
+            <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8"><div className="flex items-center gap-2 py-2.5">
         <div className="scrollbar-subtle flex min-w-0 flex-1 gap-1 overflow-x-auto">

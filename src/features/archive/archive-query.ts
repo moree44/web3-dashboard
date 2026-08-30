@@ -23,6 +23,11 @@ function toMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong";
 }
 
+async function deleteProjectOrThrow(id: string) {
+  const result = await deleteProject(id);
+  if (!result.ok) throw new Error(result.error);
+}
+
 function buildArchiveMutationOptions<TResult, TVars>(opts: {
   queryClient: QueryClient;
   key: readonly string[];
@@ -102,7 +107,7 @@ export function useArchiveMutations(opts: {
     onError: opts.onError,
     mutationFn: async (id) => {
       if (opts.developmentPreview) return;
-      return deleteProject(id);
+      return deleteProjectOrThrow(id);
     },
     applyOptimistic: opts.developmentPreview
       ? (data, id) => removeArchivedProjects(data, [id])

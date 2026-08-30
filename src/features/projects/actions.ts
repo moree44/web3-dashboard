@@ -53,6 +53,8 @@ export type ProjectsWorkspaceData = {
   nftCount: number;
 };
 
+export type ProjectDeleteResult = { ok: true } | { ok: false; error: string };
+
 function revalidateProjectViews() {
   for (const path of ["/projects", "/archive", "/daily", "/tasks"]) revalidatePath(path);
 }
@@ -511,18 +513,18 @@ export async function uploadProjectLogo(id: string, formData: FormData): Promise
   return updateProject(id, { logoPath: path, logoUrl: data.publicUrl, logoSource: "uploaded" });
 }
 
-export async function deleteProject(id: string): Promise<void> {
+export async function deleteProject(id: string): Promise<ProjectDeleteResult> {
   const { workspaceId } = await requireWorkspace();
 
   try {
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx): Promise<ProjectDeleteResult> => {
       const [project] = await tx
         .select({ id: projects.id })
         .from(projects)
         .where(and(eq(projects.id, id), eq(projects.workspaceId, workspaceId)))
         .limit(1);
 
-      if (!project) throw new Error("Project not found");
+      if (!project) return { ok: false, error: "Project not found" };
 
       const [
         taskCount,
@@ -561,7 +563,10 @@ export async function deleteProject(id: string): Promise<void> {
         const details = blockers
           .map((item) => `${item.count} ${item.label}`)
           .join(", ");
-        throw new Error(`Cannot permanently delete this project yet. It is still linked to ${details}. Remove or unlink those items first.`);
+        return {
+          ok: false,
+          error: `Cannot permanently delete this project yet. It is still linked to ${details}. Remove or unlink those items first.`,
+        };
       }
 
       await tx
@@ -581,14 +586,24 @@ export async function deleteProject(id: string): Promise<void> {
       await tx
         .delete(projects)
         .where(and(eq(projects.id, project.id), eq(projects.workspaceId, workspaceId)));
+
+      return { ok: true };
     });
+
+    if (!result.ok) return result;
   } catch (error) {
     if (hasPostgresCode(error, "23503")) {
-      throw new Error("Cannot permanently delete this project yet. It still has linked records. Remove or unlink related tasks, docs, deadlines, inbox items, or daily logs first.");
+      return {
+        ok: false,
+        error: "Cannot permanently delete this project yet. It still has linked records. Remove or unlink related tasks, docs, deadlines, inbox items, or daily logs first.",
+      };
     }
-    throw error;
+    console.error("[deleteProject]", error);
+    return { ok: false, error: "Unable to delete this project right now. Check the server logs and try again." };
   }
 
   await recordActivity(workspaceId, "project.deleted", {}, { id });
   revalidateProjectViews();
+
+  return { ok: true };
 }
