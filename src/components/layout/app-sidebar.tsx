@@ -19,8 +19,8 @@ import {
   TrendingUp,
   UsersRound,
 } from "lucide-react";
-import Link from "next/link";
 
+import { NavLink as Link } from "@/components/layout/nav-link";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { cn } from "@/lib/utils";
 

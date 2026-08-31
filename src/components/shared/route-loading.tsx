@@ -10,7 +10,7 @@ type RouteLoadingProps = {
 
 export function RouteLoading({ titleWidth = "w-56", variant = "table" }: RouteLoadingProps) {
   return (
-    <div className="px-4 py-3 sm:px-5 lg:px-6 lg:py-4" aria-label="Loading page">
+    <div className="animate-in fade-in fill-mode-both delay-300 px-4 py-3 duration-200 sm:px-5 lg:px-6 lg:py-4" aria-label="Loading page">
       <div className="space-y-2">
         <Skeleton className="h-3 w-36" />
         <Skeleton className={cn("h-7", titleWidth)} />

@@ -1,6 +1,6 @@
 import { CalendarCheck2, FolderKanban, Inbox, LayoutDashboard, UsersRound } from "lucide-react";
-import Link from "next/link";
 
+import { NavLink as Link } from "@/components/layout/nav-link";
 import type { AppSection } from "@/components/layout/app-sidebar";
 import { cn } from "@/lib/utils";
 
