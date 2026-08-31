@@ -59,8 +59,11 @@ export type ProjectDeleteOptions = {
 
 export type ProjectDeleteResult = { ok: true } | { ok: false; error: string };
 
-function revalidateProjectViews() {
-  for (const path of ["/projects", "/archive", "/daily", "/tasks"]) revalidatePath(path);
+const ACTIVE_PROJECT_PATHS = ["/", "/projects", "/tasks", "/daily"] as const;
+const ARCHIVED_PROJECT_PATHS = ["/", "/projects", "/archive", "/tasks", "/daily"] as const;
+
+function revalidateProjectViews(paths: readonly string[] = ACTIVE_PROJECT_PATHS) {
+  for (const path of paths) revalidatePath(path);
 }
 
 async function assertUniqueName(workspaceId: string, name: string, ignoredId?: string) {
@@ -368,7 +371,7 @@ export async function createProject(
   }));
 
   await recordActivity(workspaceId, "project.created", { projectId: result.id }, { name: result.name });
-  revalidateProjectViews();
+  revalidateProjectViews(["/", "/projects", "/tasks"]);
 
   return result;
 }
@@ -483,7 +486,7 @@ export async function archiveProject(id: string, reason: string): Promise<void> 
     .returning({ id: projects.id });
   if (!archived) throw new Error("Project not found");
   await recordActivity(workspaceId, "project.archived", { projectId: archived.id });
-  revalidateProjectViews();
+  revalidateProjectViews(ARCHIVED_PROJECT_PATHS);
 }
 
 export async function restoreProject(id: string): Promise<void> {
@@ -493,7 +496,7 @@ export async function restoreProject(id: string): Promise<void> {
     .returning({ id: projects.id }));
   if (restored.length === 0) throw new Error("Project not found");
   await recordActivity(workspaceId, "project.restored", { projectId: id });
-  revalidateProjectViews();
+  revalidateProjectViews(ARCHIVED_PROJECT_PATHS);
 }
 
 export async function uploadProjectLogo(id: string, formData: FormData): Promise<ProjectWithAccounts> {
@@ -530,27 +533,18 @@ export async function deleteProject(id: string, options: ProjectDeleteOptions = 
 
       if (!project) return { ok: false, error: "Project not found" };
 
-      const [
-        taskCount,
-        logCount,
-        docCount,
-        inboxCount,
-        deadlineCount,
-        watchlistCount,
-      ] = await Promise.all([
-        tx.select({ count: sql<number>`count(*)::int` }).from(tasks)
-          .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.projectId, project.id))),
-        tx.select({ count: sql<number>`count(*)::int` }).from(taskLogs)
-          .where(and(eq(taskLogs.workspaceId, workspaceId), eq(taskLogs.projectId, project.id))),
-        tx.select({ count: sql<number>`count(*)::int` }).from(notes)
-          .where(and(eq(notes.workspaceId, workspaceId), eq(notes.linkedProjectId, project.id))),
-        tx.select({ count: sql<number>`count(*)::int` }).from(inboxItems)
-          .where(and(eq(inboxItems.workspaceId, workspaceId), eq(inboxItems.linkedProjectId, project.id))),
-        tx.select({ count: sql<number>`count(*)::int` }).from(deadlines)
-          .where(and(eq(deadlines.workspaceId, workspaceId), eq(deadlines.linkedProjectId, project.id))),
-        tx.select({ count: sql<number>`count(*)::int` }).from(projectWatchlistItems)
-          .where(and(eq(projectWatchlistItems.workspaceId, workspaceId), eq(projectWatchlistItems.convertedProjectId, project.id))),
-      ]);
+      const taskCount = await tx.select({ count: sql<number>`count(*)::int` }).from(tasks)
+        .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.projectId, project.id)));
+      const logCount = await tx.select({ count: sql<number>`count(*)::int` }).from(taskLogs)
+        .where(and(eq(taskLogs.workspaceId, workspaceId), eq(taskLogs.projectId, project.id)));
+      const docCount = await tx.select({ count: sql<number>`count(*)::int` }).from(notes)
+        .where(and(eq(notes.workspaceId, workspaceId), eq(notes.linkedProjectId, project.id)));
+      const inboxCount = await tx.select({ count: sql<number>`count(*)::int` }).from(inboxItems)
+        .where(and(eq(inboxItems.workspaceId, workspaceId), eq(inboxItems.linkedProjectId, project.id)));
+      const deadlineCount = await tx.select({ count: sql<number>`count(*)::int` }).from(deadlines)
+        .where(and(eq(deadlines.workspaceId, workspaceId), eq(deadlines.linkedProjectId, project.id)));
+      const watchlistCount = await tx.select({ count: sql<number>`count(*)::int` }).from(projectWatchlistItems)
+        .where(and(eq(projectWatchlistItems.workspaceId, workspaceId), eq(projectWatchlistItems.convertedProjectId, project.id)));
 
       const blockers = [
         ["tasks", taskCount[0]?.count],
@@ -641,7 +635,7 @@ export async function deleteProject(id: string, options: ProjectDeleteOptions = 
   }
 
   await recordActivity(workspaceId, "project.deleted", {}, { id });
-  revalidateProjectViews();
+  revalidateProjectViews(ARCHIVED_PROJECT_PATHS);
 
   return { ok: true };
 }

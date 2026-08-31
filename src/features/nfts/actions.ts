@@ -60,8 +60,8 @@ async function requireWorkspace() {
   return { workspaceId: workspace.id };
 }
 
-function revalidateNftViews() {
-  for (const path of ["/nfts", "/projects", "/deadlines", "/"]) {
+function revalidateNftViews(paths: readonly string[] = ["/", "/nfts", "/deadlines"]) {
+  for (const path of paths) {
     revalidatePath(path);
   }
 }
@@ -339,7 +339,7 @@ export async function createNftCampaign(
 
   const result = await campaignResult(workspaceId, createdId);
   await recordActivity(workspaceId, "nft_campaign.created", {}, { name: result.name });
-  revalidateNftViews();
+  revalidateNftViews(["/", "/nfts", "/projects", "/deadlines"]);
   return result;
 }
 
@@ -476,5 +476,5 @@ export async function deleteNftCampaign(id: string): Promise<void> {
     .returning({ id: nftCampaigns.id });
   if (deleted.length === 0) throw new Error("NFT campaign not found");
   await recordActivity(workspaceId, "nft_campaign.deleted", {}, { id });
-  revalidateNftViews();
+  revalidateNftViews(["/", "/nfts", "/projects", "/deadlines"]);
 }

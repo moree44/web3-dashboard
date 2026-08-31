@@ -74,7 +74,7 @@ async function requireWorkspace() {
 }
 
 function revalidateDeadlineViews() {
-  for (const path of ["/", "/deadlines", "/tasks", "/daily", "/nfts"]) {
+  for (const path of ["/", "/deadlines"]) {
     revalidatePath(path);
   }
 }

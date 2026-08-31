@@ -34,8 +34,8 @@ async function requireWorkspace() {
   return (await ensureDefaultWorkspace(user.id)).id;
 }
 
-function revalidateInboxViews() {
-  for (const path of ["/inbox", "/", "/projects", "/tasks", "/docs"]) revalidatePath(path);
+function revalidateInboxViews(paths: readonly string[] = ["/", "/inbox"]) {
+  for (const path of paths) revalidatePath(path);
 }
 
 function cleanOptional(value: string | null | undefined) {
@@ -253,7 +253,7 @@ export async function createProjectFromInbox(id: string, input: InboxProjectConv
     await tx.update(inboxItems).set({ linkedProjectId: project.id, status: "converted", updatedAt: new Date() })
       .where(and(eq(inboxItems.id, inboxId), eq(inboxItems.workspaceId, workspaceId)));
   });
-  revalidateInboxViews();
+  revalidateInboxViews(["/", "/inbox", "/projects", "/tasks"]);
   const record = await getItemRecord(workspaceId, inboxId);
   await recordActivity(workspaceId, "inbox.processed", { inboxItemId: record.id, projectId: record.linkedProjectId, taskId: record.linkedTaskId, noteId: record.linkedNoteId }, { title: record.title, status: record.status });
   return record;
@@ -284,7 +284,7 @@ export async function createTaskFromInbox(id: string, input: InboxTaskConversion
     await tx.update(inboxItems).set({ linkedProjectId: project.id, linkedTaskId: task.id, status: "converted", updatedAt: new Date() })
       .where(and(eq(inboxItems.id, inboxId), eq(inboxItems.workspaceId, workspaceId)));
   });
-  revalidateInboxViews();
+  revalidateInboxViews(["/", "/inbox", "/tasks", "/daily"]);
   const record = await getItemRecord(workspaceId, inboxId);
   await recordActivity(workspaceId, "inbox.processed", { inboxItemId: record.id, projectId: record.linkedProjectId, taskId: record.linkedTaskId, noteId: record.linkedNoteId }, { title: record.title, status: record.status });
   return record;
@@ -312,7 +312,7 @@ export async function createNoteFromInbox(id: string, input: InboxNoteConversion
     await tx.update(inboxItems).set({ linkedProjectId, linkedNoteId: note.id, status: "converted", updatedAt: new Date() })
       .where(and(eq(inboxItems.id, inboxId), eq(inboxItems.workspaceId, workspaceId)));
   });
-  revalidateInboxViews();
+  revalidateInboxViews(["/", "/inbox", "/docs"]);
   const record = await getItemRecord(workspaceId, inboxId);
   await recordActivity(workspaceId, "inbox.processed", { inboxItemId: record.id, projectId: record.linkedProjectId, taskId: record.linkedTaskId, noteId: record.linkedNoteId }, { title: record.title, status: record.status });
   return record;

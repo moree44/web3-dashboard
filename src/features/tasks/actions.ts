@@ -93,8 +93,8 @@ async function requireWorkspace() {
   return workspace.id;
 }
 
-function revalidateTaskViews() {
-  for (const path of ["/tasks", "/daily", "/deadlines", "/projects", "/"]) {
+function revalidateTaskViews(paths: readonly string[] = ["/", "/tasks", "/daily", "/deadlines"]) {
+  for (const path of paths) {
     revalidatePath(path);
   }
 }
@@ -305,7 +305,7 @@ export async function createTask(input: TaskCreateInput): Promise<TaskRecord> {
     return created.id;
   });
 
-  revalidateTaskViews();
+  revalidateTaskViews(parsed.deadline ? undefined : ["/", "/tasks", "/daily"]);
   const result = (await loadTaskWorkspaceData(workspaceId)).tasks.find((task) => task.id === taskId);
   if (!result) throw new Error("Task could not be loaded after creation");
   await recordActivity(workspaceId, "task.created", { taskId: result.id, projectId: result.projectId }, { title: result.title });

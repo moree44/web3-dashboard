@@ -7,6 +7,10 @@ const publicEnvSchema = z.object({
 
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
+  DATABASE_POOL_MAX: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.coerce.number().int().min(1).max(20).optional(),
+  ),
 });
 
 function parseEnv<T>(schema: z.ZodSchema<T>, values: Record<string, string | undefined>): T {
@@ -49,6 +53,7 @@ export function getEnv() {
   if (!_env) {
     _env = parseEnv(serverEnvSchema, {
       DATABASE_URL: process.env.DATABASE_URL,
+      DATABASE_POOL_MAX: process.env.DATABASE_POOL_MAX,
     });
   }
   return _env;

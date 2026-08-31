@@ -32,8 +32,8 @@ async function requireWorkspace() {
   return (await ensureDefaultWorkspace(user.id)).id;
 }
 
-function revalidateWatchlistViews() {
-  for (const path of ["/watchlist", "/projects", "/"]) revalidatePath(path);
+function revalidateWatchlistViews(paths: readonly string[] = ["/", "/watchlist"]) {
+  for (const path of paths) revalidatePath(path);
 }
 
 function cleanOptional(value: string | null | undefined) {
@@ -324,7 +324,7 @@ export async function convertWatchlistToProject(
       item: toRecord(result.item),
       project: toProjectRecord(result.project),
     };
-    revalidateWatchlistViews();
+    revalidateWatchlistViews(["/", "/watchlist", "/projects", "/tasks"]);
     if (result.created) {
       await recordActivity(workspaceId, "watchlist.converted", { projectId: converted.project.id }, {
         watchlistItemId: converted.item.id,
