@@ -1,11 +1,12 @@
 "use client";
 
 import { Archive, CalendarClock, RotateCcw, Search, ShieldAlert, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { ProjectWithAccounts } from "@/features/projects/actions";
 import { useArchiveMutations, useArchiveWorkspace } from "@/features/archive/archive-query";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDelete } from "@/components/ui/confirm-delete";
@@ -72,14 +73,13 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
     ? previewItems
     : workspace.projects.map(mapArchivedProject);
 
-  const [actionError, setActionError] = useState("");
-  const [forceDeleteCandidate, setForceDeleteCandidate] = useState<ArchivedProject | null>(null);
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReasonFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(() => new Set());
   const mutations = useArchiveMutations({
     developmentPreview,
-    onError: (message) => setActionError(message),
+    onError: (message) => showNotice("error", "Action failed", message),
   });
   const busy = mutations.restoreMutation.isPending || mutations.deleteMutation.isPending;
   const query = searchQuery.trim().toLowerCase();
@@ -121,6 +121,14 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
 
   const selectedCount = selectedProjects.size;
 
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string, action?: ReactNode) {
+    setNotice({ id: Date.now(), tone, title, message, action });
+  }
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
+
   function toggleSelected(projectId: string) {
     setSelectedProjects((current) => {
       const next = new Set(current);
@@ -132,7 +140,7 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
 
   async function restoreSelected() {
     if (selectedCount === 0 || busy) return;
-    setActionError("");
+    clearNotice();
     const ids = [...selectedProjects];
     try {
       if (developmentPreview) {
@@ -149,8 +157,7 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
 
   async function permanentlyDelete(project: ArchivedProject, options: { forceUnlink?: boolean } = {}) {
     if (busy) return;
-    setActionError("");
-    if (options.forceUnlink) setForceDeleteCandidate(null);
+    clearNotice();
     const key = project.id ?? project.name;
     try {
       if (developmentPreview) {
@@ -164,7 +171,6 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
       }
       if (!project.id) return;
       await mutations.deleteMutation.mutateAsync({ id: project.id, forceUnlink: options.forceUnlink });
-      setForceDeleteCandidate(null);
       setSelectedProjects((current) => {
         const next = new Set(current);
         next.delete(project.id!);
@@ -172,9 +178,23 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
       });
     } catch (deleteError) {
       const message = toErrorMessage(deleteError);
-      setActionError(message);
       if (!options.forceUnlink && message.includes("safe force delete")) {
-        setForceDeleteCandidate(project);
+        showNotice(
+          "error",
+          "Project still has links",
+          message,
+          <ConfirmDelete
+            onConfirm={() => void permanentlyDelete(project, { forceUnlink: true })}
+            label="Safe force delete"
+            confirmLabel="Confirm unlink + delete"
+            className="w-auto border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5 text-[11px] text-foreground hover:bg-white/[0.08]"
+            disabled={busy}
+          >
+            <Trash2 className="size-3.5" />
+          </ConfirmDelete>,
+        );
+      } else {
+        showNotice("error", "Action failed", message);
       }
     }
   }
@@ -214,27 +234,7 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
         </div>
       </div>
 
-      {actionError ? (
-        <div className="px-4 pt-3 sm:px-6 lg:px-8">
-          <div role="alert" className="flex max-w-4xl flex-col gap-2 rounded-lg border border-destructive/15 bg-destructive/[0.055] px-3 py-2 text-xs leading-5 text-destructive/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)] sm:inline-flex sm:flex-row sm:items-center">
-            <div className="flex min-w-0 items-start gap-2">
-              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-              <span>{actionError}</span>
-            </div>
-            {forceDeleteCandidate ? (
-              <ConfirmDelete
-                onConfirm={() => void permanentlyDelete(forceDeleteCandidate, { forceUnlink: true })}
-                label="Safe force delete"
-                confirmLabel="Confirm unlink + delete"
-                className="w-auto shrink-0 border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5 text-[11px] text-foreground hover:bg-white/[0.08]"
-                disabled={busy}
-              >
-                <Trash2 className="size-3.5" />
-              </ConfirmDelete>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      <CornerToast notice={notice} onClose={clearNotice} />
 
       <div className="flex flex-col gap-3 border-b soft-divider px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
         <label className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-white/[0.06] bg-card px-3 lg:w-72">

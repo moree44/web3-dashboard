@@ -1,9 +1,10 @@
 "use client";
 
 import { CalendarDays, ChevronLeft, ChevronRight, Circle, ExternalLink, RefreshCw, Search, SkipForward, X } from "lucide-react";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { LayoutGroup, motion } from "motion/react";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useDailyMutations, useDailyWorkspace } from "@/features/daily/daily-workspace-query";
@@ -28,12 +29,12 @@ export function DailyWorkspace({ initialData, developmentPreview = false }: { in
   const [query, setQuery] = useState("");
   const [hideDone, setHideDone] = useState(false);
   const [detail, setDetail] = useState<DailyChecklistItem | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
 
   const mutations = useDailyMutations({
     selectedDate: data.selectedDate,
     developmentPreview,
-    onError: (message) => setError(message),
+    onError: (message) => showNotice("error", "Action failed", message),
   });
 
   const groups = useMemo(() => groupItems(data.items, data.accounts, view, query, hideDone), [data.accounts, data.items, hideDone, query, view]);
@@ -44,16 +45,24 @@ export function DailyWorkspace({ initialData, developmentPreview = false }: { in
   );
   const done = checklist.filter((item) => item.log?.status === "done").length;
 
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string) {
+    setNotice({ id: Date.now(), tone, title, message });
+  }
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
+
   function changeDate(date: string) {
     if (loadingDate || date === selectedDate) return;
     setSelectedDate(date);
     setDetail(null);
-    setError(null);
+    clearNotice();
   }
 
   function togglePersonalItem(item: PersonalItemRecord) {
     if (developmentPreview || mutations.togglePersonalMutation.isPending) return;
-    setError(null);
+    clearNotice();
     mutations.togglePersonalMutation.mutate({
       item,
       status: item.status === "done" ? "todo" : "done",
@@ -62,7 +71,7 @@ export function DailyWorkspace({ initialData, developmentPreview = false }: { in
 
   function saveLog(item: DailyChecklistItem, status: DailyLogStatus, fields?: { txHash?: string; proofUrl?: string; notes?: string }) {
     if (developmentPreview || item.kind !== "checklist") return;
-    setError(null);
+    clearNotice();
     mutations.saveLogMutation.mutate(
       { item, status, fields },
       {
@@ -115,7 +124,7 @@ export function DailyWorkspace({ initialData, developmentPreview = false }: { in
           onToggle={togglePersonalItem}
         />
       ) : null}
-      {error ? <p role="alert" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
+      <CornerToast notice={notice} onClose={clearNotice} />
       <LayoutGroup id="daily-groups">
         <div className="mt-5 space-y-4" aria-busy={loadingDate}>
           {groups.length === 0 ? (

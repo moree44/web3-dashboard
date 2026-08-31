@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { CircleUserRound, Copy, CreditCard, FolderOpen, Mail, MoreHorizontal, Plus, Search, ShieldCheck, Upload, WalletCards, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/app-select";
@@ -122,11 +123,11 @@ export function AccountsPreview({
   const [editingGroup, setEditingGroup] = useState<UIGroup | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
 
   const mutations = useAccountsMutations({
     developmentPreview,
-    onError: (message) => setError(message),
+    onError: (message) => showNotice("error", "Action failed", message),
   });
 
   const accountNameMap = useMemo(() => {
@@ -196,6 +197,14 @@ export function AccountsPreview({
       return haystack.includes(query);
     });
   }, [query, groupItems]);
+
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string) {
+    setNotice({ id: Date.now(), tone, title, message });
+  }
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
 
   function openAccountByName(name: string) {
     const account = accountItems.find((item) => item.name === name);
@@ -324,10 +333,10 @@ export function AccountsPreview({
         <div>
           <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Accounts</h1>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add account</Button>
+        <Button variant="secondary" size="sm" onClick={() => { clearNotice(); setIsAddOpen(true); }}><Plus />Add account</Button>
       </header>
 
-      {error ? <div role="alert" className="mx-4 mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive sm:mx-6 lg:mx-8">{error}</div> : null}
+      <CornerToast notice={notice} onClose={clearNotice} />
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8">
         <div className="scrollbar-subtle flex gap-1 overflow-x-auto py-2.5">
@@ -1006,17 +1015,21 @@ function EditableAvatar({
   const [open, setOpen] = useState(false);
   const [draftUrl, setDraftUrl] = useState(imageUrl ?? "");
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
 
   async function handleFile(file: File | null) {
     if (!file || !onUploadFile || isSaving) return;
     setIsSaving(true);
-    setError("");
+    clearNotice();
     try {
       await onUploadFile(file);
       setOpen(false);
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Unable to upload avatar");
+      setNotice({ id: Date.now(), tone: "error", title: "Action failed", message: uploadError instanceof Error ? uploadError.message : "Unable to upload avatar" });
     } finally {
       setIsSaving(false);
     }
@@ -1025,14 +1038,14 @@ function EditableAvatar({
   async function handleSetUrl() {
     if (!onSetUrl || isSaving) return;
     setIsSaving(true);
-    setError("");
+    clearNotice();
     try {
       const normalized = normalizeHttpUrl(draftUrl);
       setDraftUrl(normalized);
       await onSetUrl(normalized);
       setOpen(false);
     } catch (urlError) {
-      setError(urlError instanceof Error ? urlError.message : "Unable to save avatar URL");
+      setNotice({ id: Date.now(), tone: "error", title: "Action failed", message: urlError instanceof Error ? urlError.message : "Unable to save avatar URL" });
     } finally {
       setIsSaving(false);
     }
@@ -1040,11 +1053,12 @@ function EditableAvatar({
 
   return (
     <div className="relative shrink-0" onClick={(event) => event.stopPropagation()}>
+      <CornerToast notice={notice} onClose={clearNotice} />
       <button
         type="button"
         onClick={() => {
           setDraftUrl(imageUrl ?? "");
-          setError("");
+          clearNotice();
           setOpen((current) => !current);
         }}
         className={cn(
@@ -1110,7 +1124,6 @@ function EditableAvatar({
               </button>
             </div>
           </div>
-          {error ? <p className="mt-2 px-1 text-[11px] text-danger">{error}</p> : null}
         </div>
       ) : null}
     </div>

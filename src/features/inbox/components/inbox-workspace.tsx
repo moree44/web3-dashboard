@@ -1,8 +1,9 @@
 "use client";
 
 import { Archive, ArrowUpRight, CheckCircle2, ClipboardList, FileText, Inbox, Link2, Plus, Search, SlidersHorizontal, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { AppSelect } from "@/components/ui/app-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,10 +65,10 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
   const [priorityFilter, setPriorityFilter] = useState("");
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionDraft, setActionDraft] = useState<ActionDraft>({ projectName: "", taskTitle: "", projectId: "", linkedProjectId: "" });
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
   const mutations = useInboxMutations({
     developmentPreview,
-    onError: (message) => setError(message),
+    onError: (message) => showNotice("error", "Action failed", message),
   });
   const busy = mutations.saveItemMutation.isPending
     || mutations.statusMutation.isPending
@@ -84,20 +85,28 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
     });
   }, [data.items, priorityFilter, query, statusFilter]);
 
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string) {
+    setNotice({ id: Date.now(), tone, title, message });
+  }
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
+
   function applySavedLocal(saved: InboxItemRecord) {
     setSelectedId(saved.id);
     setDraft(recordDraft(saved));
   }
 
   function selectItem(item: InboxItemRecord) {
-    setError(null);
+    clearNotice();
     setActionMode(null);
     setSelectedId(item.id);
     setDraft(recordDraft(item));
   }
 
   function startCapture() {
-    setError(null);
+    clearNotice();
     setActionMode(null);
     setSelectedId(null);
     setDraft(blankDraft());
@@ -105,30 +114,30 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
 
   async function saveDraft() {
     if (!draft || developmentPreview || busy) return;
-    setError(null);
+    clearNotice();
     const { id, ...input } = draft;
     try {
       const saved = await mutations.saveItemMutation.mutateAsync({ id, input });
       applySavedLocal(saved);
     } catch {
-      // Failure is surfaced through onError into the error banner.
+      // Failure is surfaced through the corner toast.
     }
   }
 
   async function changeStatus(status: InboxStatus) {
     if (!selected || developmentPreview || busy) return;
-    setError(null);
+    clearNotice();
     try {
       const saved = await mutations.statusMutation.mutateAsync({ id: selected.id, status });
       applySavedLocal(saved);
     } catch {
-      // Failure is surfaced through onError into the error banner.
+      // Failure is surfaced through the corner toast.
     }
   }
 
   function openAction(mode: ActionMode) {
     if (!selected) return;
-    setError(null);
+    clearNotice();
     setActionMode(mode);
     setActionDraft({
       projectName: selected.detectedProjectName || selected.title,
@@ -140,7 +149,7 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
 
   async function runAction() {
     if (!selected || !actionMode || developmentPreview || busy) return;
-    setError(null);
+    clearNotice();
     try {
       let saved: InboxItemRecord;
       if (actionMode === "project") {
@@ -158,7 +167,7 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
       applySavedLocal(saved);
       setActionMode(null);
     } catch {
-      // Failure is surfaced through onError into the error banner.
+      // Failure is surfaced through the corner toast.
     }
   }
 
@@ -169,7 +178,7 @@ export function InboxWorkspace({ initialData, developmentPreview = false }: { in
     </header>
     <section className="soft-panel mt-4 grid gap-2 rounded-xl border soft-divider bg-card p-2 lg:grid-cols-[minmax(0,1fr)_180px_160px]"><div className="soft-inset flex min-w-0 items-center gap-3 rounded-lg border soft-divider bg-input px-3 py-2.5"><Search className="size-4 text-muted-foreground" /><input aria-label="Search inbox" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground" placeholder="Search title, source, project, or reminder..." /></div><AppSelect ariaLabel="Filter inbox by status" value={statusFilter} options={[{ value: "", label: "All statuses" }, ...INBOX_STATUSES.map((status) => ({ value: status, label: statusLabels[status] }))]} onChange={setStatusFilter} /><AppSelect ariaLabel="Filter inbox by priority" value={priorityFilter} options={[{ value: "", label: "All priorities" }, ...INBOX_PRIORITIES.map((priority) => ({ value: priority, label: priorityLabels[priority] }))]} onChange={setPriorityFilter} /></section>
     {developmentPreview ? <p className="mt-4 rounded-lg bg-info/10 px-3 py-2 text-xs text-info">Preview mode does not persist Inbox items. Configure Supabase to use the manual Inbox workflow.</p> : null}
-    {error ? <p role="alert" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
+    <CornerToast notice={notice} onClose={clearNotice} />
     <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <section className="soft-panel overflow-hidden rounded-xl border soft-divider bg-card"><div className="flex items-center justify-between gap-3 border-b soft-divider px-4 py-3"><div className="flex items-center gap-2.5"><span className="grid size-8 place-items-center rounded-lg border soft-divider bg-muted text-muted-foreground"><Inbox className="size-4" /></span><div><h2 className="text-sm font-semibold">Inbox list</h2><p className="mt-0.5 text-[11px] text-muted-foreground">Manual and quick capture items stay raw until you confirm an action.</p></div></div><Badge variant="secondary">{filteredItems.length} open</Badge></div>{filteredItems.length ? <div className="divide-y divide-white/[0.045]">{filteredItems.map((item) => <InboxRow key={item.id} item={item} selected={item.id === selectedId} onSelect={() => selectItem(item)} />)}</div> : <EmptyCopy>No Inbox items match this view.</EmptyCopy>}</section>
       {draft ? <InboxDetail draft={draft} selected={selected} projects={data.projects} tasks={data.tasks} actionMode={actionMode} actionDraft={actionDraft} busy={busy} developmentPreview={developmentPreview} onChange={setDraft} onActionChange={setActionDraft} onOpenAction={openAction} onRunAction={() => void runAction()} onSave={() => void saveDraft()} onStatus={(status) => void changeStatus(status)} onClose={() => { setDraft(null); setSelectedId(null); setActionMode(null); }} /> : <EmptyDetail onCapture={startCapture} />}

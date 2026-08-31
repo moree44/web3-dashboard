@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink, Trash2, WalletCards, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   createNftCampaign,
@@ -17,6 +17,7 @@ import { areWalletAndCampaignChainsCompatible } from "../wallet-compatibility";
 import { AppDatePicker } from "@/components/ui/app-date-picker";
 import { AppSelect } from "@/components/ui/app-select";
 import { Button } from "@/components/ui/button";
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { cn } from "@/lib/utils";
 import { normalizeHttpUrl } from "@/lib/url";
 import { usePresence } from "@/lib/use-presence";
@@ -68,7 +69,11 @@ export function NftDialog({
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -82,8 +87,8 @@ export function NftDialog({
     setMintUrl(campaign?.mintUrl ?? "");
     setNotes(campaign?.notes ?? "");
     setDeleteArmed(false);
-    setError("");
-  }, [campaign, open]);
+    clearNotice();
+  }, [campaign, clearNotice, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -141,7 +146,7 @@ export function NftDialog({
   async function save() {
     if (!canSave) return;
     setBusy(true);
-    setError("");
+    clearNotice();
     try {
       const values = {
         name: name.trim(),
@@ -160,7 +165,7 @@ export function NftDialog({
       onSaved(saved);
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save NFT campaign");
+      setNotice({ id: Date.now(), tone: "error", title: "Action failed", message: caught instanceof Error ? caught.message : "Unable to save NFT campaign" });
     } finally {
       setBusy(false);
     }
@@ -173,13 +178,13 @@ export function NftDialog({
       return;
     }
     setBusy(true);
-    setError("");
+    clearNotice();
     try {
       await deleteNftCampaign(campaign.id);
       onDeleted(campaign.id);
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to delete NFT campaign");
+      setNotice({ id: Date.now(), tone: "error", title: "Action failed", message: caught instanceof Error ? caught.message : "Unable to delete NFT campaign" });
     } finally {
       setBusy(false);
     }
@@ -195,6 +200,7 @@ export function NftDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
+      <CornerToast notice={notice} onClose={clearNotice} />
       <div className={cn("soft-panel max-h-[calc(100vh-32px)] w-full max-w-[660px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle", closing ? "modal-card-out" : "modal-card-in")}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-card/95 px-5 py-4 backdrop-blur">
           <div>
@@ -307,8 +313,6 @@ export function NftDialog({
             <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Notes, optional</span>
             <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} maxLength={5000} className="mt-1.5 w-full resize-none rounded-xl border border-white/[0.055] bg-input px-3 py-2.5 text-xs leading-relaxed outline-none soft-inset placeholder:text-muted-foreground focus:border-ring" placeholder="Whitelist requirements, mint allocation, or preparation notes." />
           </label>
-
-          {error ? <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-card/95 px-5 py-3 backdrop-blur soft-divider">

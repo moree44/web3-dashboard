@@ -2,8 +2,9 @@
 
 import { CalendarClock, Check, MoreHorizontal, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { LayoutGroup, motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import type { PersonalItemRecord } from "@/features/personal/types";
 import { filterTasks, TASK_BOARD_STATUSES } from "@/features/tasks/task-query";
 import { formatTaskDuration, getJakartaDateValue } from "@/features/tasks/task-duration";
@@ -52,14 +53,14 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
   const [quickProjectId, setQuickProjectId] = useState(initialData.projects[0]?.id ?? "");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [menuTaskId, setMenuTaskId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
   const [personalOpen, setPersonalOpen] = useState(false);
   const [personalTitle, setPersonalTitle] = useState("");
   const { data: queryData } = useTaskWorkspace(initialData, developmentPreview);
   const mutations = useTasksMutations({
     developmentPreview,
     projects: initialData.projects,
-    onError: (message) => setError(message),
+    onError: (message) => showNotice("error", "Action failed", message),
   });
   const workspace = queryData ?? initialData;
   const taskItems = workspace.tasks;
@@ -87,6 +88,14 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
     };
   }, []);
 
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string) {
+    setNotice({ id: Date.now(), tone, title, message });
+  }
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
+
   const selectedTask = taskItems.find((task) => task.id === selectedTaskId) ?? null;
   const visibleByTab = view === "running"
     ? taskItems.filter((task) => task.status === "running")
@@ -109,61 +118,63 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
     const title = quickTitle.trim();
     if (!title || !quickProjectId || busy) return;
     const input: TaskCreateInput = { projectId: quickProjectId, title, status: "todo", frequency: "once", priority: "medium", startDate: getJakartaDateValue(), accountIds: [] };
-    setError(null);
+    clearNotice();
     try {
       await mutations.createTaskMutation.mutateAsync(input);
       setQuickTitle("");
     } catch {
-      // Failure is surfaced through onError into the error banner.
+      // Failure is surfaced through the corner toast.
     }
   }
 
   async function handleCreate(input: TaskCreateInput) {
-    setError(null);
+    clearNotice();
     try {
       await mutations.createTaskMutation.mutateAsync(input);
       setAddTaskOpen(false);
     } catch {
-      // Failure is surfaced through onError; the dialog stays open.
+      // Failure is surfaced through the corner toast; the dialog stays open.
     }
   }
 
   function handleSave(input: TaskInput) {
     if (!selectedTask) return;
-    setError(null);
+    clearNotice();
     mutations.saveTaskMutation.mutate({ id: selectedTask.id, input });
     setSelectedTaskId(null);
   }
 
   function handleStatus(task: TaskRecord, status: TaskStatus) {
     setMenuTaskId(null);
-    setError(null);
+    clearNotice();
     mutations.statusTaskMutation.mutate({ id: task.id, status });
   }
 
   function handleDelete(task: TaskRecord) {
     setSelectedTaskId(null);
     setMenuTaskId(null);
-    setError(null);
-    mutations.deleteTaskMutation.mutate(task.id);
+    clearNotice();
+    mutations.deleteTaskMutation.mutate(task.id, {
+      onSuccess: () => showNotice("success", "Task deleted", task.title),
+    });
   }
 
   function addPersonalItem() {
     const title = personalTitle.trim();
     if (!title || busy) return;
-    setError(null);
+    clearNotice();
     mutations.addPersonalItemMutation.mutate(title);
     setPersonalTitle("");
     setPersonalOpen(false);
   }
 
   function togglePersonalItem(item: PersonalItemRecord) {
-    setError(null);
+    clearNotice();
     mutations.togglePersonalItemMutation.mutate({ id: item.id, status: item.status === "done" ? "todo" : "done" });
   }
 
   function removePersonalItem(item: PersonalItemRecord) {
-    setError(null);
+    clearNotice();
     mutations.removePersonalItemMutation.mutate(item.id);
   }
 
@@ -177,7 +188,7 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" onClick={() => setPersonalOpen(true)}>Add personal item</Button>
           <Button variant="ghost" size="sm" onClick={() => setQuickAddOpen(true)} disabled={initialData.projects.length === 0}>Quick add</Button>
-          <Button variant="secondary" size="sm" onClick={() => { setError(null); setAddTaskOpen(true); }} disabled={initialData.projects.length === 0}><Plus />Add task</Button>
+          <Button variant="secondary" size="sm" onClick={() => { clearNotice(); setAddTaskOpen(true); }} disabled={initialData.projects.length === 0}><Plus />Add task</Button>
         </div>
       </header>
 
@@ -239,7 +250,7 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
         ) : null}
       </div>
 
-      {error ? <div role="alert" className="mx-4 mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive sm:mx-6 lg:mx-8">{error}</div> : null}
+      <CornerToast notice={notice} onClose={clearNotice} />
       {personalItems.length > 0 ? <div className="border-b soft-divider px-4 py-2.5 sm:px-6 lg:px-8"><div className="mb-2 flex items-center justify-between"><span className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Personal items</span><span className="text-[11px] text-muted-foreground">{personalItems.filter((item) => item.status === "done").length} done</span></div><div className="flex flex-wrap gap-2">{personalItems.map((item) => <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-white/[0.04] px-2.5 py-1 text-xs text-muted-foreground"><button type="button" onClick={() => togglePersonalItem(item)} className={cn("hover:text-foreground", item.status === "done" && "text-foreground line-through")}>{item.title}</button><button type="button" onClick={() => removePersonalItem(item)} className="text-muted-foreground hover:text-destructive" aria-label={"Delete personal item " + item.title}>x</button></span>)}</div></div> : null}
 
       {view === "board" ? (
@@ -255,8 +266,8 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
       {filteredTasks.length === 0 ? <EmptyState hasProjects={initialData.projects.length > 0} onAdd={() => setAddTaskOpen(true)} /> : null}
       <footer className="flex items-center justify-between border-t soft-divider px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8"><span>Showing {filteredTasks.length} task{filteredTasks.length === 1 ? "" : "s"}</span><span /></footer>
 
-      <TaskDetailPanel task={selectedTask} projects={initialData.projects} busy={mutations.saveTaskMutation.isPending || mutations.statusTaskMutation.isPending || mutations.deleteTaskMutation.isPending} error={error} onClose={() => { setSelectedTaskId(null); setError(null); }} onSave={(input) => handleSave(input)} onDelete={() => { if (selectedTask) handleDelete(selectedTask); }} />
-      <AddTaskDialog open={addTaskOpen} projects={initialData.projects} busy={mutations.createTaskMutation.isPending} error={error} onClose={() => { if (!mutations.createTaskMutation.isPending) { setAddTaskOpen(false); setError(null); } }} onCreate={(input) => void handleCreate(input)} />
+      <TaskDetailPanel task={selectedTask} projects={initialData.projects} busy={mutations.saveTaskMutation.isPending || mutations.statusTaskMutation.isPending || mutations.deleteTaskMutation.isPending} onClose={() => { setSelectedTaskId(null); clearNotice(); }} onSave={(input) => handleSave(input)} onDelete={() => { if (selectedTask) handleDelete(selectedTask); }} />
+      <AddTaskDialog open={addTaskOpen} projects={initialData.projects} busy={mutations.createTaskMutation.isPending} onClose={() => { if (!mutations.createTaskMutation.isPending) { setAddTaskOpen(false); clearNotice(); } }} onCreate={(input) => void handleCreate(input)} />
     </div>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
 
 import { updateSettings, type SettingsData } from "@/features/settings/actions";
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -17,23 +18,29 @@ export function SettingsWorkspace({ initialData, developmentPreview = false }: {
   const [data, setData] = useState(initialData);
   const [displayName, setDisplayName] = useState(initialData.displayName);
   const [workspaceName, setWorkspaceName] = useState(initialData.workspaceName);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
+
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string) {
+    setNotice({ id: Date.now(), tone, title, message });
+  }
 
   function save() {
     if (!displayName.trim() || !workspaceName.trim() || developmentPreview) return;
-    setError(null);
+    clearNotice();
     startTransition(async () => {
       try {
         const updated = await updateSettings({ displayName, workspaceName });
         setData(updated);
         setDisplayName(updated.displayName);
         setWorkspaceName(updated.workspaceName);
-        setMessage("Settings saved");
-        window.setTimeout(() => setMessage(null), 2200);
+        showNotice("success", "Settings saved", "Profile and workspace changes are up to date.");
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Settings could not be saved");
+        showNotice("error", "Action failed", cause instanceof Error ? cause.message : "Settings could not be saved");
       }
     });
   }
@@ -42,11 +49,11 @@ export function SettingsWorkspace({ initialData, developmentPreview = false }: {
     <div className="min-w-0 py-5 lg:py-7">
       <header className="flex flex-col gap-4 border-b soft-divider px-4 pb-5 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:px-8">
         <div><h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em]">Settings</h1><p className="mt-1 text-xs text-muted-foreground">Profile and workspace preferences.</p></div>
-        <Button variant="secondary" size="sm" onClick={save} disabled={developmentPreview || isPending || !displayName.trim() || !workspaceName.trim()}>{isPending ? "Saving..." : message ?? "Save changes"}</Button>
+        <Button variant="secondary" size="sm" onClick={save} disabled={developmentPreview || isPending || !displayName.trim() || !workspaceName.trim()}>{isPending ? "Saving..." : "Save changes"}</Button>
       </header>
 
       {developmentPreview ? <p className="mx-4 mt-4 rounded-lg bg-info/10 px-3 py-2 text-xs text-info sm:mx-6 lg:mx-8">Preview mode uses sample settings. Persistence is available after Supabase is configured.</p> : null}
-      {error ? <p role="alert" className="mx-4 mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive sm:mx-6 lg:mx-8">{error}</p> : null}
+      <CornerToast notice={notice} onClose={clearNotice} />
 
       <div className="grid gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">
         <section className="rounded-xl bg-card/80 soft-panel">

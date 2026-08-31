@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TasksPreview } from "@/features/tasks/components/tasks-preview";
-import { createTask } from "@/features/tasks/actions";
+import { createTask, deleteTask } from "@/features/tasks/actions";
 import { taskPreviewData } from "@/features/tasks/preview-data";
 
 vi.mock("@/features/tasks/actions", () => ({
@@ -123,5 +123,18 @@ describe("TasksPreview", () => {
 
     fireEvent.keyDown(window, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit task" })).not.toBeInTheDocument());
+  });
+
+  it("shows task mutation failures in a corner toast", async () => {
+    vi.mocked(deleteTask).mockRejectedValueOnce(new Error("Unable to delete task"));
+    renderTasksPreview();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Submit proof after address generated/ })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Action failed");
+    expect(screen.getByRole("alert")).toHaveTextContent("Unable to delete task");
   });
 });

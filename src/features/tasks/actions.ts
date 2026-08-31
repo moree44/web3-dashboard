@@ -7,12 +7,16 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import {
+  activityLogs,
   accounts,
   deadlines,
+  inboxItems,
+  notes,
   projectAccounts,
   projects,
   projectWallets,
   taskAccounts,
+  taskLogs,
   tasks,
   taskWallets,
   wallets,
@@ -97,17 +101,6 @@ function revalidateTaskViews(paths: readonly string[] = ["/", "/tasks", "/daily"
   for (const path of paths) {
     revalidatePath(path);
   }
-}
-
-function hasPostgresCode(error: unknown, code: string) {
-  let current: unknown = error;
-  const visited = new Set<unknown>();
-  while (current && typeof current === "object" && !visited.has(current)) {
-    visited.add(current);
-    if ("code" in current && current.code === code) return true;
-    current = "cause" in current ? current.cause : undefined;
-  }
-  return false;
 }
 
 async function loadTaskWorkspaceData(workspaceId: string): Promise<TaskWorkspaceData> {
@@ -380,21 +373,25 @@ export async function updateTaskStatus(id: string, status: (typeof TASK_STATUSES
 export async function deleteTask(id: string): Promise<void> {
   const workspaceId = await requireWorkspace();
   const taskId = z.string().uuid().parse(id);
-  try {
-    await db.transaction(async (tx) => {
-      const [existing] = await tx.select({ id: tasks.id }).from(tasks)
-        .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId))).limit(1);
-      if (!existing) throw new Error("Task not found");
-      await tx.delete(taskAccounts).where(eq(taskAccounts.taskId, taskId));
-      await tx.delete(taskWallets).where(eq(taskWallets.taskId, taskId));
-      await tx.delete(tasks).where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId)));
-    });
-  } catch (error) {
-    if (hasPostgresCode(error, "23503")) {
-      throw new Error("This task has activity logs and cannot be deleted. Set it to Dropped instead.");
-    }
-    throw error;
-  }
+  await db.transaction(async (tx) => {
+    const [existing] = await tx.select({ id: tasks.id }).from(tasks)
+      .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId))).limit(1);
+    if (!existing) throw new Error("Task not found");
+
+    await tx.update(deadlines).set({ linkedTaskId: null, updatedAt: new Date() })
+      .where(and(eq(deadlines.workspaceId, workspaceId), eq(deadlines.linkedTaskId, taskId)));
+    await tx.update(inboxItems).set({ linkedTaskId: null, updatedAt: new Date() })
+      .where(and(eq(inboxItems.workspaceId, workspaceId), eq(inboxItems.linkedTaskId, taskId)));
+    await tx.update(notes).set({ linkedTaskId: null, updatedAt: new Date() })
+      .where(and(eq(notes.workspaceId, workspaceId), eq(notes.linkedTaskId, taskId)));
+    await tx.update(activityLogs).set({ taskId: null })
+      .where(and(eq(activityLogs.workspaceId, workspaceId), eq(activityLogs.taskId, taskId)));
+    await tx.delete(taskLogs).where(and(eq(taskLogs.workspaceId, workspaceId), eq(taskLogs.taskId, taskId)));
+    await tx.delete(taskAccounts).where(eq(taskAccounts.taskId, taskId));
+    await tx.delete(taskWallets).where(eq(taskWallets.taskId, taskId));
+    await tx.delete(tasks).where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId)));
+  });
+
   await recordActivity(workspaceId, "task.deleted", {}, { id: taskId });
-  revalidateTaskViews();
+  revalidateTaskViews(["/", "/tasks", "/daily", "/deadlines", "/inbox", "/docs"]);
 }

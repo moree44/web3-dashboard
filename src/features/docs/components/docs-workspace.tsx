@@ -1,8 +1,9 @@
 "use client";
 
 import { FileText, Folder, FolderPlus, Inbox, Pencil, Plus, Search, Star, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { AppSelect } from "@/components/ui/app-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,10 +30,10 @@ export function DocsWorkspace({ initialData, developmentPreview = false }: { ini
   const [folder, setFolder] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [folderDraft, setFolderDraft] = useState<FolderDraft | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
   const mutations = useDocsMutations({
     developmentPreview,
-    onError: (message) => setError(message),
+    onError: (message) => showNotice("error", "Action failed", message),
   });
   const busy = mutations.saveNoteMutation.isPending || mutations.deleteNoteMutation.isPending;
   const folderBusy = mutations.createFolderMutation.isPending || mutations.updateFolderMutation.isPending || mutations.deleteFolderMutation.isPending;
@@ -64,37 +65,45 @@ export function DocsWorkspace({ initialData, developmentPreview = false }: { ini
   const selectedTitle = activeFolder?.name ?? (folder === UNFILED_FOLDER ? "Unfiled" : "All docs");
   const createFolder = folder && folder !== UNFILED_FOLDER ? folder : null;
 
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string) {
+    setNotice({ id: Date.now(), tone, title, message });
+  }
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
+
   function openNote(note: DocsNoteRecord) {
-    setError(null);
+    clearNotice();
     setDraft({ id: note.id, title: note.title, content: note.content, noteType: note.noteType, folder: note.folder, pinned: note.pinned, linkedProjectId: note.linkedProjectId });
   }
 
   async function save() {
     if (!draft || developmentPreview || busy) return;
-    setError(null);
+    clearNotice();
     const { id, ...input } = draft;
     try {
       const saved = await mutations.saveNoteMutation.mutateAsync({ id, input });
       setDraft({ id: saved.id, title: saved.title, content: saved.content, noteType: saved.noteType, folder: saved.folder, pinned: saved.pinned, linkedProjectId: saved.linkedProjectId });
     } catch {
-      // Failure is surfaced through onError into the error banner.
+      // Failure is surfaced through the corner toast.
     }
   }
 
   async function remove() {
     if (!draft?.id || developmentPreview || busy) return;
-    setError(null);
+    clearNotice();
     try {
       await mutations.deleteNoteMutation.mutateAsync(draft.id);
       setDraft(null);
     } catch {
-      // Failure is surfaced through onError into the error banner.
+      // Failure is surfaced through the corner toast.
     }
   }
 
   async function saveFolder() {
     if (!folderDraft || developmentPreview || folderBusy) return;
-    setError(null);
+    clearNotice();
     try {
       if (folderDraft.id) {
         const saved = await mutations.updateFolderMutation.mutateAsync({ id: folderDraft.id, input: { name: folderDraft.name, description: folderDraft.description } });
@@ -105,20 +114,20 @@ export function DocsWorkspace({ initialData, developmentPreview = false }: { ini
       }
       setFolderDraft(null);
     } catch {
-      // Failure is surfaced through onError into the error banner.
+      // Failure is surfaced through the corner toast.
     }
   }
 
   async function deleteFolder() {
     if (!folderDraft?.id || developmentPreview || folderBusy) return;
-    setError(null);
+    clearNotice();
     const deletedName = folderDraft.originalName ?? folderDraft.name;
     try {
       await mutations.deleteFolderMutation.mutateAsync(folderDraft.id);
       if (folder === deletedName) setFolder("");
       setFolderDraft(null);
     } catch {
-      // Failure is surfaced through onError into the error banner.
+      // Failure is surfaced through the corner toast.
     }
   }
 
@@ -129,8 +138,8 @@ export function DocsWorkspace({ initialData, developmentPreview = false }: { ini
         <h1 className="font-display mt-1 text-2xl font-semibold tracking-[-0.025em]">Docs</h1>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" disabled={developmentPreview} onClick={() => { setError(null); setFolderDraft({ name: "", description: "" }); }}><FolderPlus className="size-4" />New folder</Button>
-        <Button size="sm" disabled={developmentPreview} onClick={() => { setError(null); setDraft(newDraft(createFolder)); }}><Plus />New doc</Button>
+        <Button size="sm" variant="outline" disabled={developmentPreview} onClick={() => { clearNotice(); setFolderDraft({ name: "", description: "" }); }}><FolderPlus className="size-4" />New folder</Button>
+        <Button size="sm" disabled={developmentPreview} onClick={() => { clearNotice(); setDraft(newDraft(createFolder)); }}><Plus />New doc</Button>
       </div>
     </header>
 
@@ -141,7 +150,7 @@ export function DocsWorkspace({ initialData, developmentPreview = false }: { ini
       </div>
     </section>
     {developmentPreview ? <p className="mt-4 rounded-lg bg-info/10 px-3 py-2 text-xs text-info">Preview mode uses no persisted Docs. Configure Supabase to create and edit documents.</p> : null}
-    {error ? <p role="alert" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
+    <CornerToast notice={notice} onClose={clearNotice} />
 
     <section className="soft-panel mt-4 grid min-h-[560px] overflow-hidden rounded-xl border soft-divider bg-card xl:min-h-[calc(100vh-238px)] xl:grid-cols-[260px_minmax(0,1fr)_320px]">
       <aside className="border-b border-white/[0.035] bg-muted/10 xl:border-b-0 xl:border-r xl:border-white/[0.035]">
@@ -153,7 +162,7 @@ export function DocsWorkspace({ initialData, developmentPreview = false }: { ini
           <FolderNavItem icon="inbox" label="All docs" count={notes.length} active={!folder} onSelect={() => setFolder("")} />
           <FolderNavItem icon="folder" label="Unfiled" count={unfiledCount} active={folder === UNFILED_FOLDER} onSelect={() => setFolder(UNFILED_FOLDER)} />
           <div className="my-2 border-t border-white/[0.035]" />
-          {folders.map((item) => <FolderNavItem key={item.id} label={item.name} count={folderCounts.get(item.name) ?? 0} active={folder === item.name} onSelect={() => setFolder(item.name)} onEdit={() => { setError(null); setFolderDraft({ id: item.id, originalName: item.name, name: item.name, description: item.description ?? "" }); }} />)}
+          {folders.map((item) => <FolderNavItem key={item.id} label={item.name} count={folderCounts.get(item.name) ?? 0} active={folder === item.name} onSelect={() => setFolder(item.name)} onEdit={() => { clearNotice(); setFolderDraft({ id: item.id, originalName: item.name, name: item.name, description: item.description ?? "" }); }} />)}
         </div>
       </aside>
 

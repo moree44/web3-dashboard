@@ -30,12 +30,11 @@ type Props = {
   open: boolean;
   projects: TaskProjectOption[];
   busy: boolean;
-  error: string | null;
   onClose: () => void;
   onCreate: (input: TaskCreateInput) => void;
 };
 
-export function AddTaskDialog({ open, projects, busy, error, onClose, onCreate }: Props) {
+export function AddTaskDialog({ open, projects, busy, onClose, onCreate }: Props) {
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [status, setStatus] = useState<TaskStatus>("todo");
@@ -198,8 +197,6 @@ export function AddTaskDialog({ open, projects, busy, error, onClose, onCreate }
               </div>
             ) : null}
           </div>
-
-          {error ? <p role="alert" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t soft-divider bg-muted/20 px-4 py-2.5">

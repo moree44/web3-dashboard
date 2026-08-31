@@ -1,8 +1,9 @@
 "use client";
 
 import { Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Button } from "@/components/ui/button";
 import { WATCHLIST_PROJECT_TYPES, type WatchlistInput, type WatchlistItemRecord } from "@/features/watchlist/watchlist-types";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,11 @@ export function WatchlistDialog({
   const [customType, setCustomType] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -43,8 +48,8 @@ export function WatchlistDialog({
     setProjectTypes(item?.projectTypes ?? []);
     setCustomType("");
     setDeleteArmed(false);
-    setError("");
-  }, [initialXUrl, item, open]);
+    clearNotice();
+  }, [clearNotice, initialXUrl, item, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -76,7 +81,7 @@ export function WatchlistDialog({
   async function save() {
     if (!canSave) return;
     setBusy(true);
-    setError("");
+    clearNotice();
     try {
       await onSave({
         name: name.trim(),
@@ -87,7 +92,7 @@ export function WatchlistDialog({
       }, item?.id);
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save Watchlist item");
+      setNotice({ id: Date.now(), tone: "error", title: "Action failed", message: caught instanceof Error ? caught.message : "Unable to save Watchlist item" });
     } finally {
       setBusy(false);
     }
@@ -100,12 +105,12 @@ export function WatchlistDialog({
       return;
     }
     setBusy(true);
-    setError("");
+    clearNotice();
     try {
       await onDelete(item.id);
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to delete Watchlist item");
+      setNotice({ id: Date.now(), tone: "error", title: "Action failed", message: caught instanceof Error ? caught.message : "Unable to delete Watchlist item" });
     } finally {
       setBusy(false);
     }
@@ -121,6 +126,7 @@ export function WatchlistDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
+      <CornerToast notice={notice} onClose={clearNotice} />
       <div className={cn("soft-panel max-h-[calc(100vh-32px)] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle", closing ? "modal-card-out" : "modal-card-in")}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-card/95 px-5 py-4 backdrop-blur">
           <div>
@@ -230,9 +236,6 @@ export function WatchlistDialog({
               </Button>
             </div>
           </fieldset>
-
-          {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-
           <div className="flex items-center justify-between gap-3 pt-1">
             <div>
               {item ? (

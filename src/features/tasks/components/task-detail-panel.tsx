@@ -31,7 +31,6 @@ type Props = {
   task: TaskRecord | null;
   projects: TaskProjectOption[];
   busy: boolean;
-  error: string | null;
   onClose: () => void;
   onSave: (input: TaskInput) => void;
   onDelete: () => void;
@@ -52,7 +51,7 @@ function emptyInput(task: TaskRecord): TaskInput {
   };
 }
 
-export function TaskDetailPanel({ task, projects, busy, error, onClose, onSave, onDelete }: Props) {
+export function TaskDetailPanel({ task, projects, busy, onClose, onSave, onDelete }: Props) {
   useDrawerDismiss(onClose, Boolean(task) && !busy);
   const [draft, setDraft] = useState<TaskInput | null>(task ? emptyInput(task) : null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -163,8 +162,6 @@ export function TaskDetailPanel({ task, projects, busy, error, onClose, onSave, 
             <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Description</span>
             <textarea value={draft.description ?? ""} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className="mt-1.5 min-h-28 w-full resize-y rounded-lg border border-white/[0.055] bg-input px-3 py-2.5 text-sm leading-relaxed outline-none focus:border-ring" placeholder="Optional context, instructions, or proof requirements" />
           </label>
-
-          {error ? <p role="alert" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t soft-divider bg-card/95 px-5 py-3 backdrop-blur">

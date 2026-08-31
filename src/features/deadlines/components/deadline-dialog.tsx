@@ -1,7 +1,7 @@
 "use client";
 
 import { ExternalLink, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   createDeadline,
@@ -11,6 +11,7 @@ import {
   type DeadlineWithContext,
 } from "@/features/deadlines/actions";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { AppDatePicker } from "@/components/ui/app-date-picker";
 import { AppSelect } from "@/components/ui/app-select";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,11 @@ export function DeadlineDialog({
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -64,8 +69,8 @@ export function DeadlineDialog({
     setUrl(deadline?.url ?? "");
     setNotes(deadline?.notes ?? "");
     setDeleteArmed(false);
-    setError("");
-  }, [deadline, open]);
+    clearNotice();
+  }, [clearNotice, deadline, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -103,10 +108,14 @@ export function DeadlineDialog({
   ];
   const linkedNftName = deadline?.linkedNftCampaignName;
 
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string) {
+    setNotice({ id: Date.now(), tone, title, message });
+  }
+
   async function save() {
     if (!canSave) return;
     setIsSaving(true);
-    setError("");
+    clearNotice();
 
     try {
       const values = {
@@ -125,7 +134,7 @@ export function DeadlineDialog({
       onSaved?.(saved);
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save deadline");
+      showNotice("error", "Action failed", caught instanceof Error ? caught.message : "Unable to save deadline");
     } finally {
       setIsSaving(false);
     }
@@ -139,13 +148,13 @@ export function DeadlineDialog({
     }
 
     setIsSaving(true);
-    setError("");
+    clearNotice();
     try {
       await deleteDeadline(deadline.id);
       onDeleted?.(deadline.id);
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to delete deadline");
+      showNotice("error", "Action failed", caught instanceof Error ? caught.message : "Unable to delete deadline");
     } finally {
       setIsSaving(false);
     }
@@ -175,6 +184,7 @@ export function DeadlineDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
+      <CornerToast notice={notice} onClose={clearNotice} />
       <div className={cn("soft-panel max-h-[calc(100vh-32px)] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-white/[0.065] bg-card shadow-2xl shadow-black/45 scrollbar-subtle", closing ? "modal-card-out" : "modal-card-in")}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-card/95 px-5 py-4 backdrop-blur">
           <div>
@@ -269,8 +279,6 @@ export function DeadlineDialog({
               placeholder="Add context, renewal conditions, or claim instructions."
             />
           </label>
-
-          {error ? <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p> : null}
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-card/95 px-5 py-3 backdrop-blur soft-divider">

@@ -1,11 +1,12 @@
 "use client";
 
-import { Archive, ArrowUpRight, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, ShieldAlert, SlidersHorizontal, Trash2, Upload, WalletCards, X } from "lucide-react";
+import { Archive, ArrowUpRight, Check, ChevronDown, Columns3, ExternalLink, MoreHorizontal, Plus, Search, SlidersHorizontal, Trash2, Upload, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Badge } from "@/components/ui/badge";
 import { AppDatePicker } from "@/components/ui/app-date-picker";
 import { Button } from "@/components/ui/button";
@@ -156,15 +157,14 @@ export function ProjectsPreview({
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [forceDeleteCandidate, setForceDeleteCandidate] = useState<{ id: string; name: string } | null>(null);
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
   const { data: queryData } = useProjectsWorkspace(initialData, developmentPreview);
   const workspace = queryData ?? initialData;
   const mutations = useProjectsMutations({
     developmentPreview,
     accountOptions: workspace.accountOptions,
     walletOptions: workspace.walletOptions,
-    onError: (message) => setError(message),
+    onError: (message) => showNotice("error", "Action failed", message),
   });
   const projectItems = useMemo(() => workspace.projects.map(dbToUIProject), [workspace.projects]);
   const selectedProject = useMemo(
@@ -208,6 +208,14 @@ export function ProjectsPreview({
   ];
   const visibleColumns = new Set(queryState.columns);
   const stageOptions = [...new Set([...STAGE_PRESETS, ...projectItems.map((project) => project.stage).filter(Boolean)])];
+
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string, action?: ReactNode) {
+    setNotice({ id: Date.now(), tone, title, message, action });
+  }
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
 
   function activateTab(tab: { hunt: string }) {
     const next = new URLSearchParams(searchParams.toString());
@@ -265,22 +273,34 @@ export function ProjectsPreview({
   }
 
   async function handleDeleteProject(id: string, options: { forceUnlink?: boolean } = {}) {
-    setError(null);
-    if (options.forceUnlink) setForceDeleteCandidate(null);
-
+    clearNotice();
     try {
       await mutations.deleteProjectMutation.mutateAsync({ id, forceUnlink: options.forceUnlink });
     } catch (deleteError) {
       const message = toErrorMessage(deleteError);
-      setError(message);
       if (!options.forceUnlink && message.includes("safe force delete")) {
         const project = projectItems.find((item) => item.id === id);
-        setForceDeleteCandidate({ id, name: project?.name ?? "this project" });
+        const candidate = { id, name: project?.name ?? "this project" };
+        showNotice(
+          "error",
+          "Project still has links",
+          message,
+          <ConfirmDelete
+            onConfirm={() => handleDeleteProject(candidate.id, { forceUnlink: true })}
+            label="Safe force delete"
+            confirmLabel="Confirm unlink + delete"
+            className="w-auto border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5 text-[11px] text-foreground hover:bg-white/[0.08]"
+            disabled={mutations.deleteProjectMutation.isPending}
+          >
+            <Trash2 className="size-3.5" />
+          </ConfirmDelete>,
+        );
+      } else {
+        showNotice("error", "Action failed", message);
       }
       return;
     }
 
-    setForceDeleteCandidate(null);
     setSelectedProjectId(null);
   }
 
@@ -301,27 +321,7 @@ export function ProjectsPreview({
         <Button variant="secondary" size="sm" onClick={() => setIsAddOpen(true)}><Plus />Add project</Button>
       </header>
 
-      {error ? (
-        <div className="px-4 pt-3 sm:px-6 lg:px-8">
-          <div role="alert" className="flex max-w-4xl flex-col gap-2 rounded-lg border border-destructive/15 bg-destructive/[0.055] px-3 py-2 text-xs leading-5 text-destructive/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.035)] sm:inline-flex sm:flex-row sm:items-center">
-            <div className="flex min-w-0 items-start gap-2">
-              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-              <span>{error}</span>
-            </div>
-            {forceDeleteCandidate ? (
-              <ConfirmDelete
-                onConfirm={() => handleDeleteProject(forceDeleteCandidate.id, { forceUnlink: true })}
-                label="Safe force delete"
-                confirmLabel="Confirm unlink + delete"
-                className="w-auto shrink-0 border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5 text-[11px] text-foreground hover:bg-white/[0.08]"
-                disabled={mutations.deleteProjectMutation.isPending}
-              >
-                <Trash2 className="size-3.5" />
-              </ConfirmDelete>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      <CornerToast notice={notice} onClose={clearNotice} />
 
       <div className="border-b soft-divider px-4 sm:px-6 lg:px-8"><div className="flex items-center gap-2 py-2.5">
         <div className="scrollbar-subtle flex min-w-0 flex-1 gap-1 overflow-x-auto">

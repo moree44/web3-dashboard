@@ -2,8 +2,9 @@
 
 import { ArrowRight, ExternalLink, FolderKanban, Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 
+import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { WatchlistDialog } from "@/features/watchlist/components/watchlist-dialog";
@@ -35,10 +36,10 @@ export function WatchlistPreview({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState<WatchlistItemRecord | null>(null);
   const [dialogXUrl, setDialogXUrl] = useState("");
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<CornerToastNotice | null>(null);
   const mutations = useWatchlistMutations({
     developmentPreview,
-    onError: setError,
+    onError: (message) => showNotice("error", "Action failed", message),
   });
 
   const items = view === "active" ? data.activeItems : data.convertedItems;
@@ -59,10 +60,18 @@ export function WatchlistPreview({
     ? mutations.convertMutation.variables
     : null;
 
+  function showNotice(tone: CornerToastNotice["tone"], title: string, message?: string) {
+    setNotice({ id: Date.now(), tone, title, message });
+  }
+
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
+
   async function quickAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!quickUrl.trim() || quickSaving) return;
-    setError("");
+    clearNotice();
     try {
       await mutations.saveMutation.mutateAsync({ input: { xUrl: quickUrl } });
       setQuickUrl("");
@@ -76,29 +85,29 @@ export function WatchlistPreview({
     setSelected(null);
     setDialogXUrl(prefilledUrl);
     setDialogOpen(true);
-    setError("");
+    clearNotice();
   }
 
   function openEdit(item: WatchlistItemRecord) {
     setSelected(item);
     setDialogXUrl("");
     setDialogOpen(true);
-    setError("");
+    clearNotice();
   }
 
   async function saveItem(input: WatchlistInput, id?: string) {
-    setError("");
+    clearNotice();
     await mutations.saveMutation.mutateAsync({ id, input });
     setView("active");
   }
 
   async function deleteItem(id: string) {
-    setError("");
+    clearNotice();
     await mutations.deleteMutation.mutateAsync(id);
   }
 
   async function startProject(id: string) {
-    setError("");
+    clearNotice();
     try {
       await mutations.convertMutation.mutateAsync(id);
     } catch {
@@ -187,11 +196,7 @@ export function WatchlistPreview({
         </label>
       </div>
 
-      {error ? (
-        <div role="alert" className="border-b border-destructive/15 bg-destructive/[0.04] px-4 py-2 text-xs text-destructive sm:px-6 lg:px-8">
-          {error}
-        </div>
-      ) : null}
+      <CornerToast notice={notice} onClose={clearNotice} />
 
       {visibleItems.length > 0 ? (
         <>
