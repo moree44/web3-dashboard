@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { deleteProject } from "@/features/projects/actions";
+import { createProject, deleteProject } from "@/features/projects/actions";
 import { ProjectsPreview } from "@/features/projects/components/projects-preview";
 import { projectsPreviewData } from "@/features/projects/preview-data";
 
@@ -53,6 +53,31 @@ describe("ProjectsPreview", () => {
 
     await waitFor(() => expect(screen.getAllByText("Mint campaign").length).toBeGreaterThan(0));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Add project" })).not.toBeInTheDocument());
+  });
+
+  it("optimistically shows a created project before the server responds", async () => {
+    const created = {
+      ...projectsPreviewData.projects[0],
+      id: "created-project",
+      name: "Optimistic Alpha",
+    };
+    let resolveCreate: (value: typeof created) => void = () => {};
+    vi.mocked(createProject).mockImplementation(() => new Promise((resolve) => {
+      resolveCreate = resolve;
+    }));
+
+    renderProjectsPreview();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+    fireEvent.change(screen.getByPlaceholderText("Soundness, NexusHQ, Linera..."), { target: { value: "Optimistic Alpha" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    await waitFor(() => expect(createProject).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Add project" })).not.toBeInTheDocument());
+    expect(screen.getAllByText("Optimistic Alpha").length).toBeGreaterThan(0);
+
+    resolveCreate(created);
+    await waitFor(() => expect(screen.getAllByText("Optimistic Alpha").length).toBeGreaterThan(0));
   });
 
   it("edits a project name through the detail drawer in development preview", async () => {

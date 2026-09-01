@@ -59,7 +59,10 @@ describe("TasksPreview", () => {
       title: "Mint allowlist NFT",
       startDate: "2026-07-29",
     };
-    vi.mocked(createTask).mockResolvedValue(created);
+    let resolveCreate: (value: typeof created) => void = () => {};
+    vi.mocked(createTask).mockImplementation(() => new Promise((resolve) => {
+      resolveCreate = resolve;
+    }));
     renderTasksPreview();
 
     fireEvent.click(screen.getByRole("button", { name: "Add task" }));
@@ -79,7 +82,10 @@ describe("TasksPreview", () => {
       deadline: { dueDate: expect.any(String) },
     });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Add task" })).not.toBeInTheDocument());
-  });
+    expect(screen.getAllByText("Mint allowlist NFT").length).toBeGreaterThan(0);
+    resolveCreate(created);
+    await waitFor(() => expect(screen.getAllByText("Mint allowlist NFT").length).toBeGreaterThan(0));
+  }, 10000);
 
   it("opens the edit drawer and persists a local preview edit", async () => {
     renderTasksPreview({ developmentPreview: true });

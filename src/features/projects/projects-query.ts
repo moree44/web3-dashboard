@@ -82,6 +82,8 @@ export type ProjectCreateVars = {
   data: Omit<typeof projectsSchema.$inferInsert, "workspaceId">;
   assignments: ProjectAssignmentInput;
   logoFile?: File | null;
+  optimisticId?: string;
+  optimisticLogoUrl?: string | null;
 };
 
 export type ProjectUpdateVars = {
@@ -110,12 +112,12 @@ function optimisticProject(
     ...newWallets,
   ];
   return {
-    id: "preview-project-" + Date.now(),
+    id: vars.optimisticId ?? "preview-project-" + Date.now(),
     workspaceId: "preview-workspace",
     name: vars.data.name ?? "",
     slug: null,
     description: null,
-    logoUrl: vars.data.logoUrl ?? null,
+    logoUrl: vars.optimisticLogoUrl ?? vars.data.logoUrl ?? null,
     logoPath: null,
     logoSource: vars.data.logoSource ?? "none",
     huntType: vars.data.huntType ?? null,
@@ -142,6 +144,23 @@ function optimisticProject(
     assignedAccounts,
     assignedWallets,
   };
+}
+
+function mergeProjectCreate(
+  data: ProjectsWorkspaceData,
+  result: ProjectWithAccounts,
+  vars: ProjectCreateVars,
+): ProjectsWorkspaceData {
+  const withoutPlaceholder = vars.optimisticId
+    ? data.projects.filter((project) => project.id !== vars.optimisticId)
+    : data.projects;
+  if (withoutPlaceholder.some((project) => project.id === result.id)) {
+    return {
+      ...data,
+      projects: withoutPlaceholder.map((project) => (project.id === result.id ? result : project)),
+    };
+  }
+  return { ...data, projects: [result, ...withoutPlaceholder] };
 }
 
 function applyProjectEdit(
@@ -208,9 +227,6 @@ export function useProjectsMutations(opts: {
     projects: data.projects.map((project) => (project.id === record.id ? record : project)),
   });
 
-  // createProject is commit-waiting in real mode (the dialog shows
-  // "Creating..." until the server responds). Preview swaps to the local
-  // builder so the optimistic record is the created row.
   const createProjectMutation = useMutation(buildProjectMutationOptions<ProjectWithAccounts, ProjectCreateVars>({
     queryClient,
     key,
@@ -232,10 +248,11 @@ export function useProjectsMutations(opts: {
       if (logoUploadError) opts.onError(`Project created, but the logo was not uploaded. ${logoUploadError}`);
       return created;
     },
-    applyOptimistic: opts.developmentPreview
-      ? (data, vars) => ({ ...data, projects: [optimisticProject(vars, opts.accountOptions, opts.walletOptions), ...data.projects] })
-      : undefined,
-    mergeResult: (data, result) => ({ ...data, projects: [result, ...data.projects] }),
+    applyOptimistic: (data, vars) => {
+      vars.optimisticId ??= "optimistic-project-" + Date.now();
+      return { ...data, projects: [optimisticProject(vars, opts.accountOptions, opts.walletOptions), ...data.projects] };
+    },
+    mergeResult: (data, result, vars) => mergeProjectCreate(data, result, vars),
   }));
 
   const updateProjectMutation = useMutation(buildProjectMutationOptions<ProjectWithAccounts, ProjectUpdateVars>({

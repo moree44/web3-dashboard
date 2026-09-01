@@ -114,27 +114,19 @@ export function TasksPreview({ initialData, developmentPreview = false }: { init
   const recheckTasks = taskItems.filter((task) => task.status === "recheck");
   const boardTasks = filteredTasks.filter((task) => task.status !== "running");
 
-  async function handleQuickCreate() {
+  function handleQuickCreate() {
     const title = quickTitle.trim();
     if (!title || !quickProjectId || busy) return;
     const input: TaskCreateInput = { projectId: quickProjectId, title, status: "todo", frequency: "once", priority: "medium", startDate: getJakartaDateValue(), accountIds: [] };
     clearNotice();
-    try {
-      await mutations.createTaskMutation.mutateAsync(input);
-      setQuickTitle("");
-    } catch {
-      // Failure is surfaced through the corner toast.
-    }
+    mutations.createTaskMutation.mutate(input);
+    setQuickTitle("");
   }
 
-  async function handleCreate(input: TaskCreateInput) {
+  function handleCreate(input: TaskCreateInput) {
     clearNotice();
-    try {
-      await mutations.createTaskMutation.mutateAsync(input);
-      setAddTaskOpen(false);
-    } catch {
-      // Failure is surfaced through the corner toast; the dialog stays open.
-    }
+    mutations.createTaskMutation.mutate(input);
+    setAddTaskOpen(false);
   }
 
   function handleSave(input: TaskInput) {

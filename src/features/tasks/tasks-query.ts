@@ -33,6 +33,7 @@ export const taskKeys = {
 };
 
 type MutationContext = { previous?: TaskWorkspaceData };
+type TaskCreateVars = TaskCreateInput & { optimisticId?: string };
 
 function toMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong";
@@ -75,14 +76,14 @@ function buildTaskMutationOptions<TResult, TVars>(opts: {
 
 // ─── Pure record builders (also used as optimistic cache values) ─────────────
 
-export function optimisticTask(input: TaskInput, projects: TaskProjectOption[]): TaskRecord {
+export function optimisticTask(input: TaskInput, projects: TaskProjectOption[], id = "preview-task-" + Date.now()): TaskRecord {
   const project = projects.find((item) => item.id === input.projectId) ?? projects[0];
   if (!project) throw new Error("Project not found");
   const now = new Date().toISOString();
   const status = input.status ?? "todo";
   const assignedAccounts = project.accounts.filter((account) => (input.accountIds ?? []).includes(account.id));
   return {
-    id: "preview-task-" + Date.now(),
+    id,
     projectId: project.id,
     projectName: project.name,
     projectLogoUrl: project.logoUrl,
@@ -130,6 +131,19 @@ export function applyTaskEdit(task: TaskRecord, input: TaskInput, projects: Task
   };
 }
 
+function mergeTaskCreate(data: TaskWorkspaceData, result: TaskRecord, input: TaskCreateVars): TaskWorkspaceData {
+  const withoutPlaceholder = input.optimisticId
+    ? data.tasks.filter((task) => task.id !== input.optimisticId)
+    : data.tasks;
+  if (withoutPlaceholder.some((task) => task.id === result.id)) {
+    return {
+      ...data,
+      tasks: withoutPlaceholder.map((task) => (task.id === result.id ? result : task)),
+    };
+  }
+  return { ...data, tasks: [result, ...withoutPlaceholder] };
+}
+
 // ─── Query ───────────────────────────────────────────────────────────────────
 
 export function useTaskWorkspace(initialData: TaskWorkspaceData, developmentPreview: boolean) {
@@ -158,19 +172,21 @@ export function useTasksMutations(opts: {
     tasks: data.tasks.map((task) => (task.id === record.id ? record : task)),
   });
 
-  // createTask is commit-waiting (dialog shows "Creating..." until the server
-  // responds) because the e2e smoke spec reads the row back via direct SQL
-  // right after the title becomes visible. Everything else is optimistic.
-  const createTaskMutation = useMutation(buildTaskMutationOptions<TaskRecord, TaskCreateInput>({
+  const createTaskMutation = useMutation(buildTaskMutationOptions<TaskRecord, TaskCreateVars>({
     queryClient,
     key,
     developmentPreview: opts.developmentPreview,
     onError: opts.onError,
-    mutationFn: async (input) => (opts.developmentPreview ? optimisticTask(input, opts.projects) : createTask(input)),
-    applyOptimistic: opts.developmentPreview
-      ? (data, input) => ({ ...data, tasks: [optimisticTask(input, opts.projects), ...data.tasks] })
-      : undefined,
-    mergeResult: (data, result) => ({ ...data, tasks: [result, ...data.tasks] }),
+    mutationFn: async (vars) => {
+      const { optimisticId, ...input } = vars;
+      void optimisticId;
+      return opts.developmentPreview ? optimisticTask(input, opts.projects) : createTask(input);
+    },
+    applyOptimistic: (data, input) => {
+      input.optimisticId ??= "optimistic-task-" + Date.now();
+      return { ...data, tasks: [optimisticTask(input, opts.projects, input.optimisticId), ...data.tasks] };
+    },
+    mergeResult: (data, result, input) => mergeTaskCreate(data, result, input),
   }));
 
   const saveTaskMutation = useMutation(buildTaskMutationOptions<TaskRecord, { id: string; input: TaskInput }>({

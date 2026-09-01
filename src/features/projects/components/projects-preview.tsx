@@ -226,10 +226,11 @@ export function ProjectsPreview({
     router.replace("/projects" + (next.size ? "?" + next.toString() : ""), { scroll: false });
   }
 
-  async function handleCreateProject(project: Project, assignments: ProjectAssignmentInput, context?: { logoFile?: File | null }) {
+  function handleCreateProject(project: Project, assignments: ProjectAssignmentInput, context?: { logoFile?: File | null }) {
     const hasFileUpload = Boolean(context?.logoFile);
     const externalLogoUrl = hasFileUpload || (project.logoUrl?.startsWith("blob:") || project.logoUrl?.startsWith("data:")) ? undefined : project.logoUrl;
-    await mutations.createProjectMutation.mutateAsync({
+    clearNotice();
+    mutations.createProjectMutation.mutate({
       data: {
         name: project.name,
         huntType: (reverseHuntLabels[project.hunt] ?? "free_hunts") as typeof projectsSchema.$inferInsert.huntType,
@@ -248,6 +249,7 @@ export function ProjectsPreview({
       },
       assignments,
       logoFile: context?.logoFile ?? null,
+      optimisticLogoUrl: project.logoUrl ?? null,
     });
     setIsAddOpen(false);
   }
@@ -1405,7 +1407,7 @@ function AddProjectDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onCreate: (project: Project, assignments: ProjectAssignmentInput, context?: { logoFile?: File | null }) => Promise<void>;
+  onCreate: (project: Project, assignments: ProjectAssignmentInput, context?: { logoFile?: File | null }) => void;
   accountOptions: ProjectAccountOption[];
   walletOptions: ProjectWalletOption[];
 }) {
@@ -1460,7 +1462,7 @@ function AddProjectDialog({
     onClose();
   }
 
-  async function handleCreate() {
+  function handleCreate() {
     const name = projectName.trim();
     if (!name || isSubmitting) return;
 
@@ -1472,7 +1474,7 @@ function AddProjectDialog({
     setIsSubmitting(true);
     setFormError("");
     try {
-      await onCreate({
+      onCreate({
         name,
         mark,
         logoClass: "bg-white/[0.065] text-[#c4cad3]",
