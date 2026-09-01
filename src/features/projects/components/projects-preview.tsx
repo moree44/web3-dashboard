@@ -285,16 +285,16 @@ export function ProjectsPreview({
         const candidate = { id, name: project?.name ?? "this project" };
         showNotice(
           "error",
-          "Project still has links",
-          message,
+          "Still linked",
+          "Detach links, then delete project only.",
           <ConfirmDelete
             onConfirm={() => handleDeleteProject(candidate.id, { forceUnlink: true })}
-            label="Safe force delete"
-            confirmLabel="Confirm unlink + delete"
-            className="w-auto border border-white/[0.08] bg-white/[0.045] px-2.5 py-1.5 text-[11px] text-foreground hover:bg-white/[0.08]"
+            label="Detach + delete"
+            confirmLabel="Confirm"
+            className="w-auto border border-white/[0.08] bg-white/[0.045] px-2 py-1 text-[11px] text-foreground hover:bg-white/[0.08]"
             disabled={mutations.deleteProjectMutation.isPending}
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 className="size-3" />
           </ConfirmDelete>,
         );
       } else {

@@ -139,10 +139,10 @@ describe("ProjectsPreview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Safe force delete" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Detach + delete" })).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: "Safe force delete" }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm unlink + delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Detach + delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
 
     await waitFor(() => {
       expect(deleteProjectMock).toHaveBeenLastCalledWith(expect.any(String), { forceUnlink: true });
