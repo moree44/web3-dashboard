@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, t
 import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AppFloatingPanel } from "@/components/ui/app-floating-panel";
+import { AppModal } from "@/components/ui/app-modal";
 import { AppSelect } from "@/components/ui/app-select";
 import { ConfirmDelete } from "@/components/ui/confirm-delete";
 import { cn } from "@/lib/utils";
@@ -472,14 +474,17 @@ function IdentitiesView({
           <div className="relative z-10 flex h-full flex-col">
             <div className="flex items-start justify-between gap-3">
               <h2 className="truncate text-sm font-semibold tracking-[-0.01em] text-foreground">{account.name}</h2>
-              <div className="relative">
-                <button onClick={(event) => { event.stopPropagation(); setMenuOpen(menuOpen === account.name ? null : account.name); }} aria-label={"More options for " + account.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
-                {menuOpen === account.name ? (
-                  <div onClick={(event) => event.stopPropagation()} className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                    <ConfirmDelete onConfirm={() => { setMenuOpen(null); if (account.id) onDeleteAccount(account.id); }} className="px-3 py-1.5" />
-                  </div>
-                ) : null}
-              </div>
+              <AppFloatingPanel
+                open={menuOpen === account.name}
+                onOpenChange={(open) => setMenuOpen(open ? account.name : null)}
+                ariaLabel={"Account actions for " + account.name}
+                width={144}
+                trigger={({ ref, open, toggle }) => (
+                  <button ref={ref} onClick={(event) => { event.stopPropagation(); toggle(); }} aria-expanded={open} aria-label={"More options for " + account.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+                )}
+              >
+                <ConfirmDelete onConfirm={() => { setMenuOpen(null); if (account.id) onDeleteAccount(account.id); }} className="px-2.5 py-2" />
+              </AppFloatingPanel>
             </div>
 
             <div className="mt-4 flex flex-1 items-center justify-between gap-5">
@@ -557,14 +562,17 @@ function WalletRow({ wallet, onOpen, onDelete }: { wallet: Wallet; onOpen: () =>
       <td className="px-3"><Badge variant="outline">{formatWalletType(wallet.type)}</Badge></td>
       <td className="px-3 text-xs tabular-nums text-muted-foreground">{wallet.used} projects</td>
       <td className="px-3">
-        <div className="relative">
-          <button onClick={(event) => { event.stopPropagation(); setMenuOpen(!menuOpen); }} aria-label={"More options for " + wallet.label} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
-          {menuOpen ? (
-            <div onClick={(event) => event.stopPropagation()} className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-              <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (wallet.id) onDelete(wallet.id); }} className="px-3 py-1.5" />
-            </div>
-          ) : null}
-        </div>
+        <AppFloatingPanel
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          ariaLabel={"Wallet actions for " + wallet.label}
+          width={144}
+          trigger={({ ref, open, toggle }) => (
+            <button ref={ref} onClick={(event) => { event.stopPropagation(); toggle(); }} aria-expanded={open} aria-label={"More options for " + wallet.label} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+          )}
+        >
+          <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (wallet.id) onDelete(wallet.id); }} className="px-2.5 py-2" />
+        </AppFloatingPanel>
       </td>
     </tr>
   );
@@ -667,14 +675,17 @@ function AccountDetailPanel({
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <h2 id="account-detail-title" className="truncate text-base font-semibold">Account detail</h2>
           <div className="flex items-center gap-1">
-            <div className="relative">
-              <button onClick={() => setMenuOpen((open) => !open)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="More options"><MoreHorizontal className="size-4" /></button>
-              {menuOpen ? (
-                <div className="absolute right-0 top-10 z-50 w-36 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                  <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (current.id) onDeleteAccount(current.id); }} className="px-3 py-1.5" />
-                </div>
-              ) : null}
-            </div>
+            <AppFloatingPanel
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              ariaLabel={"Account actions for " + current.name}
+              width={144}
+              trigger={({ ref, open, toggle }) => (
+                <button ref={ref} onClick={toggle} aria-expanded={open} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="More options"><MoreHorizontal className="size-4" /></button>
+              )}
+            >
+              <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (current.id) onDeleteAccount(current.id); }} className="px-2.5 py-2" />
+            </AppFloatingPanel>
             <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close account detail"><X className="size-4" /></button>
           </div>
         </div>
@@ -857,15 +868,18 @@ function WalletDetailPanel({ wallet, onClose, onOpenAccount, onUpdate, onDelete,
         <div className="sticky top-0 z-10 flex items-center justify-between border-b soft-divider bg-card/95 px-5 py-3 backdrop-blur">
           <h2 id="wallet-detail-title" className="truncate text-base font-semibold">Wallet detail</h2>
           <div className="flex items-center gap-1">
-            <div className="relative">
-              <button onClick={() => setMenuOpen(!menuOpen)} aria-label="More options" className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"><MoreHorizontal className="size-4" /></button>
-              {menuOpen ? (
-                <div className="absolute right-0 top-full z-50 mt-1 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                  <button onClick={enterEdit} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>
-                  <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (w.id) onDelete(w.id); }} className="px-3 py-1.5" />
-                </div>
-              ) : null}
-            </div>
+            <AppFloatingPanel
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              ariaLabel={"Wallet actions for " + w.label}
+              width={144}
+              trigger={({ ref, open, toggle }) => (
+                <button ref={ref} onClick={toggle} aria-expanded={open} aria-label="More options" className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+              )}
+            >
+              <button role="menuitem" onClick={enterEdit} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>
+              <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (w.id) onDelete(w.id); }} className="px-2.5 py-2" />
+            </AppFloatingPanel>
             <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close wallet detail"><X className="size-4" /></button>
           </div>
         </div>
@@ -975,15 +989,18 @@ function GroupsView({ groups: groupItems, onDeleteGroup, onEditGroup }: { groups
         <article key={group.id ?? group.name} className="row-enter-in rounded-xl bg-card/80 p-4 soft-panel">
           <div className="flex items-start justify-between gap-3">
             <span className="grid size-9 place-items-center rounded-lg bg-white/[0.055] text-muted-foreground"><FolderOpen className="size-4" /></span>
-            <div className="relative">
-              <button onClick={() => setMenuOpen(menuOpen === (group.id ?? group.name) ? null : (group.id ?? group.name))} aria-label={"More options for " + group.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
-              {menuOpen === (group.id ?? group.name) ? (
-                <div className="absolute right-0 top-8 z-50 w-32 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                  <button onClick={() => { setMenuOpen(null); onEditGroup(group); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>
-                  <ConfirmDelete onConfirm={() => { setMenuOpen(null); if (group.id) onDeleteGroup(group.id); }} className="px-3 py-1.5" />
-                </div>
-              ) : null}
-            </div>
+            <AppFloatingPanel
+              open={menuOpen === (group.id ?? group.name)}
+              onOpenChange={(open) => setMenuOpen(open ? (group.id ?? group.name) : null)}
+              ariaLabel={"Group actions for " + group.name}
+              width={144}
+              trigger={({ ref, open, toggle }) => (
+                <button ref={ref} onClick={toggle} aria-expanded={open} aria-label={"More options for " + group.name} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground"><MoreHorizontal className="size-4" /></button>
+              )}
+            >
+              <button role="menuitem" onClick={() => { setMenuOpen(null); onEditGroup(group); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-foreground hover:bg-white/[0.055]">Edit</button>
+              <ConfirmDelete onConfirm={() => { setMenuOpen(null); if (group.id) onDeleteGroup(group.id); }} className="px-2.5 py-2" />
+            </AppFloatingPanel>
           </div>
           <h2 className="mt-3 text-sm font-semibold">{group.name}</h2>
           <p className="mt-1 min-h-10 text-xs leading-5 text-muted-foreground">{group.description}</p>
@@ -1054,78 +1071,88 @@ function EditableAvatar({
   return (
     <div className="relative shrink-0" onClick={(event) => event.stopPropagation()}>
       <CornerToast notice={notice} onClose={clearNotice} />
-      <button
-        type="button"
-        onClick={() => {
-          setDraftUrl(imageUrl ?? "");
-          clearNotice();
-          setOpen((current) => !current);
-        }}
-        className={cn(
-          "grid shrink-0 place-items-center overflow-hidden bg-white/[0.065] text-xs font-semibold text-foreground",
-          size === "lg" ? "size-12" : "size-10",
-          shape === "square" ? "rounded-xl" : "rounded-full",
-        )}
-        aria-label="Edit account avatar"
-      >
-        {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt=""
-            width={size === "lg" ? 48 : 40}
-            height={size === "lg" ? 48 : 40}
-            className="size-full object-cover"
-            unoptimized
-          />
-        ) : (
-          label
-        )}
-      </button>
-
-      {open ? (
-        <div className="absolute left-0 top-full z-[80] mt-2 w-64 rounded-xl border border-white/[0.08] bg-[#161618] p-2 shadow-2xl shadow-black/50">
-          <label className={cn("flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-muted-foreground hover:bg-white/[0.055] hover:text-foreground", isSaving || !onUploadFile ? "pointer-events-none opacity-50" : "")}>
-            <Upload className="size-3.5" />
-            {isSaving ? "Uploading..." : "Upload image"}
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              disabled={isSaving || !onUploadFile}
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null;
-                event.target.value = "";
-                void handleFile(file);
-              }}
-            />
-          </label>
-          <div className="mt-1 rounded-lg bg-white/[0.025] p-2">
-            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Image URL</p>
-            <div className="mt-1.5 flex gap-2">
-              <input
-                type="text"
-                inputMode="url"
-                autoCapitalize="none"
-                autoCorrect="off"
-                value={draftUrl}
-                onChange={(event) => setDraftUrl(event.target.value)}
-                onBlur={() => setDraftUrl((value) => normalizeHttpUrl(value))}
-                disabled={isSaving || !onSetUrl}
-                className="h-8 min-w-0 flex-1 rounded-lg bg-background px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
-                placeholder="https://..."
+      <AppFloatingPanel
+        open={open}
+        onOpenChange={setOpen}
+        ariaLabel="Account avatar actions"
+        align="start"
+        width={256}
+        panelClassName="p-2"
+        trigger={({ ref, open: panelOpen, toggle }) => (
+          <button
+            ref={ref}
+            type="button"
+            onClick={() => {
+              if (!panelOpen) {
+                setDraftUrl(imageUrl ?? "");
+                clearNotice();
+              }
+              toggle();
+            }}
+            className={cn(
+              "grid shrink-0 place-items-center overflow-hidden bg-white/[0.065] text-xs font-semibold text-foreground",
+              size === "lg" ? "size-12" : "size-10",
+              shape === "square" ? "rounded-xl" : "rounded-full",
+            )}
+            aria-expanded={panelOpen}
+            aria-label="Edit account avatar"
+          >
+            {imageUrl ? (
+              <Image
+                src={imageUrl}
+                alt=""
+                width={size === "lg" ? 48 : 40}
+                height={size === "lg" ? 48 : 40}
+                className="size-full object-cover"
+                unoptimized
               />
-              <button
-                type="button"
-                disabled={isSaving || !onSetUrl}
-                onClick={() => void handleSetUrl()}
-                className="h-8 rounded-lg bg-white/[0.075] px-2 text-xs font-medium hover:bg-white/[0.11] disabled:opacity-50"
-              >
-                Set
-              </button>
-            </div>
+            ) : (
+              label
+            )}
+          </button>
+        )}
+      >
+        <label className={cn("flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-muted-foreground hover:bg-white/[0.055] hover:text-foreground", isSaving || !onUploadFile ? "pointer-events-none opacity-50" : "")}>
+          <Upload className="size-3.5" />
+          {isSaving ? "Uploading..." : "Upload image"}
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            disabled={isSaving || !onUploadFile}
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              event.target.value = "";
+              void handleFile(file);
+            }}
+          />
+        </label>
+        <div className="mt-1 rounded-lg bg-white/[0.025] p-2">
+          <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Image URL</p>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              type="text"
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={draftUrl}
+              onChange={(event) => setDraftUrl(event.target.value)}
+              onBlur={() => setDraftUrl((value) => normalizeHttpUrl(value))}
+              disabled={isSaving || !onSetUrl}
+              className="h-8 min-w-0 flex-1 rounded-lg bg-background px-2 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring disabled:opacity-50"
+              placeholder="https://..."
+            />
+            <button
+              type="button"
+              disabled={isSaving || !onSetUrl}
+              onClick={() => void handleSetUrl()}
+              className="h-8 rounded-lg bg-white/[0.075] px-2 text-xs font-medium hover:bg-white/[0.11] disabled:opacity-50"
+            >
+              Set
+            </button>
           </div>
         </div>
-      ) : null}
+      </AppFloatingPanel>
     </div>
   );
 }
@@ -1168,17 +1195,15 @@ function AddWalletDialog({
   const [walletType, setWalletType] = useState("main");
   const [ownerAccountId, setOwnerAccountId] = useState("");
 
-  if (!open) return null;
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!label.trim() || !address.trim()) return;
     onCreate({
-label: label.trim(),
-address: address.trim(),
-chainType,
-walletType,
-ownerAccountId: ownerAccountId || undefined,
+      label: label.trim(),
+      address: address.trim(),
+      chainType,
+      walletType,
+      ownerAccountId: ownerAccountId || undefined,
     });
     setLabel("");
     setAddress("");
@@ -1188,49 +1213,46 @@ ownerAccountId: ownerAccountId || undefined,
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
-<div className="absolute inset-0 bg-black/50" onClick={onClose} />
-<div className="relative z-10 w-full max-w-sm rounded-lg bg-popover shadow-[0_0_0_1px_rgb(255_255_255/0.06),0_24px_48px_-8px_rgb(0_0_0/0.45)]">
-  <form onSubmit={handleSubmit}>
-    <div className="flex items-center justify-between px-4 py-3 border-b soft-divider">
-      <h3 className="text-sm font-semibold">New Wallet</h3>
-      <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"><X className="size-4" /></button>
-    </div>
-    <div className="flex flex-col gap-3 px-4 py-3">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Label *</span>
-        <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Moree EVM Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Address *</span>
-        <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x..." className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
-      </label>
-      <AppSelect
-        label="Chain"
-        value={chainType}
-        options={["EVM", "Solana", "Bitcoin", "Sui", "Aptos", "Other"].map((chain) => ({ value: chain, label: chain }))}
-        onChange={setChainType}
-      />
-      <AppSelect
-        label="Type"
-        value={walletType}
-        options={["main", "project_wallet", "burner", "l1", "testnet", "retro", "nft", "other"].map((type) => ({ value: type, label: formatWalletType(type) }))}
-        onChange={setWalletType}
-      />
-      <AppSelect
-        label="Owner Account"
-        value={ownerAccountId}
-        options={[{ value: "", label: "None" }, ...accounts.filter((account) => account.id).map((account) => ({ value: account.id!, label: account.name }))]}
-        onChange={setOwnerAccountId}
-      />
-    </div>
-    <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
-      <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
-      <Button size="sm" type="submit" disabled={!label.trim() || !address.trim()}>Create</Button>
-    </div>
-  </form>
-</div>
-    </div>
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="New Wallet"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button size="sm" type="submit" form="add-wallet-form" disabled={!label.trim() || !address.trim()}>Create</Button>
+        </>
+      }
+    >
+      <form id="add-wallet-form" onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Label *</span>
+          <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Moree EVM Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Address *</span>
+          <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x..." className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+        </label>
+        <AppSelect
+          label="Chain"
+          value={chainType}
+          options={["EVM", "Solana", "Bitcoin", "Sui", "Aptos", "Other"].map((chain) => ({ value: chain, label: chain }))}
+          onChange={setChainType}
+        />
+        <AppSelect
+          label="Type"
+          value={walletType}
+          options={["main", "project_wallet", "burner", "l1", "testnet", "retro", "nft", "other"].map((type) => ({ value: type, label: formatWalletType(type) }))}
+          onChange={setWalletType}
+        />
+        <AppSelect
+          label="Owner Account"
+          value={ownerAccountId}
+          options={[{ value: "", label: "None" }, ...accounts.filter((account) => account.id).map((account) => ({ value: account.id!, label: account.name }))]}
+          onChange={setOwnerAccountId}
+        />
+      </form>
+    </AppModal>
   );
 }
 
@@ -1246,8 +1268,6 @@ function AddGroupDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  if (!open) return null;
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
@@ -1257,31 +1277,28 @@ function AddGroupDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
-<div className="absolute inset-0 bg-black/50" onClick={onClose} />
-<div className="relative z-10 w-full max-w-sm rounded-lg bg-popover shadow-[0_0_0_1px_rgb(255_255_255/0.06),0_24px_48px_-8px_rgb(0_0_0/0.45)]">
-  <form onSubmit={handleSubmit}>
-    <div className="flex items-center justify-between px-4 py-3 border-b soft-divider">
-      <h3 className="text-sm font-semibold">New Group</h3>
-      <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"><X className="size-4" /></button>
-    </div>
-    <div className="flex flex-col gap-3 px-4 py-3">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Name *</span>
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Description</span>
-        <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Primary wallets owned by personas" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
-      </label>
-    </div>
-    <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
-      <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
-      <Button size="sm" type="submit" disabled={!name.trim()}>Create</Button>
-    </div>
-  </form>
-</div>
-    </div>
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="New Group"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button size="sm" type="submit" form="add-group-form" disabled={!name.trim()}>Create</Button>
+        </>
+      }
+    >
+      <form id="add-group-form" onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Name *</span>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Description</span>
+          <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Primary wallets owned by personas" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+        </label>
+      </form>
+    </AppModal>
   );
 }
 
@@ -1294,8 +1311,7 @@ function EditGroupDialog({ group, onClose, onSave }: { group: UIGroup | null; on
     setDescription(group?.description ?? "");
   }, [group]);
 
-  if (!group) return null;
-  const groupId = group.id;
+  const groupId = group?.id;
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -1304,31 +1320,28 @@ function EditGroupDialog({ group, onClose, onSave }: { group: UIGroup | null; on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm rounded-lg bg-popover shadow-[0_0_0_1px_rgb(255_255_255/0.06),0_24px_48px_-8px_rgb(0_0_0/0.45)]">
-        <form onSubmit={handleSubmit}>
-          <div className="flex items-center justify-between px-4 py-3 border-b soft-divider">
-            <h3 className="text-sm font-semibold">Edit Group</h3>
-            <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"><X className="size-4" /></button>
-          </div>
-          <div className="flex flex-col gap-3 px-4 py-3">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Name *</span>
-              <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Description</span>
-              <input type="text" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Primary wallets owned by personas" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
-            </label>
-          </div>
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
-            <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
-            <Button size="sm" type="submit" disabled={!name.trim()}>Save</Button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <AppModal
+      open={Boolean(group)}
+      onClose={onClose}
+      title="Edit Group"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button size="sm" type="submit" form="edit-group-form" disabled={!name.trim() || !groupId}>Save</Button>
+        </>
+      }
+    >
+      <form id="edit-group-form" onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Name *</span>
+          <input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Main" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Description</span>
+          <input type="text" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Primary wallets owned by personas" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+        </label>
+      </form>
+    </AppModal>
   );
 }
 
@@ -1393,8 +1406,6 @@ function AddAccountDialog({ open, onClose, onCreate }: { open: boolean; onClose:
   const [discordUsername, setDiscordUsername] = useState("");
   const [email, setEmail] = useState("");
 
-  if (!open) return null;
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!label.trim()) return;
@@ -1406,38 +1417,35 @@ function AddAccountDialog({ open, onClose, onCreate }: { open: boolean; onClose:
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm rounded-lg bg-popover shadow-[0_0_0_1px_rgb(255_255_255/0.06),0_24px_48px_-8px_rgb(0_0_0/0.45)]">
-        <form onSubmit={handleSubmit}>
-          <div className="flex items-center justify-between px-4 py-3 border-b soft-divider">
-            <h3 className="text-sm font-semibold">New Account</h3>
-            <button type="button" onClick={onClose} className="rounded-full p-1 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"><X className="size-4" /></button>
-          </div>
-          <div className="flex flex-col gap-3 px-4 py-3">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Label *</span>
-              <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Moree" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">X Username</span>
-              <input type="text" value={xUsername} onChange={(e) => setXUsername(e.target.value)} placeholder="@handle" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Discord Username</span>
-              <input type="text" value={discordUsername} onChange={(e) => setDiscordUsername(e.target.value)} placeholder="user.name" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Email</span>
-              <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
-            </label>
-          </div>
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t soft-divider">
-            <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
-            <Button size="sm" type="submit" disabled={!label.trim()}>Create</Button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="New Account"
+      footer={
+        <>
+          <Button variant="secondary" size="sm" type="button" onClick={onClose}>Cancel</Button>
+          <Button size="sm" type="submit" form="add-account-form" disabled={!label.trim()}>Create</Button>
+        </>
+      }
+    >
+      <form id="add-account-form" onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Label *</span>
+          <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Moree" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" autoFocus />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">X Username</span>
+          <input type="text" value={xUsername} onChange={(e) => setXUsername(e.target.value)} placeholder="@handle" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Discord Username</span>
+          <input type="text" value={discordUsername} onChange={(e) => setDiscordUsername(e.target.value)} placeholder="user.name" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Email</span>
+          <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-8 rounded-md bg-white/[0.05] px-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20" />
+        </label>
+      </form>
+    </AppModal>
   );
 }

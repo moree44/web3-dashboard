@@ -168,7 +168,7 @@ export function TaskDetailPanel({ task, projects, busy, onClose, onSave, onDelet
           {confirmDelete ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Delete permanently?</span>
-              <Button type="button" variant="destructive" size="sm" disabled={busy} onClick={() => void onDelete()}>Confirm</Button>
+              <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => void onDelete()}>Confirm</Button>
               <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmDelete(false)}>Cancel</Button>
             </div>
           ) : (

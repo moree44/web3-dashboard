@@ -9,6 +9,8 @@ import { createPortal } from "react-dom";
 import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Badge } from "@/components/ui/badge";
 import { AppDatePicker } from "@/components/ui/app-date-picker";
+import { AppFloatingPanel } from "@/components/ui/app-floating-panel";
+import { AppModal } from "@/components/ui/app-modal";
 import { Button } from "@/components/ui/button";
 import { AppSelect } from "@/components/ui/app-select";
 import { ConfirmDelete } from "@/components/ui/confirm-delete";
@@ -22,6 +24,7 @@ import {
   type ProjectWithAccounts,
   type ProjectsWorkspaceData,
 } from "@/features/projects/actions";
+import { projectDeleteLinkedMessage } from "@/features/projects/project-delete-message";
 import { useProjectsMutations, useProjectsWorkspace } from "@/features/projects/projects-query";
 import type { ProjectAssignmentInput, ProjectWalletDraft } from "@/features/projects/project-schema";
 import type { projects as projectsSchema } from "@/lib/db/schema";
@@ -157,6 +160,7 @@ export function ProjectsPreview({
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [archiveProjectId, setArchiveProjectId] = useState<string | null>(null);
   const [notice, setNotice] = useState<CornerToastNotice | null>(null);
   const { data: queryData } = useProjectsWorkspace(initialData, developmentPreview);
   const workspace = queryData ?? initialData;
@@ -254,16 +258,12 @@ export function ProjectsPreview({
     setIsAddOpen(false);
   }
 
-  async function handleArchiveProject(id: string) {
-    const reason = window.prompt(
-      "Archive reason: claimed, dropped, scam_risk, expired, not_worth, duplicate, completed, or other",
-      "completed",
-    )?.trim().toLowerCase();
-    if (!reason) return;
-    if (!ARCHIVE_REASONS.includes(reason as (typeof ARCHIVE_REASONS)[number])) {
-      window.alert("Choose a valid archive reason: " + ARCHIVE_REASONS.join(", "));
-      return;
-    }
+  function requestArchiveProject(id: string) {
+    clearNotice();
+    setArchiveProjectId(id);
+  }
+
+  async function handleArchiveProject(id: string, reason: (typeof ARCHIVE_REASONS)[number]) {
     try {
       await mutations.archiveProjectMutation.mutateAsync({ id, reason });
     } catch {
@@ -271,6 +271,7 @@ export function ProjectsPreview({
       // drawer open so the user can retry.
       return;
     }
+    setArchiveProjectId(null);
     setSelectedProjectId(null);
   }
 
@@ -286,7 +287,7 @@ export function ProjectsPreview({
         showNotice(
           "error",
           "Still linked",
-          "Detach links, then delete project only.",
+          projectDeleteLinkedMessage(message),
           <ConfirmDelete
             onConfirm={() => handleDeleteProject(candidate.id, { forceUnlink: true })}
             label="Detach + delete"
@@ -352,7 +353,19 @@ export function ProjectsPreview({
             onChange={(stage) => updateUrl({ stage })}
             className="w-[150px] shrink-0"
           />
-          <div className="relative"><button type="button" onClick={() => setFiltersOpen((open) => !open)} className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.055] px-3 text-xs text-muted-foreground"><SlidersHorizontal className="size-3.5" />More filters</button>{filtersOpen ? <div className="absolute left-0 top-10 z-40 grid w-64 gap-3 rounded-xl border border-white/[0.08] bg-[#18181a] p-3 shadow-2xl">
+          <AppFloatingPanel
+            open={filtersOpen}
+            onOpenChange={setFiltersOpen}
+            ariaLabel="Project filters"
+            align="start"
+            width={256}
+            panelClassName="grid gap-3 p-3"
+            trigger={({ ref, open, toggle }) => (
+              <button ref={ref} type="button" onClick={toggle} aria-expanded={open} className="flex h-8 items-center gap-2 rounded-lg border border-white/[0.055] px-3 text-xs text-muted-foreground transition-[background-color,color,transform] duration-150 hover:bg-white/[0.055] hover:text-foreground active:scale-[0.97]">
+                <SlidersHorizontal className="size-3.5" />More filters
+              </button>
+            )}
+          >
             <AppSelect
               label="Priority"
               value={queryState.priority}
@@ -370,7 +383,7 @@ export function ProjectsPreview({
               <AppDatePicker label="To" value={queryState.dateTo} onChange={(dateTo) => updateUrl({ dateTo })} size="xs" />
             </div>
             <button type="button" onClick={() => updateUrl({ priority: null, account: null, dateFrom: null, dateTo: null })} className="text-left text-xs text-muted-foreground hover:text-foreground">Clear filters</button>
-          </div> : null}</div>
+          </AppFloatingPanel>
           <span className="hidden flex-1 lg:block" />
           <AppSelect
             ariaLabel="Sort projects"
@@ -385,19 +398,46 @@ export function ProjectsPreview({
             }}
             className="w-[190px] shrink-0"
           />
-          <div className="relative"><button type="button" onClick={() => setColumnsOpen((open) => !open)} className="grid size-8 place-items-center rounded-lg border border-white/[0.055] text-muted-foreground" aria-label="Choose columns"><Columns3 className="size-3.5" /></button>{columnsOpen ? <div className="absolute right-0 top-10 z-40 w-44 rounded-xl border border-white/[0.08] bg-[#18181a] p-2 shadow-2xl">{PROJECT_COLUMNS.map((column) => <label key={column} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-white/[0.04]"><input type="checkbox" checked={visibleColumns.has(column)} onChange={() => { const next = visibleColumns.has(column) ? queryState.columns.filter((item) => item !== column) : [...queryState.columns, column]; updateUrl({ columns: next.length === PROJECT_COLUMNS.length ? null : next.length === 0 ? "none" : next.join(",") }); }} />{columnLabels[column]}</label>)}</div> : null}</div>
+          <AppFloatingPanel
+            open={columnsOpen}
+            onOpenChange={setColumnsOpen}
+            ariaLabel="Project columns"
+            width={176}
+            panelClassName="p-2"
+            trigger={({ ref, open, toggle }) => (
+              <button ref={ref} type="button" onClick={toggle} aria-expanded={open} className="grid size-8 place-items-center rounded-lg border border-white/[0.055] text-muted-foreground transition-[background-color,color,transform] duration-150 hover:bg-white/[0.055] hover:text-foreground active:scale-[0.97]" aria-label="Choose columns">
+                <Columns3 className="size-3.5" />
+              </button>
+            )}
+          >
+            {PROJECT_COLUMNS.map((column) => (
+              <label key={column} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-foreground hover:bg-white/[0.055]">
+                <input type="checkbox" checked={visibleColumns.has(column)} onChange={() => { const next = visibleColumns.has(column) ? queryState.columns.filter((item) => item !== column) : [...queryState.columns, column]; updateUrl({ columns: next.length === PROJECT_COLUMNS.length ? null : next.length === 0 ? "none" : next.join(",") }); }} />
+                {columnLabels[column]}
+              </label>
+            ))}
+          </AppFloatingPanel>
         </div>
       </div>
 
       <div className="hidden overflow-x-auto lg:block"><table className="w-full min-w-[1120px] table-fixed border-collapse text-left"><colgroup><col className="w-[300px]" />{visibleColumns.has("status") && <col className="w-[115px]" />}{visibleColumns.has("priority") && <col className="w-[110px]" />}{visibleColumns.has("work") && <col className="w-[180px]" />}{visibleColumns.has("type") && <col className="w-[150px]" />}{visibleColumns.has("accounts") && <col className="w-[110px]" />}{visibleColumns.has("completion") && <col className="w-[140px]" />}{visibleColumns.has("date") && <col className="w-[105px]" />}<col className="w-[48px]" /></colgroup>
         <thead className="sticky top-0 z-10 bg-background text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground"><tr><th className="sticky left-0 z-20 border-b border-white/[0.045] bg-background px-4 py-3 lg:px-8">Project</th>{PROJECT_COLUMNS.map((column) => visibleColumns.has(column) ? <th key={column} className="border-b border-white/[0.045] px-3 py-3">{columnLabels[column]}</th> : null)}<th className="border-b border-white/[0.045] px-3 py-3"><span className="sr-only">Actions</span></th></tr></thead>
-        <tbody>{visibleProjects.map((project, index) => <ProjectRow key={project.id ?? `${project.name}-${index}`} project={project} visibleColumns={visibleColumns} onOpen={() => setSelectedProjectId(project.id ?? null)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</tbody>
+        <tbody>{visibleProjects.map((project, index) => <ProjectRow key={project.id ?? `${project.name}-${index}`} project={project} visibleColumns={visibleColumns} onOpen={() => setSelectedProjectId(project.id ?? null)} onArchive={requestArchiveProject} onDelete={handleDeleteProject} />)}</tbody>
       </table></div>
-      <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project, index) => <ProjectCard key={project.id ?? `${project.name}-${index}`} project={project} onOpen={() => setSelectedProjectId(project.id ?? null)} onArchive={handleArchiveProject} onDelete={handleDeleteProject} />)}</div>
+      <div className="divide-y divide-white/[0.045] lg:hidden">{visibleProjects.map((project, index) => <ProjectCard key={project.id ?? `${project.name}-${index}`} project={project} onOpen={() => setSelectedProjectId(project.id ?? null)} onArchive={requestArchiveProject} onDelete={handleDeleteProject} />)}</div>
       <div className="flex min-h-12 items-center justify-between px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8"><span>Showing {filteredProjects.length} {filteredProjects.length === 1 ? "project" : "projects"}</span><div className="flex items-center gap-2"><AppSelect ariaLabel="Projects per page" value={String(queryState.pageSize)} options={[{ value: "10", label: "10 per page" }, { value: "25", label: "25 per page" }, { value: "50", label: "50 per page" }]} onChange={(pageSize) => updateUrl({ pageSize, page: 1 }, true)} className="w-[120px]" size="xs" /><Button variant="secondary" size="sm" disabled={currentPage <= 1} onClick={() => updateUrl({ page: currentPage - 1 }, true)}>Previous</Button><span>{currentPage} / {totalPages}</span><Button variant="secondary" size="sm" disabled={currentPage >= totalPages} onClick={() => updateUrl({ page: currentPage + 1 }, true)}>Next</Button></div></div>
 
       <AddProjectDialog open={isAddOpen} onClose={() => setIsAddOpen(false)} onCreate={handleCreateProject} accountOptions={availableAccountOptions} walletOptions={availableWalletOptions} />
-      <ProjectDetailPanel project={selectedProject} onClose={() => setSelectedProjectId(null)} onUpdate={handleUpdateProject} onLogoUploaded={handleLogoUploaded} onArchive={handleArchiveProject} onDelete={handleDeleteProject} accountOptions={availableAccountOptions} walletOptions={availableWalletOptions} />
+      <ProjectDetailPanel project={selectedProject} onClose={() => setSelectedProjectId(null)} onUpdate={handleUpdateProject} onLogoUploaded={handleLogoUploaded} onArchive={requestArchiveProject} onDelete={handleDeleteProject} onUploadError={(message) => showNotice("error", "Upload failed", message)} accountOptions={availableAccountOptions} walletOptions={availableWalletOptions} />
+      <ArchiveProjectDialog
+        projectName={projectItems.find((item) => item.id === archiveProjectId)?.name ?? ""}
+        open={Boolean(archiveProjectId)}
+        busy={mutations.archiveProjectMutation.isPending}
+        onClose={() => setArchiveProjectId(null)}
+        onConfirm={(reason) => {
+          if (archiveProjectId) void handleArchiveProject(archiveProjectId, reason);
+        }}
+      />
     </div>
   );
 }
@@ -424,30 +464,6 @@ function ProjectRow({
   onDelete: ProjectDeleteHandler;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 });
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const closeMenu = () => setMenuOpen(false);
-    window.addEventListener("resize", closeMenu);
-    window.addEventListener("scroll", closeMenu, true);
-    return () => {
-      window.removeEventListener("resize", closeMenu);
-      window.removeEventListener("scroll", closeMenu, true);
-    };
-  }, [menuOpen]);
-
-  function toggleMenu() {
-    const button = menuButtonRef.current;
-    if (!button) return;
-    const rect = button.getBoundingClientRect();
-    setMenuPosition({
-      left: Math.max(12, rect.right - 176),
-      top: Math.min(window.innerHeight - 104, rect.bottom + 6),
-    });
-    setMenuOpen((open) => !open);
-  }
 
   return (
     <tr className="row-enter-in group h-[58px] align-middle border-b border-white/[0.035] hover:bg-white/[0.025]">
@@ -463,14 +479,18 @@ function ProjectRow({
       {visibleColumns.has("date") ? <td className="whitespace-nowrap px-3 text-xs text-foreground">{project.date}</td> : null}
       <td className="px-3">
         <div className="flex justify-end">
-          <button ref={menuButtonRef} onClick={(event) => { event.stopPropagation(); toggleMenu(); }} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground" aria-label={"More options for " + project.name}><MoreHorizontal className="size-4" /></button>
-          {menuOpen && typeof document !== "undefined" ? createPortal(
-            <div className="fixed z-[100] w-44 rounded-xl border border-white/[0.08] bg-[#18181a]/[0.98] p-1 shadow-2xl shadow-black/45" style={menuPosition} onClick={(event) => event.stopPropagation()}>
-              <button onClick={() => { setMenuOpen(false); if (project.id) onArchive(project.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
+          <AppFloatingPanel
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            ariaLabel={"Project actions for " + project.name}
+            width={176}
+            trigger={({ ref, open, toggle }) => (
+              <button ref={ref} onClick={(event) => { event.stopPropagation(); toggle(); }} aria-expanded={open} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground" aria-label={"More options for " + project.name}><MoreHorizontal className="size-4" /></button>
+            )}
+          >
+              <button role="menuitem" onClick={() => { setMenuOpen(false); if (project.id) onArchive(project.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
               <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (project.id) onDelete(project.id); }} label="Delete permanently"><Trash2 className="size-3.5" /></ConfirmDelete>
-            </div>,
-            document.body,
-          ) : null}
+          </AppFloatingPanel>
         </div>
       </td>
     </tr>
@@ -797,15 +817,18 @@ function ProjectCard({
     <article className="row-enter-in px-4 py-4 hover:bg-accent/25 sm:px-6">
       <div className="flex items-start justify-between gap-3">
         <ProjectIdentity project={project} onOpen={onOpen} />
-        <div className="relative">
-          <button onClick={(event) => { event.stopPropagation(); setMenuOpen(!menuOpen); }} aria-label={"More options for " + project.name}><MoreHorizontal className="size-4 text-muted-foreground" /></button>
-          {menuOpen ? (
-            <div className="absolute right-0 top-8 z-50 w-44 rounded-xl border border-white/[0.08] bg-[#18181a] p-1 shadow-xl">
-              <button onClick={(event) => { event.stopPropagation(); setMenuOpen(false); if (project.id) onArchive(project.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
+        <AppFloatingPanel
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          ariaLabel={"Project actions for " + project.name}
+          width={176}
+          trigger={({ ref, open, toggle }) => (
+            <button ref={ref} onClick={(event) => { event.stopPropagation(); toggle(); }} aria-expanded={open} className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.045] hover:text-foreground" aria-label={"More options for " + project.name}><MoreHorizontal className="size-4" /></button>
+          )}
+        >
+              <button role="menuitem" onClick={(event) => { event.stopPropagation(); setMenuOpen(false); if (project.id) onArchive(project.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
               <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (project.id) onDelete(project.id); }} label="Delete permanently"><Trash2 className="size-3.5" /></ConfirmDelete>
-            </div>
-          ) : null}
-        </div>
+        </AppFloatingPanel>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2"><Badge variant={statusVariant(project.status)}>{project.status}</Badge><Priority value={project.priority} /><AccountAvatarGroup accounts={project.accounts} accountDetails={project.accountDetails} /></div>
       <div className="mt-3 flex flex-wrap gap-1"><Tags tags={project.work} strong max={3} /><Tags tags={project.type} max={2} /></div>
@@ -821,6 +844,7 @@ function ProjectDetailPanel({
   onLogoUploaded,
   onArchive,
   onDelete,
+  onUploadError,
   accountOptions,
   walletOptions,
 }: {
@@ -834,6 +858,7 @@ function ProjectDetailPanel({
   onLogoUploaded: (id: string, formData: FormData) => Promise<void>;
   onArchive: (id: string) => void;
   onDelete: ProjectDeleteHandler;
+  onUploadError: (message: string) => void;
   accountOptions: ProjectAccountOption[];
   walletOptions: ProjectWalletOption[];
 }) {
@@ -957,7 +982,7 @@ function ProjectDetailPanel({
       await onLogoUploaded(p.id, formData);
       setEditLogoPreview("");
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Unable to upload logo");
+      onUploadError(error instanceof Error ? error.message : "Unable to upload logo");
     } finally {
       setIsUploadingLogo(false);
     }
@@ -1012,15 +1037,18 @@ function ProjectDetailPanel({
             <h2 id="project-detail-title" className="truncate text-base font-semibold">{p.name}</h2>
           </div>
           <div className="flex items-center gap-1">
-            <div className="relative">
-              <button onClick={() => setMenuOpen(!menuOpen)} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="More options"><MoreHorizontal className="size-4" /></button>
-              {menuOpen ? (
-                <div className="absolute right-0 top-10 z-50 w-44 rounded-lg border border-white/[0.08] bg-[#161618] py-1 shadow-xl">
-                  <button onClick={() => { setMenuOpen(false); if (p.id) onArchive(p.id); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
-                  <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (p.id) onDelete(p.id); }} label="Delete permanently" className="px-3 py-1.5"><Trash2 className="size-3.5" /></ConfirmDelete>
-                </div>
-              ) : null}
-            </div>
+            <AppFloatingPanel
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              ariaLabel={"Project actions for " + p.name}
+              width={176}
+              trigger={({ ref, open, toggle }) => (
+                <button ref={ref} onClick={toggle} aria-expanded={open} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="More options"><MoreHorizontal className="size-4" /></button>
+              )}
+            >
+              <button role="menuitem" onClick={() => { setMenuOpen(false); if (p.id) onArchive(p.id); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-[#c8cdd5] hover:bg-white/[0.055]"><Archive className="size-3.5" />Archive</button>
+              <ConfirmDelete onConfirm={() => { setMenuOpen(false); if (p.id) onDelete(p.id); }} label="Delete permanently"><Trash2 className="size-3.5" /></ConfirmDelete>
+            </AppFloatingPanel>
             <button onClick={onClose} className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close project detail"><X className="size-4" /></button>
           </div>
         </div>
@@ -1272,6 +1300,58 @@ function ProjectDetailPanel({
 
 function Property({ label, children }: { label: string; children: ReactNode }) {
   return <div><p className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p><div className="mt-1 flex min-h-[22px] items-center text-xs text-foreground">{children}</div></div>;
+}
+
+function ArchiveProjectDialog({
+  open,
+  projectName,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  projectName: string;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: (reason: (typeof ARCHIVE_REASONS)[number]) => void;
+}) {
+  const [reason, setReason] = useState<(typeof ARCHIVE_REASONS)[number]>("completed");
+
+  useEffect(() => {
+    if (open) setReason("completed");
+  }, [open]);
+
+  return (
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="Archive project"
+      description={projectName ? projectName : "Move this project out of the active table."}
+      closeDisabled={busy}
+      footer={
+        <>
+          <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={onClose}>Cancel</Button>
+          <Button type="button" size="sm" disabled={busy} onClick={() => onConfirm(reason)}>{busy ? "Archiving..." : "Archive"}</Button>
+        </>
+      }
+    >
+      <AppSelect
+        label="Reason"
+        value={reason}
+        options={ARCHIVE_REASONS.map((value) => ({ value, label: formatArchiveReason(value) }))}
+        onChange={(value) => setReason(value as (typeof ARCHIVE_REASONS)[number])}
+      />
+      <p className="mt-3 text-[11px] leading-5 text-muted-foreground">Archived projects stay available in Archive and can be restored later.</p>
+    </AppModal>
+  );
+}
+
+function formatArchiveReason(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function PropertyBlock({ label, children }: { label: string; children: ReactNode }) {

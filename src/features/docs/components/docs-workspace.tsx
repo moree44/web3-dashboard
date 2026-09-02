@@ -149,7 +149,7 @@ export function DocsWorkspace({ initialData, developmentPreview = false }: { ini
         <input aria-label="Search docs" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground" placeholder="Search docs, folders, project references, or links..." />
       </div>
     </section>
-    {developmentPreview ? <p className="mt-4 rounded-lg bg-info/10 px-3 py-2 text-xs text-info">Preview mode uses no persisted Docs. Configure Supabase to create and edit documents.</p> : null}
+    {developmentPreview ? <p className="mt-4 rounded-lg border border-white/[0.065] bg-white/[0.025] px-3 py-2 text-xs text-muted-foreground">Preview mode uses no persisted Docs. Configure Supabase to create and edit documents.</p> : null}
     <CornerToast notice={notice} onClose={clearNotice} />
 
     <section className="soft-panel mt-4 grid min-h-[560px] overflow-hidden rounded-xl border soft-divider bg-card xl:min-h-[calc(100vh-238px)] xl:grid-cols-[260px_minmax(0,1fr)_320px]">

@@ -116,7 +116,7 @@ export function DailyWorkspace({ initialData, developmentPreview = false }: { in
           <button type="button" onClick={() => setHideDone((current) => !current)} className={cn("h-7 rounded-md px-3 text-xs hover:bg-accent hover:text-foreground", hideDone ? "bg-accent text-foreground" : "text-muted-foreground")}>{hideDone ? "Show done" : "Hide done"}</button>
         </div>
       </div>
-      {developmentPreview ? <p className="mt-4 rounded-lg bg-info/10 px-3 py-2 text-xs text-info">Preview mode uses sample Tasks. Daily log persistence is available after Supabase is configured.</p> : null}
+      {developmentPreview ? <p className="mt-4 rounded-lg border border-white/[0.065] bg-white/[0.025] px-3 py-2 text-xs text-muted-foreground">Preview mode uses sample Tasks. Daily log persistence is available after Supabase is configured.</p> : null}
       {visiblePersonalItems.length > 0 ? (
         <PersonalItemsCard
           items={visiblePersonalItems}

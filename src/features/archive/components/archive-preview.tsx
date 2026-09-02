@@ -4,6 +4,7 @@ import { Archive, CalendarClock, RotateCcw, Search, ShieldAlert, Trash2 } from "
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { ProjectWithAccounts } from "@/features/projects/actions";
+import { projectDeleteLinkedMessage } from "@/features/projects/project-delete-message";
 import { useArchiveMutations, useArchiveWorkspace } from "@/features/archive/archive-query";
 
 import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
@@ -182,7 +183,7 @@ export function ArchivePreview({ initialProjects = [], developmentPreview = fals
         showNotice(
           "error",
           "Still linked",
-          "Detach links, then delete project only.",
+          projectDeleteLinkedMessage(message),
           <ConfirmDelete
             onConfirm={() => void permanentlyDelete(project, { forceUnlink: true })}
             label="Detach + delete"

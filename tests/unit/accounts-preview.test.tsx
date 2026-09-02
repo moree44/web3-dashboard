@@ -51,7 +51,7 @@ describe("AccountsPreview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     await waitFor(() => expect(screen.getAllByText("Test Hunt").length).toBeGreaterThan(0));
-    expect(screen.queryByRole("heading", { name: "New Account" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "New Account" })).not.toBeInTheDocument());
   });
 
   it("edits an account label through the detail drawer in development preview", async () => {
@@ -94,6 +94,6 @@ describe("AccountsPreview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
     await waitFor(() => expect(screen.getAllByText("Sol Burner").length).toBeGreaterThan(0));
-    expect(screen.queryByRole("heading", { name: "New Wallet" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "New Wallet" })).not.toBeInTheDocument());
   });
 });

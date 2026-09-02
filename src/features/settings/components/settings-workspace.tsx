@@ -52,7 +52,7 @@ export function SettingsWorkspace({ initialData, developmentPreview = false }: {
         <Button variant="secondary" size="sm" onClick={save} disabled={developmentPreview || isPending || !displayName.trim() || !workspaceName.trim()}>{isPending ? "Saving..." : "Save changes"}</Button>
       </header>
 
-      {developmentPreview ? <p className="mx-4 mt-4 rounded-lg bg-info/10 px-3 py-2 text-xs text-info sm:mx-6 lg:mx-8">Preview mode uses sample settings. Persistence is available after Supabase is configured.</p> : null}
+      {developmentPreview ? <p className="mx-4 mt-4 rounded-lg border border-white/[0.065] bg-white/[0.025] px-3 py-2 text-xs text-muted-foreground sm:mx-6 lg:mx-8">Preview mode uses sample settings. Persistence is available after Supabase is configured.</p> : null}
       <CornerToast notice={notice} onClose={clearNotice} />
 
       <div className="grid gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8">

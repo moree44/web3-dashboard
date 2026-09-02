@@ -139,7 +139,8 @@ describe("ProjectsPreview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Detach + delete" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Linked: 1 tasks.")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Detach + delete" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Detach + delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
