@@ -1,23 +1,23 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-08-12
+Last updated: 2026-09-01
 
 ## Current Position
 
-Web3 Hunting OS is in **Phase 1 Core, CRUD wired + Track D React Query**.
+Web3 Hunting OS is in **Phase 1 Core, CRUD wired + production smoothness pass**.
 
 The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
 
 **Data foundation is in place:** Drizzle ORM schema (22 tables), 17 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0016_add_project_watchlist.sql have been applied to the live database. Migration 0017_add_docs_folders.sql has been applied to the live database. The current live 22-table schema has RLS enabled on every application table, including the Docs folder catalog. **CRUD server actions now exist for Projects, Project Watchlist, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
 
-Gmail remains Phase 2 because it requires OAuth and an email connector. Settings basic profile/workspace CRUD and Personal Items persistence are now live. Core Dashboard Quick Capture, overview metrics, and Hunting Pulse categories now read live workspace data. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme.
+Gmail remains Phase 2 because it requires OAuth and an email connector. Settings basic profile/workspace CRUD and Personal Items persistence are now live. Core Dashboard Quick Capture, overview metrics, and Hunting Pulse categories now read live workspace data. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme. The latest production pass tightened serverless database pooling, disabled sidebar viewport prefetch storms, added compact route skeleton delay, moved feature mutation failures into compact bottom-right monochrome toasts, and made Tasks/Projects create flows optimistic with rollback.
 
 ## Active Source of Truth
 
 Read these before major work:
 
 1. PRD.MD — product behavior, scope, phasing, data model, implementation order (v3.4)
-2. DESIGN.md — visual direction, layout, density, spacing, interaction tone (v2.16)
+2. DESIGN.md — visual direction, layout, density, spacing, interaction tone (v2.17)
 3. `PROJECT_STATUS.md` — implementation state only (this file)
 4. `AGENTS.md` — contributor workflow guidance
 
@@ -37,6 +37,8 @@ PRD v3.4 supersedes v3.3 and older decisions.
 - TypeScript narrowing fix: `const p = project;` after early `if (!project) return null;` for closures
 - Verify database migrations against the live database, not only by checking that a SQL file exists
 - In Storage policies, qualify the file path as `storage.objects.name`; unqualified `name` can bind to `workspaces.name` inside a subquery
+- Sidebar and mobile navigation use `NavLink` with viewport prefetch disabled; only hover/touch should manually prefetch the target route
+- User-facing mutation errors should use compact bottom-right `CornerToast` notifications, not page-level red banners
 
 ## PRD v3.4 Alignment Notes
 
@@ -65,6 +67,7 @@ Current implementation should align with:
 - Open desktop-style shell: fixed sidebar + independently scrollable main workspace
 - Sidebar routes: Dashboard, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Deadlines, Tasks, Accounts, Archive, Settings, inactive Trading
 - Projects parent links to `/projects`; Watchlist, NFTs, Daily, Deadlines, and Tasks are nested below
+- Sidebar and mobile nav links opt out of automatic viewport prefetch to avoid production request storms from always-visible navigation; hover and touch still warm the intended route
 - Mobile nav exists but is secondary
 
 ### Data Foundation
@@ -256,7 +259,7 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Marking a Task Done records `completed_at`; reopening clears it, and the UI derives human completion duration from Start date
 - Personal Item creation, completion toggle, and delete now persist through the workspace-scoped Personal Items table
 - Task Logs are persisted through the Daily execution surface; Activity Logs remain separate
-- **TanStack Query + optimistic UI pilot (2026-08-04):** Tasks and Personal Items now run through React Query instead of blocking `await serverAction() → setState`. Status change, edit save, delete, and Personal Item mutations apply optimistically (UI updates instantly, server syncs in background, rollback on error). Task creation stays commit-waiting ("Creating..." until the server returns) so the direct-SQL e2e smoke never races the insert. Cache is keyed `["tasks"]`; preview mode never refetches, real mode refetches on mount (`staleTime 0`) to reconcile with fresh RSC initialData.
+- **TanStack Query + optimistic UI:** Tasks and Personal Items run through React Query instead of blocking `await serverAction() → setState`. Quick Add, detailed Task create, status change, edit save, delete, and Personal Item mutations apply optimistically where safe (UI updates instantly, server syncs in background, rollback on error). Cache is keyed `["tasks"]`; preview mode never refetches, real mode refetches on mount (`staleTime 0`) to reconcile with fresh RSC initialData.
 
 ### Daily — persisted execution
 
@@ -307,9 +310,9 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 
 | Area | Rough size | CRUD Status |
 | --- | --- | --- |
-| `tasks-preview.tsx` | ~330 lines | CRUD wired; Personal Item CRUD is persisted; React Query + optimistic mutations (`tasks-query.ts` holds the hooks) |
+| `tasks-preview.tsx` | ~330 lines | CRUD wired; Personal Item CRUD is persisted; React Query + optimistic create/edit/status/delete mutations (`tasks-query.ts` holds the hooks) |
 | `accounts-preview.tsx` | ~1600+ lines | CRUD wired (identities, wallets, groups); React Query + optimistic mutations (`accounts-query.ts` holds the hooks) |
-| `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation; React Query + optimistic mutations (`projects-query.ts` holds the hooks) |
+| `projects-preview.tsx` | ~2100+ lines | CRUD wired + logo upload + Account/Wallet assignment + custom-chain Wallet creation; React Query + optimistic create/edit/archive/delete mutations (`projects-query.ts` holds the hooks) |
 | `nfts-preview.tsx` | ~200 lines | CRUD wired; React Query cache (`nfts-query.ts`); dialog still owns create/update/delete server calls |
 | `deadlines-preview.tsx` | ~230 lines | CRUD wired; React Query cache (`deadlines-query.ts`); dialog still owns create/update/delete server calls |
 | `docs-workspace.tsx` | ~250 lines | Docs CRUD wired; explorer folder layout, custom folder create/edit/delete, React Query + commit-waiting save/delete/folder mutations (`docs-query.ts`) |
@@ -317,11 +320,21 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | `archive-preview.tsx` | ~350 lines | CRUD wired (restore, delete); React Query + commit-waiting mutations (`archive-query.ts`); inline two-step delete |
 | `daily-workspace.tsx` | ~350 lines | Task Log + Daily execution; React Query date-scoped cache (`daily-workspace-query.ts`) with optimistic Done/Skip and personal toggle; Motion `layout` on checklist rows |
 
-Unit tests: 18 files, 78 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, Quick Add, detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, and new Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
+Unit tests: 22 files, 89 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, optimistic Quick Add and detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, Projects optimistic create, compact toast behavior, and Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
 
 E2E diagnostics now include focused Accounts/Projects, Project Wallet assignment, NFT Wallet participation, Docs/Daily, Inbox, and a full application smoke suite. The latest focused Project Wallet browser smoke passed login, custom-chain Wallet creation, reload persistence, Project unlink behavior, Wallet survival, cleanup, and captured no console or page errors.
 
 ## Latest Change Batch
+
+The 2026-09-01 production smoothness and notification polish batch includes:
+
+- **Serverless DB pool safety:** production default pool size now avoids the prior `max: 1` bottleneck; `DATABASE_POOL_MAX` remains configurable.
+- **Navigation prefetch control:** `NavLink` disables automatic viewport prefetch in sidebar/mobile nav and prefetches only on hover/touch, reducing route request storms from always-visible navigation.
+- **Route loading polish:** shared route skeletons delay their fade-in slightly to avoid flicker during fast transitions.
+- **Task deletion hardening:** deleting Tasks now clears or unlinks related logs, assignments, deadlines, inbox items, notes, and activity references so linked personal data does not block normal deletion.
+- **Toast notifications:** feature mutation errors use compact bottom-right monochrome `CornerToast` notifications instead of full-width red page banners. Safe project delete copy is short: `Still linked` with `Detach + delete`.
+- **Optimistic create flows:** Tasks Quick Add, detailed Task create, and Project create insert placeholders immediately, then merge the server record on success or roll back on failure.
+- **Validation:** latest local checks passed with `pnpm typecheck`, `pnpm lint`, `pnpm test` (22 files, 89 tests), `pnpm build`, and `git diff --check`. Production deployments for the pushed commits reached `Ready` on Vercel.
 
 The 2026-08-01 Phase 1 Core batch includes:
 
@@ -393,14 +406,14 @@ The 2026-08-04 TanStack Query pilot batch includes:
 
 - `@tanstack/react-query` v5 installed; root layout wrapped with a client `QueryProvider` (defaults: staleTime 5 min, no refetch-on-window-focus, retry 1)
 - New `src/features/tasks/tasks-query.ts` with query keys, pure optimistic record builders (`optimisticTask`, `applyTaskEdit`, `optimisticPersonalItem`), `useTaskWorkspace`, and `useTasksMutations` (create/save/status/delete + Personal Item add/toggle/remove)
-- Tasks and Personal Items refactored from blocking `await serverAction() → setState` to optimistic React Query mutations with cancel-and-snapshot `onMutate`, rollback `onError`, and merge `onSuccess`; create stays commit-waiting for e2e direct-SQL safety
+- Tasks and Personal Items refactored from blocking `await serverAction() → setState` to optimistic React Query mutations with cancel-and-snapshot `onMutate`, rollback `onError`, and merge `onSuccess`
 - Preview mode (`developmentPreview`) uses locally-built records with `staleTime: Infinity` and no invalidation; real mode refetches on mount to reconcile with RSC `initialData`
 - `tasks-preview.tsx` no longer holds task/personal-item state; busy states aggregate mutation `isPending`
 - Unit tests updated with a `QueryClientProvider` render wrapper and preview-mode action mocks; full verification passed (typecheck, lint 0 warnings, 71 unit tests, production build, and both e2e specs)
 
 The 2026-08-06 Projects/Accounts React Query + motion + delete batch includes:
 
-- **Projects React Query** (`src/features/projects/projects-query.ts`, `preview-data.ts`): `getProjectsWorkspaceData` action combines projects, account options, wallet options, and NFT count; page and preview now run entirely through the query cache. Create stays commit-waiting ("Creating..."); edit/archive/delete are optimistic with rollback; logo upload is not optimistic (needs the server publicUrl) and merges on success.
+- **Projects React Query** (`src/features/projects/projects-query.ts`, `preview-data.ts`): `getProjectsWorkspaceData` action combines projects, account options, wallet options, and NFT count; page and preview now run entirely through the query cache. Create/edit/archive/delete are optimistic with rollback; logo upload still waits for the server public URL and merges on success.
 - **Accounts React Query** (`src/features/accounts/accounts-query.ts`, `preview-data.ts`): `getAccountsWorkspaceData` combines accounts, wallets, and wallet groups; accounts/wallets/groups all follow the same create-commit-waiting / update-optimistic / delete-optimistic split, with avatar upload/URL merging on success.
 - **CSS-only motion infrastructure** (`src/lib/use-presence.ts` + `globals.css`): exit keyframes (modal/drawer backdrop + card/panel), dropdown `popup-in` entrance on `AppSelect`/`AppDatePicker` and the Projects hand-rolled dropdowns, and `row-enter-in` row entrance on Projects/Accounts lists. All sit under the existing reduced-motion kill switch. Drawers/modals/dialogs across Projects, Accounts, Tasks, NFTs, Deadlines, and Docs now animate out via the presence hook (Docs editor gained its missing entrance classes).
 - **Standardized inline two-step delete** (`src/components/ui/confirm-delete.tsx`): replaced the remaining native `confirm()` calls in Projects (project delete) and Accounts (account/wallet/group deletes) with an armed "Confirm delete" button that auto-disarms; e2e specs updated to the second click.
@@ -482,6 +495,17 @@ DONE     11. Project Watchlist: dedicated CRUD UI, conversion, Dashboard capture
 ```
 
 ## Validation Status
+
+Production smoothness and compact toast polish checked 2026-09-01:
+
+```txt
+pnpm typecheck  # pass
+pnpm lint       # pass, 0 warnings
+pnpm test       # pass, 22 files and 89 tests
+pnpm build      # pass
+git diff --check  # pass
+Vercel production deployment for latest pushed commits  # Ready
+```
 
 Docs folder polish checked 2026-08-11:
 

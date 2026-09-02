@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.16
-**Status:** Current visual direction for Phase 1, including Project Wallet assignment, NFT wallet participation, and shared Deadline integration
+**Version:** 2.17
+**Status:** Current visual direction for Phase 1, including production smoothness, compact monochrome notifications, Project Wallet assignment, NFT wallet participation, and shared Deadline integration
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -341,6 +341,31 @@ Icon rules:
 
 ---
 
+## 8B. Notifications
+
+Notifications should feel like quiet system feedback, not page-level errors.
+
+Use compact bottom-right toast notifications for mutation errors, success feedback, and retryable actions. Toasts should be:
+
+* monochrome first
+* small enough to scan without covering workspace rows
+* positioned at the bottom-right corner on desktop
+* no wider than about 320px
+* limited to a short title and at most two compact message lines
+* paired with one concise action when needed
+
+Avoid:
+
+* full-width red alert strips for normal mutation failures
+* large semantic-color icon blocks
+* colored left bars for error/success/info states
+* long backend error strings as primary copy
+* stiff copy such as full database relation explanations inside the toast
+
+Safe-delete notifications should use short wording. Prefer `Still linked` with `Detach + delete` over long explanations. Longer detail belongs in logs, confirm dialogs, or developer debugging output, not the toast.
+
+---
+
 ## 9. Navigation
 
 Sidebar is top-level navigation.
@@ -382,6 +407,8 @@ Navigation roles:
 Do not add Project hunt categories to sidebar. Projects may contain workflow children: Watchlist, NFTs, Daily, Deadlines, and Tasks. NFTs is a separate entity and route, not a Project category. The Projects parent is a direct link to the full project table.
 
 Hunt categories stay inside Projects as tabs or filters on the Projects page.
+
+Sidebar and mobile navigation should avoid automatic viewport prefetch for protected dynamic routes. Manual hover/touch prefetch is allowed so intentional navigation still feels quick without triggering a request burst from every visible sidebar item.
 
 Examples:
 

@@ -36,21 +36,12 @@ function FocusRow({ item }: { item: FocusItem }) {
         <span className="flex min-w-0 items-center gap-2"><span className="truncate text-[13px] font-medium">{item.title}</span><span className="hidden text-[11px] text-muted-foreground sm:inline">· {item.meta}</span></span>
         <span className="mt-0.5 block truncate text-[11px] text-muted-foreground sm:hidden">{item.meta}</span>
       </span>
-      <Badge variant={badgeVariant(item.tone)}>{item.project}</Badge>
+      <Badge variant="outline">{item.project}</Badge>
     </button>
   );
 }
 
 function toneClass(tone: FocusItem["tone"]) {
-  if (tone === "danger") return "border-destructive/30 bg-destructive/10 text-destructive";
-  if (tone === "warning") return "border-warning/30 bg-warning/10 text-warning";
-  if (tone === "info") return "border-info/30 bg-info/10 text-info";
-  return "border-success/30 bg-success/10 text-success";
-}
-
-function badgeVariant(tone: FocusItem["tone"]) {
-  if (tone === "danger") return "destructive" as const;
-  if (tone === "warning") return "warning" as const;
-  if (tone === "info") return "info" as const;
-  return "success" as const;
+  void tone;
+  return "border-white/[0.08] bg-white/[0.035] text-muted-foreground";
 }

@@ -287,7 +287,7 @@ export function NftDialog({
                 ) : null}
               </div>
             )}
-            {hasInvalidWallet ? <p role="alert" className="mt-2 text-[10px] text-destructive">Remove wallets that do not match the selected Account or chain before saving.</p> : null}
+            {hasInvalidWallet ? <p role="alert" className="mt-2 text-[10px] text-muted-foreground">Remove wallets that do not match the selected Account or chain before saving.</p> : null}
           </div>
 
           <div className="rounded-xl bg-white/[0.025] p-3 ring-1 ring-white/[0.045]">

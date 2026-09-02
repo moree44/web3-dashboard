@@ -772,7 +772,7 @@ function AccountDetailPanel({
                   <Mail className="size-3.5 shrink-0 text-muted-foreground" />
                   <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-8 flex-1 rounded-md bg-white/[0.05] px-2 text-xs outline-none focus:ring-1 focus:ring-ring" placeholder="email@example.com" />
                 </div>
-                {profileError ? <p className="text-xs text-danger">{profileError}</p> : null}
+                {profileError ? <p className="text-[11px] text-muted-foreground">{profileError}</p> : null}
               </div>
             ) : (
               <div className="space-y-2 text-xs">

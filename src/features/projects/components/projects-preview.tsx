@@ -1139,7 +1139,7 @@ function ProjectDetailPanel({
                 </>
               )}
             </div>
-            {saveError ? <p className="mt-3 text-xs text-danger">{saveError}</p> : null}
+            {saveError ? <p className="mt-3 rounded-lg border border-white/[0.08] bg-white/[0.025] px-2.5 py-1.5 text-[11px] leading-5 text-muted-foreground">{saveError}</p> : null}
           </section>
 
           <section className="mt-4 grid gap-3">
@@ -1385,7 +1385,7 @@ function ProjectWalletPicker({
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
-            {draftError ? <p className="text-[11px] text-danger">{draftError}</p> : <span />}
+            {draftError ? <p className="text-[11px] text-muted-foreground">{draftError}</p> : <span />}
             <div className="flex gap-2"><Button variant="secondary" size="sm" onClick={() => setIsAdding(false)}>Cancel</Button><Button size="sm" onClick={addDraft}>Add wallet</Button></div>
           </div>
         </div>
@@ -1631,7 +1631,7 @@ function AddProjectDialog({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t soft-divider bg-muted/20 px-4 py-2.5">
-          {formError ? <p className="min-w-0 text-xs text-danger">{formError}</p> : <span />}
+          {formError ? <p className="min-w-0 text-[11px] text-muted-foreground">{formError}</p> : <span />}
           <div className="flex shrink-0 gap-2">
             <Button variant="secondary" size="sm" onClick={handleClose} disabled={isSubmitting}>Cancel</Button>
             <Button size="sm" className="bg-accent text-foreground hover:bg-white/[0.09]" disabled={!canCreate} onClick={handleCreate}>{isSubmitting ? "Creating..." : "Create project"}</Button>
