@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.17
-**Status:** Current visual direction for Phase 1, including production smoothness, compact monochrome notifications, Project Wallet assignment, NFT wallet participation, and shared Deadline integration
+**Version:** 2.20
+**Status:** Current visual direction for Phase 1, including production smoothness, compact monochrome notifications, PWA app icon branding, Watchlist X metadata import, Project Wallet assignment, NFT X links, custom NFT chains/statuses, NFT wallet participation, and shared Deadline integration
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -338,6 +338,42 @@ Icon rules:
 * semantic color only for state or priority
 * no random colorful icon sets
 * no emoji as primary UI icons
+
+### 8A. App Logo And PWA Icon
+
+The primary app mark is a compact dark rounded-square radar/target icon.
+
+Use it for:
+
+* desktop sidebar brand mark
+* auth screen brand mark
+* browser icons
+* PWA install icons
+* iPhone/Windows app launch surfaces
+
+The app mark should stay:
+
+* compact
+* monochrome first
+* dark charcoal
+* softly raised
+* readable at sidebar size
+* consistent with the dashboard shell
+
+Do not use generated wordmarks inside the product UI. The product text remains rendered by the app using the dashboard typography:
+
+```txt
+Hunting OS
+Private workspace
+```
+
+Avoid:
+
+* glossy logo sheets
+* sci-fi typography
+* neon crypto marks
+* standalone wordmark images in the sidebar
+* text baked into favicon or PWA icons
 
 ---
 
@@ -884,6 +920,8 @@ Quick add from X URL
 
 The quick-add flow should keep X URL as the primary field. Project name is derived from the X handle and remains editable. Thesis, chain, and Project Type are optional details. Do not request or display a custom project logo in Watchlist.
 
+New Watchlist captures may perform one authenticated server-side metadata lookup for the public X profile. Use the public display name and bio as editable Name and Thesis defaults, never overwrite manual values, do not send workspace data or credentials, and keep handle-derived naming as the no-blocking fallback when the provider is unavailable.
+
 Desktop rows should show:
 
 ```txt
@@ -924,6 +962,9 @@ Collection · Chain · Status · Participation · Mint schedule · Action
 Rules:
 
 * use the shared monochrome artwork icon instead of collection initials or logo uploads
+* Collection name may derive from a pasted X profile URL; store and render the X profile link separately from Mint URL
+* linked collection names open their X profile from the list, while the icon or muted campaign detail text opens the edit dialog
+* Chain and lifecycle Status use compact editable dropdowns that support custom add/remove values
 * reuse the assigned Account avatar group and its interactive overflow behavior
 * Participation combines Account avatars with a compact Whitelisted / Wallets summary
 * Add/Edit groups compatible Wallets below each selected Account

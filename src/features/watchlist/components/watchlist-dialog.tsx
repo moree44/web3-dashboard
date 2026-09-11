@@ -1,10 +1,11 @@
 "use client";
 
-import { Plus, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { LoaderCircle, Plus, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Button } from "@/components/ui/button";
+import { lookupWatchlistXProfile } from "@/features/watchlist/actions";
 import { WATCHLIST_PROJECT_TYPES, type WatchlistInput, type WatchlistItemRecord } from "@/features/watchlist/watchlist-types";
 import { cn } from "@/lib/utils";
 import { normalizeHttpUrl } from "@/lib/url";
@@ -31,25 +32,60 @@ export function WatchlistDialog({
   const [chain, setChain] = useState("");
   const [projectTypes, setProjectTypes] = useState<string[]>([]);
   const [customType, setCustomType] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [notice, setNotice] = useState<CornerToastNotice | null>(null);
+  const lookupRequestRef = useRef(0);
+  const lastLookupUrlRef = useRef("");
 
   const clearNotice = useCallback(() => {
     setNotice(null);
   }, []);
 
+  const importXProfile = useCallback(async (rawUrl: string) => {
+    const normalizedUrl = normalizeHttpUrl(rawUrl);
+    if (!normalizedUrl || lastLookupUrlRef.current === normalizedUrl) return;
+
+    lastLookupUrlRef.current = normalizedUrl;
+    const requestId = ++lookupRequestRef.current;
+    setProfileLoading(true);
+
+    try {
+      const profile = await lookupWatchlistXProfile(normalizedUrl);
+      if (lookupRequestRef.current !== requestId) return;
+      setName((current) => current.trim() || profile.name);
+      setThesis((current) => current.trim() || profile.thesis);
+    } catch {
+      if (lookupRequestRef.current === requestId) {
+        lastLookupUrlRef.current = "";
+      }
+    } finally {
+      if (lookupRequestRef.current === requestId) {
+        setProfileLoading(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
+    lookupRequestRef.current += 1;
     if (!open) return;
+    lastLookupUrlRef.current = "";
     setName(item?.name ?? "");
     setXUrl(item?.xUrl ?? initialXUrl);
     setThesis(item?.thesis ?? "");
     setChain(item?.chain ?? "");
     setProjectTypes(item?.projectTypes ?? []);
     setCustomType("");
+    setProfileLoading(false);
     setDeleteArmed(false);
     clearNotice();
   }, [clearNotice, initialXUrl, item, open]);
+
+  useEffect(() => {
+    if (!open || item || !initialXUrl.trim()) return;
+    void importXProfile(initialXUrl);
+  }, [importXProfile, initialXUrl, item, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -63,7 +99,7 @@ export function WatchlistDialog({
   const { mounted, closing } = usePresence(open, 160);
   if (!mounted) return null;
 
-  const canSave = Boolean(xUrl.trim() && (!item || name.trim()) && !busy);
+  const canSave = Boolean(xUrl.trim() && (!item || name.trim()) && !profileLoading && !busy);
 
   function toggleProjectType(value: string) {
     setProjectTypes((current) => current.includes(value)
@@ -144,7 +180,10 @@ export function WatchlistDialog({
 
         <div className="space-y-4 px-5 pb-5">
           <label className="block">
-            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">X profile URL</span>
+            <span className="flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              X profile URL
+              {profileLoading ? <LoaderCircle className="size-3 animate-spin" aria-label="Importing X profile" /> : null}
+            </span>
             <input
               autoFocus
               type="text"
@@ -153,7 +192,19 @@ export function WatchlistDialog({
               autoCorrect="off"
               value={xUrl}
               onChange={(event) => setXUrl(event.target.value)}
-              onBlur={() => setXUrl((value) => normalizeHttpUrl(value))}
+              onPaste={(event) => {
+                const pastedUrl = event.clipboardData.getData("text").trim();
+                if (!pastedUrl) return;
+                event.preventDefault();
+                const normalizedUrl = normalizeHttpUrl(pastedUrl);
+                setXUrl(normalizedUrl);
+                if (!item) void importXProfile(normalizedUrl);
+              }}
+              onBlur={() => {
+                const normalizedUrl = normalizeHttpUrl(xUrl);
+                setXUrl(normalizedUrl);
+                if (!item) void importXProfile(normalizedUrl);
+              }}
               className="mt-1.5 h-10 w-full rounded-lg border border-white/[0.055] bg-input px-3 text-sm outline-none soft-inset placeholder:text-muted-foreground focus:border-ring"
               placeholder="x.com/project"
             />

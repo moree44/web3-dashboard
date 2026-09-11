@@ -38,6 +38,7 @@ describe("NftDialog", () => {
       chain: "Base",
       status: "whitelisted",
       mintUrl: "https://mint.example.com",
+      xUrl: "https://x.com/laptopnfts",
       notes: null,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -53,10 +54,14 @@ describe("NftDialog", () => {
   it("creates an NFT campaign and normalizes its mint URL", async () => {
     const onClose = vi.fn();
     const onSaved = vi.fn();
-    render(<NftDialog open accounts={[account]} wallets={[wallet]} onClose={onClose} onSaved={onSaved} onDeleted={vi.fn()} />);
+    render(<NftDialog open accounts={[account]} wallets={[wallet]} chainOptions={["Base"]} statusOptions={["whitelisted"]} onClose={onClose} onSaved={onSaved} onDeleted={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Collection or campaign name"), { target: { value: "Genesis Pass" } });
-    fireEvent.change(screen.getByPlaceholderText("Ethereum, Solana, Base..."), { target: { value: "Base" } });
+    fireEvent.change(screen.getByPlaceholderText("Collection name or x.com/collection"), { target: { value: "https://x.com/laptopnfts" } });
+    fireEvent.blur(screen.getByPlaceholderText("Collection name or x.com/collection"));
+    fireEvent.click(screen.getByRole("button", { name: "Chain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Base" }));
+    fireEvent.click(screen.getByRole("button", { name: "Status" }));
+    fireEvent.click(screen.getByRole("button", { name: "Whitelist" }));
     fireEvent.click(screen.getByRole("button", { name: "Moree" }));
     fireEvent.click(screen.getByLabelText("Mint date, optional"));
     fireEvent.click(screen.getByRole("button", { name: "Today" }));
@@ -68,8 +73,10 @@ describe("NftDialog", () => {
 
     await waitFor(() => expect(actionMocks.createNftCampaign).toHaveBeenCalledTimes(1));
     expect(actionMocks.createNftCampaign).toHaveBeenCalledWith(expect.objectContaining({
-      name: "Genesis Pass",
+      name: "LaptopNfts",
       chain: "Base",
+      status: "whitelisted",
+      xUrl: "https://x.com/laptopnfts",
       accountIds: [account.id],
       walletAssignments: [{ walletId: wallet.id, status: "planned" }],
       mintTime: "20:00",

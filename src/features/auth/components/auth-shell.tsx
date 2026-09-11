@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Radar } from "lucide-react";
 
+import { AppLogoMark } from "@/components/shared/app-logo-mark";
 import { cn } from "@/lib/utils";
 
 type AuthShellProps = {
@@ -16,9 +16,7 @@ export function AuthShell({ eyebrow, title, description, children, className }: 
     <main className="flex min-h-screen items-center justify-center px-4 py-10 text-foreground">
       <section className={cn("w-full max-w-[420px]", className)}>
         <div className="mb-7">
-          <span className="grid size-11 place-items-center rounded-xl border soft-divider bg-secondary text-foreground">
-            <Radar aria-hidden="true" className="size-5" strokeWidth={1.8} />
-          </span>
+          <AppLogoMark className="size-11" />
           <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{eyebrow}</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-[-0.02em] text-foreground">{title}</h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>

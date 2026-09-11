@@ -14,13 +14,13 @@ import {
   LayoutDashboard,
   ListChecks,
   Sparkles,
-  Radar,
   Settings,
   TrendingUp,
   UsersRound,
 } from "lucide-react";
 
 import { NavLink as Link } from "@/components/layout/nav-link";
+import { AppLogoMark } from "@/components/shared/app-logo-mark";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { cn } from "@/lib/utils";
 
@@ -53,9 +53,7 @@ export function AppSidebar({ active }: { active: AppSection }) {
   return (
     <aside className="hidden h-screen flex-col border-r soft-divider bg-secondary px-5 py-6 lg:flex">
       <Link href="/" className="flex items-center gap-3 rounded-xl px-1 py-1 focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="soft-control grid size-10 place-items-center rounded-xl border border-white/[0.06] bg-card text-foreground">
-          <Radar aria-hidden="true" className="size-[17px]" strokeWidth={1.8} />
-        </span>
+        <AppLogoMark className="size-10" />
         <span className="min-w-0">
           <span className="block truncate text-sm font-semibold">Hunting OS</span>
           <span className="block truncate text-xs text-muted-foreground">Moree&apos;s workspace</span>

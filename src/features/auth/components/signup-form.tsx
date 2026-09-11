@@ -25,10 +25,10 @@ export function SignupForm() {
   return (
     <form className="space-y-4" method="POST" onSubmit={onSubmit} noValidate>
       <Field label="Username" hint="Lowercase letters, numbers, and underscores" error={errors.username?.message}>
-        <input {...register("username")} className={inputClass} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="moree" />
+        <input {...register("username")} className={inputClass} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="hunter_01" />
       </Field>
       <Field label="Display name" error={errors.displayName?.message}>
-        <input {...register("displayName")} className={inputClass} autoComplete="name" placeholder="Moree" />
+        <input {...register("displayName")} className={inputClass} autoComplete="name" placeholder="Your name" />
       </Field>
       <Field label="Password" hint="At least 8 characters" error={errors.password?.message}>
         <input {...register("password")} className={inputClass} type="password" autoComplete="new-password" placeholder="Create a password" />

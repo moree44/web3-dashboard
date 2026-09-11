@@ -29,7 +29,7 @@ async function openDialog(page: Page, buttonName: string, target: ReturnType<Pag
 
 async function openCampaign(page: Page, campaignName: string) {
   await expect(async () => {
-    await page.getByText(campaignName, { exact: true }).first().click();
+    await page.getByRole("button", { name: "Open details for " + campaignName }).first().click();
     await expect(page.getByRole("dialog").getByRole("heading", { name: "Edit NFT" })).toBeVisible({ timeout: 4_000 });
   }).toPass({ timeout: 30_000 });
 }
@@ -69,10 +69,11 @@ test("NFT wallet participation persists partial whitelist outcomes", async ({ pa
 
   await page.goto("/nfts", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "NFTs" })).toBeVisible();
-  await openDialog(page, "Add NFT", page.getByPlaceholder("Collection or campaign name"));
+  await openDialog(page, "Add NFT", page.getByPlaceholder("Collection name or x.com/collection"));
   const addDialog = page.getByRole("dialog");
-  await addDialog.getByPlaceholder("Collection or campaign name").fill(campaignName);
-  await addDialog.getByPlaceholder("Ethereum, Solana, Base...").fill("Base");
+  await addDialog.getByPlaceholder("Collection name or x.com/collection").fill(campaignName);
+  await addDialog.getByRole("button", { name: "Chain" }).click();
+  await page.getByRole("menu").getByText("Base", { exact: true }).click();
   await addDialog.getByRole("button", { name: accountLabel, exact: true }).click();
   await expect(addDialog.getByRole("button", { name: "Remove wallet " + walletLabel })).toBeVisible();
   await addDialog.getByRole("button", { name: "Whitelist status for " + walletLabel }).click();

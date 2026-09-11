@@ -160,7 +160,7 @@ export function WatchlistPreview({
             </Button>
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground">
-            The project name is derived from the X handle. You can edit it and add more context later.
+            Public profile name and bio are imported when available. You can edit them later.
           </p>
         </div>
       </section>

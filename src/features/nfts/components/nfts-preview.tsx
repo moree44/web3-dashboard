@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 
 import type { NftAccountOption, NftCampaignWithContext, NftWalletOption } from "../actions";
 import { NFT_STATUSES } from "../nft-schema";
+import { formatNftStatus, uniqueOptions } from "../nft-labels";
 import { useNftsCache, useNftsWorkspace } from "../nfts-query";
 import { NftDialog } from "./nft-dialog";
 
@@ -16,15 +17,9 @@ import { AccountAvatarGroup } from "@/features/projects/components/projects-prev
 import { formatDeadlineDueLabel, formatDeadlineTime, getDeadlineDayDifference } from "@/features/deadlines/deadline-utils";
 import { cn } from "@/lib/utils";
 
-type NftView = "all" | (typeof NFT_STATUSES)[number];
+type NftView = "all" | string;
 
-const statusLabels: Record<(typeof NFT_STATUSES)[number], string> = {
-  watching: "Watching",
-  whitelisted: "Whitelist",
-  upcoming: "Upcoming",
-  minted: "Minted",
-  missed: "Missed",
-};
+const defaultChains = ["Ethereum", "Solana", "Base", "Monad", "Robinhood"];
 
 export function NftsPreview({ initialCampaigns, accounts, wallets, canPersist = true }: { initialCampaigns: NftCampaignWithContext[]; accounts: NftAccountOption[]; wallets: NftWalletOption[]; canPersist?: boolean }) {
   const developmentPreview = !canPersist;
@@ -45,15 +40,16 @@ export function NftsPreview({ initialCampaigns, accounts, wallets, canPersist = 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState<NftCampaignWithContext | null>(null);
 
-  const counts = useMemo(() => Object.fromEntries(NFT_STATUSES.map((status) => [status, campaigns.filter((campaign) => campaign.status === status).length])) as Record<(typeof NFT_STATUSES)[number], number>, [campaigns]);
-  const chains = useMemo(() => [...new Set(campaigns.map((campaign) => campaign.chain))].sort(), [campaigns]);
+  const statusOptions = useMemo(() => uniqueOptions([...NFT_STATUSES, ...campaigns.map((campaign) => campaign.status)]), [campaigns]);
+  const counts = useMemo(() => Object.fromEntries(statusOptions.map((status) => [status, campaigns.filter((campaign) => campaign.status === status).length])) as Record<string, number>, [campaigns, statusOptions]);
+  const chains = useMemo(() => uniqueOptions([...defaultChains, ...walletOptions.flatMap((wallet) => wallet.chainType ? [wallet.chainType] : []), ...campaigns.map((campaign) => campaign.chain)]).sort(), [campaigns, walletOptions]);
   const visibleCampaigns = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return campaigns.filter((campaign) => {
       if (view !== "all" && campaign.status !== view) return false;
       if (chain && campaign.chain !== chain) return false;
       if (!normalizedQuery) return true;
-      return [campaign.name, campaign.chain, campaign.notes ?? "", ...campaign.assignedAccounts.map((account) => account.label), ...campaign.assignedWallets.flatMap((wallet) => [wallet.label, wallet.address])].join(" ").toLowerCase().includes(normalizedQuery);
+      return [campaign.name, campaign.xUrl ?? "", campaign.chain, campaign.status, campaign.notes ?? "", ...campaign.assignedAccounts.map((account) => account.label), ...campaign.assignedWallets.flatMap((wallet) => [wallet.label, wallet.address])].join(" ").toLowerCase().includes(normalizedQuery);
     });
   }, [campaigns, chain, query, view]);
 
@@ -89,9 +85,9 @@ export function NftsPreview({ initialCampaigns, accounts, wallets, canPersist = 
 
       <div className="border-b px-4 soft-divider sm:px-6 lg:px-8">
         <div className="flex items-center gap-1 overflow-x-auto py-2.5 scrollbar-subtle">
-          {(["all", ...NFT_STATUSES] as const).map((status) => (
+          {(["all", ...statusOptions] as const).map((status) => (
             <button key={status} type="button" onClick={() => setView(status)} className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors", view === status ? "bg-accent text-foreground shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}>
-              {status === "all" ? "All" : statusLabels[status]} <span className="ml-1 text-[10px] opacity-60">{status === "all" ? campaigns.length : counts[status]}</span>
+              {status === "all" ? "All" : formatNftStatus(status)} <span className="ml-1 text-[10px] opacity-60">{status === "all" ? campaigns.length : counts[status]}</span>
             </button>
           ))}
         </div>
@@ -119,7 +115,7 @@ export function NftsPreview({ initialCampaigns, accounts, wallets, canPersist = 
 
       <div className="flex min-h-12 items-center px-4 py-3 text-[11px] text-muted-foreground sm:px-6 lg:px-8">Showing {visibleCampaigns.length} {visibleCampaigns.length === 1 ? "NFT" : "NFTs"}</div>
 
-      <NftDialog open={dialogOpen} campaign={selected} accounts={accountOptions} wallets={walletOptions} onClose={() => setDialogOpen(false)} onSaved={handleSaved} onDeleted={handleDeleted} />
+      <NftDialog open={dialogOpen} campaign={selected} accounts={accountOptions} wallets={walletOptions} chainOptions={chains} statusOptions={statusOptions} onClose={() => setDialogOpen(false)} onSaved={handleSaved} onDeleted={handleDeleted} />
     </div>
   );
 }
@@ -127,7 +123,7 @@ export function NftsPreview({ initialCampaigns, accounts, wallets, canPersist = 
 function NftRow({ campaign, onOpen }: { campaign: NftCampaignWithContext; onOpen: () => void }) {
   return (
     <tr className="group border-b border-white/[0.045] hover:bg-white/[0.02]">
-      <td className="py-2.5 pl-8 pr-3"><button type="button" onClick={onOpen} className="flex min-w-0 items-center gap-3 text-left focus-visible:ring-2 focus-visible:ring-ring"><CollectionMark /><span className="min-w-0"><span className="block truncate text-[13px] font-semibold">{campaign.name}</span><span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{campaign.notes || "NFT hunting campaign"}</span></span></button></td>
+      <td className="py-2.5 pl-8 pr-3"><div className="flex min-w-0 items-center gap-3"><button type="button" onClick={onOpen} className="focus-visible:ring-2 focus-visible:ring-ring" aria-label={"Open details for " + campaign.name}><CollectionMark /></button><span className="min-w-0"><CollectionName campaign={campaign} />{campaign.notes ? <button type="button" onClick={onOpen} className="mt-0.5 block max-w-full truncate text-left text-[10px] text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">{campaign.notes}</button> : null}</span></div></td>
       <td className="px-3"><Badge variant="secondary" className="text-[10px]">{campaign.chain}</Badge></td>
       <td className="px-3"><StatusBadge status={campaign.status} /></td>
       <td className="px-3"><div className="flex items-center gap-2"><AccountAvatarGroup accounts={campaign.assignedAccounts.map((account) => account.label)} accountDetails={campaign.assignedAccounts} /><WalletOutcomeSummary campaign={campaign} /></div></td>
@@ -141,12 +137,19 @@ function NftCard({ campaign, onOpen }: { campaign: NftCampaignWithContext; onOpe
   return (
     <div className="px-4 py-4 hover:bg-white/[0.02] sm:px-6">
       <div className="flex items-start gap-3">
-        <CollectionMark />
+        <button type="button" onClick={onOpen} className="shrink-0 rounded-xl focus-visible:ring-2 focus-visible:ring-ring" aria-label={"Open details for " + campaign.name}>
+          <CollectionMark />
+        </button>
         <div className="min-w-0 flex-1">
-          <button type="button" onClick={onOpen} className="flex w-full items-start justify-between gap-3 text-left focus-visible:ring-2 focus-visible:ring-ring">
-            <span className="truncate text-sm font-semibold">{campaign.name}</span>
+          <div className="flex w-full items-start justify-between gap-3 text-left">
+            <CollectionName campaign={campaign} className="text-sm" />
             <StatusBadge status={campaign.status} />
-          </button>
+          </div>
+          {campaign.notes ? (
+            <button type="button" onClick={onOpen} className="mt-0.5 block max-w-full truncate text-left text-[10px] text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+              {campaign.notes}
+            </button>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="text-[10px]">{campaign.chain}</Badge>
             <AccountAvatarGroup accounts={campaign.assignedAccounts.map((account) => account.label)} accountDetails={campaign.assignedAccounts} />
@@ -172,7 +175,28 @@ function CollectionMark() {
 
 function StatusBadge({ status }: { status: NftCampaignWithContext["status"] }) {
   const variant = status === "minted" ? "success" : status === "missed" ? "destructive" : status === "upcoming" ? "info" : status === "whitelisted" ? "warning" : "secondary";
-  return <Badge variant={variant} className="text-[10px]">{statusLabels[status]}</Badge>;
+  return <Badge variant={variant} className="text-[10px]">{formatNftStatus(status)}</Badge>;
+}
+
+function CollectionName({ campaign, className }: { campaign: NftCampaignWithContext; className?: string }) {
+  const baseClassName = cn("inline-flex min-w-0 max-w-full items-center gap-1.5 truncate text-[13px] font-semibold text-foreground", className);
+  if (!campaign.xUrl) {
+    return <span className={baseClassName}>{campaign.name}</span>;
+  }
+
+  return (
+    <Link
+      href={campaign.xUrl}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      aria-label={"Open X profile for " + campaign.name}
+      className={cn(baseClassName, "hover:text-white/80 focus-visible:ring-2 focus-visible:ring-ring")}
+    >
+      <span className="min-w-0 truncate">{campaign.name}</span>
+      <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
+    </Link>
+  );
 }
 
 function WalletOutcomeSummary({ campaign }: { campaign: NftCampaignWithContext }) {

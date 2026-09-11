@@ -244,12 +244,9 @@ export const nftCampaigns = pgTable(
       .references(() => workspaces.id),
     name: text("name").notNull(),
     chain: text("chain").notNull(),
-    status: text("status", {
-      enum: ["watching", "whitelisted", "upcoming", "minted", "missed"],
-    })
-      .notNull()
-      .default("watching"),
+    status: text("status").notNull().default("watching"),
     mintUrl: text("mint_url"),
+    xUrl: text("x_url"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

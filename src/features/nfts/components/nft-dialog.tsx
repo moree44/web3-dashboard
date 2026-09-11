@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Trash2, WalletCards, X } from "lucide-react";
+import { Check, ChevronDown, ExternalLink, Plus, Trash2, WalletCards, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -12,23 +12,18 @@ import {
   type NftWalletOption,
 } from "../actions";
 import { NFT_STATUSES, NFT_WALLET_STATUSES } from "../nft-schema";
+import { deriveCollectionNameFromXHandle, parseXProfileUrl } from "../nft-links";
+import { formatNftStatus, normalizeCustomOption, uniqueOptions } from "../nft-labels";
 import { areWalletAndCampaignChainsCompatible } from "../wallet-compatibility";
 
 import { AppDatePicker } from "@/components/ui/app-date-picker";
+import { AppFloatingPanel } from "@/components/ui/app-floating-panel";
 import { AppSelect } from "@/components/ui/app-select";
 import { Button } from "@/components/ui/button";
 import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { cn } from "@/lib/utils";
 import { normalizeHttpUrl } from "@/lib/url";
 import { usePresence } from "@/lib/use-presence";
-
-const statusLabels: Record<(typeof NFT_STATUSES)[number], string> = {
-  watching: "Watching",
-  whitelisted: "Whitelist",
-  upcoming: "Upcoming",
-  minted: "Minted",
-  missed: "Missed",
-};
 
 type NftWalletStatus = (typeof NFT_WALLET_STATUSES)[number];
 
@@ -49,6 +44,8 @@ export function NftDialog({
   onClose,
   onSaved,
   onDeleted,
+  chainOptions = [],
+  statusOptions = [],
 }: {
   open: boolean;
   campaign?: NftCampaignWithContext | null;
@@ -57,10 +54,16 @@ export function NftDialog({
   onClose: () => void;
   onSaved: (campaign: NftCampaignWithContext) => void;
   onDeleted: (id: string) => void;
+  chainOptions?: string[];
+  statusOptions?: string[];
 }) {
   const [name, setName] = useState("");
+  const [xUrl, setXUrl] = useState("");
   const [chain, setChain] = useState("");
-  const [status, setStatus] = useState<(typeof NFT_STATUSES)[number]>("watching");
+  const [status, setStatus] = useState("watching");
+  const [chainItems, setChainItems] = useState<string[]>([]);
+  const [statusItems, setStatusItems] = useState<string[]>([]);
+  const [openCustomSelect, setOpenCustomSelect] = useState<"chain" | "status" | null>(null);
   const [accountIds, setAccountIds] = useState<string[]>([]);
   const [walletAssignments, setWalletAssignments] = useState<Array<{ walletId: string; status: NftWalletStatus }>>([]);
   const [mintDate, setMintDate] = useState("");
@@ -78,8 +81,11 @@ export function NftDialog({
   useEffect(() => {
     if (!open) return;
     setName(campaign?.name ?? "");
+    setXUrl(campaign?.xUrl ?? "");
     setChain(campaign?.chain ?? "");
     setStatus(campaign?.status ?? "watching");
+    setChainItems(uniqueOptions([...chainOptions, campaign?.chain ?? ""]));
+    setStatusItems(uniqueOptions([...NFT_STATUSES, ...statusOptions, campaign?.status ?? ""]));
     setAccountIds(campaign?.assignedAccounts.map((account) => account.id) ?? []);
     setWalletAssignments(campaign?.assignedWallets.map((wallet) => ({ walletId: wallet.id, status: wallet.status })) ?? []);
     setMintDate(campaign?.mintDate ?? "");
@@ -88,7 +94,7 @@ export function NftDialog({
     setNotes(campaign?.notes ?? "");
     setDeleteArmed(false);
     clearNotice();
-  }, [campaign, clearNotice, open]);
+  }, [campaign, chainOptions, clearNotice, open, statusOptions]);
 
   useEffect(() => {
     if (!open) return;
@@ -110,7 +116,7 @@ export function NftDialog({
       || Boolean(wallet.ownerAccountId && !accountIds.includes(wallet.ownerAccountId))
       || !areWalletAndCampaignChainsCompatible(wallet.chainType, chain);
   });
-  const canSave = Boolean(name.trim() && chain.trim() && !busy && !hasInvalidWallet);
+  const canSave = Boolean(name.trim() && chain.trim() && status.trim() && !busy && !hasInvalidWallet);
   const selectedAccounts = accounts.filter((account) => accountIds.includes(account.id));
   const selectedWalletIds = new Set(walletAssignments.map((assignment) => assignment.walletId));
   const sharedWallets = wallets.filter((wallet) => wallet.ownerAccountId === null && (areWalletAndCampaignChainsCompatible(wallet.chainType, chain) || selectedWalletIds.has(wallet.id)));
@@ -143,6 +149,29 @@ export function NftDialog({
     setWalletAssignments((current) => current.map((assignment) => assignment.walletId === walletId ? { ...assignment, status } : assignment));
   }
 
+  function handleNameChange(value: string) {
+    setName(value);
+  }
+
+  function handleNameUrl(value: string) {
+    const parsed = parseXProfileUrl(value);
+    if (!parsed) return;
+
+    setName(deriveCollectionNameFromXHandle(parsed.handle));
+    setXUrl(parsed.url);
+  }
+
+  function normalizeXUrlField() {
+    const parsed = parseXProfileUrl(xUrl);
+    if (!parsed) {
+      setXUrl((value) => normalizeHttpUrl(value));
+      return;
+    }
+
+    setXUrl(parsed.url);
+    if (!name.trim()) setName(deriveCollectionNameFromXHandle(parsed.handle));
+  }
+
   async function save() {
     if (!canSave) return;
     setBusy(true);
@@ -157,6 +186,7 @@ export function NftDialog({
         mintDate: mintDate || null,
         mintTime: mintDate ? mintTime.trim() || null : null,
         mintUrl: normalizeHttpUrl(mintUrl),
+        xUrl: normalizeHttpUrl(xUrl),
         notes: notes.trim() || null,
       };
       const saved = campaign
@@ -219,16 +249,60 @@ export function NftDialog({
         <div className="space-y-4 px-5 pb-5">
           <label className="block">
             <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Collection name</span>
-            <input autoFocus value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1.5 h-10 w-full rounded-lg border border-white/[0.055] bg-input px-3 text-sm font-semibold outline-none soft-inset placeholder:text-muted-foreground focus:border-ring" placeholder="Collection or campaign name" />
+            <input
+              autoFocus
+              value={name}
+              onChange={(event) => handleNameChange(event.target.value)}
+              onBlur={(event) => handleNameUrl(event.target.value)}
+              onPaste={(event) => {
+                const parsed = parseXProfileUrl(event.clipboardData.getData("text"));
+                if (!parsed) return;
+                event.preventDefault();
+                setName(deriveCollectionNameFromXHandle(parsed.handle));
+                setXUrl(parsed.url);
+              }}
+              maxLength={120}
+              className="mt-1.5 h-10 w-full rounded-lg border border-white/[0.055] bg-input px-3 text-sm font-semibold outline-none soft-inset placeholder:text-muted-foreground focus:border-ring"
+              placeholder="Collection name or x.com/collection"
+            />
+            {xUrl ? <span className="mt-1.5 block truncate text-[10px] text-muted-foreground">X: {xUrl.replace(/^https?:\/\//, "")}</span> : null}
           </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Chain</span>
-              <input value={chain} onChange={(event) => setChain(event.target.value)} maxLength={80} className="mt-1.5 h-8 w-full rounded-full bg-white/[0.035] px-3 text-xs font-medium outline-none ring-1 ring-white/[0.055] placeholder:text-muted-foreground focus:ring-white/[0.16]" placeholder="Ethereum, Solana, Base..." />
-            </label>
-            <AppSelect label="Status" value={status} options={NFT_STATUSES.map((value) => ({ value, label: statusLabels[value] }))} onChange={(value) => setStatus(value as (typeof NFT_STATUSES)[number])} />
+            <EditableOptionSelect
+              id="chain"
+              label="Chain"
+              value={chain}
+              options={chainItems}
+              placeholder="Select or add chain"
+              customPlaceholder="Add chain..."
+              open={openCustomSelect === "chain"}
+              onOpenChange={(nextOpen) => setOpenCustomSelect(nextOpen ? "chain" : null)}
+              onChange={setChain}
+              onOptionsChange={setChainItems}
+            />
+            <EditableOptionSelect
+              id="status"
+              label="Status"
+              value={status}
+              options={statusItems}
+              placeholder="Select or add status"
+              customPlaceholder="Add status..."
+              open={openCustomSelect === "status"}
+              onOpenChange={(nextOpen) => setOpenCustomSelect(nextOpen ? "status" : null)}
+              onChange={setStatus}
+              onOptionsChange={setStatusItems}
+              formatOption={formatNftStatus}
+            />
           </div>
+
+          <label className="block">
+            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">X URL, optional</span>
+            <span className="relative mt-1.5 block">
+              <ExternalLink className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" value={xUrl} onChange={(event) => setXUrl(event.target.value)} onBlur={normalizeXUrlField} className="h-9 w-full rounded-lg border border-white/[0.055] bg-input pl-9 pr-3 text-xs outline-none soft-inset placeholder:text-muted-foreground focus:border-ring" placeholder="x.com/collection" />
+            </span>
+          </label>
 
           <div>
             <div className="flex items-baseline justify-between gap-3">
@@ -398,4 +472,133 @@ function WalletGroup({
 function shortWalletAddress(address: string) {
   if (address.length <= 14) return address;
   return address.slice(0, 6) + "..." + address.slice(-5);
+}
+
+function EditableOptionSelect({
+  id,
+  label,
+  value,
+  options,
+  placeholder,
+  customPlaceholder,
+  open,
+  onOpenChange,
+  onChange,
+  onOptionsChange,
+  formatOption = (option) => option,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: string[];
+  placeholder: string;
+  customPlaceholder: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onChange: (value: string) => void;
+  onOptionsChange: (options: string[]) => void;
+  formatOption?: (option: string) => string;
+}) {
+  const [customValue, setCustomValue] = useState("");
+  const normalizedCustomValue = normalizeCustomOption(customValue);
+  const optionValues = uniqueOptions([value, ...options]);
+  const canAdd = normalizedCustomValue.length > 0 && !optionValues.some((option) => option.toLowerCase() === normalizedCustomValue.toLowerCase());
+
+  function addCustomValue() {
+    if (!canAdd) return;
+    const nextOptions = uniqueOptions([...optionValues, normalizedCustomValue]);
+    onOptionsChange(nextOptions);
+    onChange(normalizedCustomValue);
+    setCustomValue("");
+  }
+
+  function removeOption(option: string) {
+    const nextOptions = optionValues.filter((item) => item.toLowerCase() !== option.toLowerCase());
+    onOptionsChange(nextOptions);
+    if (value.toLowerCase() === option.toLowerCase()) onChange("");
+  }
+
+  return (
+    <div>
+      <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</span>
+      <AppFloatingPanel
+        open={open}
+        onOpenChange={onOpenChange}
+        ariaLabel={label}
+        width={260}
+        align="start"
+        panelClassName="max-h-72 overflow-y-auto scrollbar-subtle"
+        trigger={({ ref, toggle }) => (
+          <button
+            ref={ref}
+            type="button"
+            aria-label={label}
+            aria-expanded={open}
+            onClick={toggle}
+            className={cn(
+              "mt-1.5 flex h-8 w-full items-center justify-between gap-2 rounded-full bg-white/[0.035] px-3 text-left text-xs outline-none ring-1 ring-white/[0.055] transition-colors hover:bg-white/[0.055] hover:text-foreground focus-visible:ring-white/[0.16] active:scale-[0.99]",
+              value ? "text-foreground" : "text-muted-foreground",
+              open ? "bg-white/[0.055] ring-white/[0.12]" : "",
+            )}
+          >
+            <span className="min-w-0 truncate font-medium">{value ? formatOption(value) : placeholder}</span>
+            <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open ? "rotate-180" : "")} />
+          </button>
+        )}
+      >
+        <div className="px-2 py-1 text-[10px] text-muted-foreground">Change {label.toLowerCase()}</div>
+        <div className="mb-1 flex items-center gap-1 rounded-lg bg-white/[0.025] p-1">
+          <input
+            value={customValue}
+            onChange={(event) => setCustomValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              addCustomValue();
+            }}
+            maxLength={80}
+            className="min-w-0 flex-1 bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground"
+            placeholder={customPlaceholder}
+            aria-label={customPlaceholder}
+          />
+          <button
+            type="button"
+            onClick={addCustomValue}
+            disabled={!canAdd}
+            className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.055] hover:text-foreground disabled:opacity-35"
+            aria-label={"Add " + label.toLowerCase()}
+          >
+            <Plus className="size-3.5" />
+          </button>
+        </div>
+        {optionValues.map((option) => {
+          const selected = value.toLowerCase() === option.toLowerCase();
+          return (
+            <div key={option} className={cn("flex h-8 items-center gap-1 rounded-lg transition-colors hover:bg-white/[0.055]", selected ? "text-foreground" : "text-[#aeb5bf]")}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(option);
+                  onOpenChange(false);
+                }}
+                className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left text-xs"
+              >
+                <span className="min-w-0 flex-1 truncate font-medium">{formatOption(option)}</span>
+                {selected ? <Check className="size-3.5 shrink-0 text-muted-foreground" /> : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => removeOption(option)}
+                className="mr-1 grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                aria-label={"Remove " + label.toLowerCase() + " option " + formatOption(option)}
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </AppFloatingPanel>
+      <input type="hidden" name={id} value={value} />
+    </div>
+  );
 }

@@ -1,14 +1,14 @@
 # Project Status - Web3 Hunting OS
 
-Last updated: 2026-09-01
+Last updated: 2026-09-11
 
 ## Current Position
 
 Web3 Hunting OS is in **Phase 1 Core, CRUD wired + production smoothness pass**.
 
-The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline.
+The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline. The shell now uses a dedicated Web3 Hunting OS app icon and has a lightweight PWA foundation for installable app surfaces.
 
-**Data foundation is in place:** Drizzle ORM schema (22 tables), 17 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0016_add_project_watchlist.sql have been applied to the live database. Migration 0017_add_docs_folders.sql has been applied to the live database. The current live 22-table schema has RLS enabled on every application table, including the Docs folder catalog. **CRUD server actions now exist for Projects, Project Watchlist, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
+**Data foundation is in place:** Drizzle ORM schema (22 tables), 18 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0016_add_project_watchlist.sql have been applied to the live database. Migration 0017_add_docs_folders.sql has been applied to the live database. Migration 0018_nft_x_url_and_custom_status.sql has been applied through the Supabase SQL Editor for NFT X links and custom lifecycle statuses. The current live 22-table schema has RLS enabled on every application table, including the Docs folder catalog. **CRUD server actions now exist for Projects, Project Watchlist, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
 
 Gmail remains Phase 2 because it requires OAuth and an email connector. Settings basic profile/workspace CRUD and Personal Items persistence are now live. Core Dashboard Quick Capture, overview metrics, and Hunting Pulse categories now read live workspace data. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme. The latest production pass tightened serverless database pooling, disabled sidebar viewport prefetch storms, added compact route skeleton delay, moved feature mutation failures into compact bottom-right monochrome toasts, and made Tasks/Projects create flows optimistic with rollback.
 
@@ -17,7 +17,7 @@ Gmail remains Phase 2 because it requires OAuth and an email connector. Settings
 Read these before major work:
 
 1. PRD.MD — product behavior, scope, phasing, data model, implementation order (v3.4)
-2. DESIGN.md — visual direction, layout, density, spacing, interaction tone (v2.17)
+2. DESIGN.md — visual direction, layout, density, spacing, interaction tone (v2.19)
 3. `PROJECT_STATUS.md` — implementation state only (this file)
 4. `AGENTS.md` — contributor workflow guidance
 
@@ -69,6 +69,9 @@ Current implementation should align with:
 - Projects parent links to `/projects`; Watchlist, NFTs, Daily, Deadlines, and Tasks are nested below
 - Sidebar and mobile nav links opt out of automatic viewport prefetch to avoid production request storms from always-visible navigation; hover and touch still warm the intended route
 - Mobile nav exists but is secondary
+- Shared app mark is wired into the desktop sidebar and auth shell
+- PWA metadata is in place via `src/app/manifest.ts`, including install icons, shortcut icons, desktop/mobile install screenshots, dark theme color, standalone display mode, stable app id, and shortcuts to Projects, Tasks, and Daily
+- Service worker registration is production-only and caches static shell assets/icons only; application data routes remain network-driven
 
 ### Data Foundation
 
@@ -152,7 +155,8 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 ### Project Watchlist - dedicated discovery workspace
 
 - Dedicated route at `/watchlist`, separate from Projects and separate from Trading Token Watchlist
-- Quick add accepts an X profile URL and derives an editable project name from the handle
+- Quick add accepts an X profile URL and performs a one-time authenticated server lookup through Microlink for editable display-name and bio-derived Thesis defaults
+- Metadata lookup sends only the public X URL, preserves manual values, has bounded response/timeout handling, and falls back to the X handle without blocking creation
 - Optional thesis, Chain, preset or custom multi Project Type, search, and Active/Converted views
 - Uses one generic Project icon and does not request a logo
 - Desktop table and compact mobile cards share the same persisted data
@@ -198,9 +202,10 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Migrations `0010_add_nft_campaigns.sql` and `0011_add_nft_campaign_wallet_tracking.sql` are applied to the live database
 - `nft_campaigns`, `nft_campaign_accounts`, and `nft_campaign_wallets` use workspace-scoped RLS; catalog verification reports RLS enabled with one policy on each table
 - Projects no longer accepts `nft` as a Hunt Type; the live database has zero legacy NFT Project rows
-- `/nfts` provides All, Watching, Whitelist, Upcoming, Minted, and Missed views, plus search and Chain filtering
-- Add/Edit NFT uses the shared modal, AppSelect, AppDatePicker, URL normalization, Account and Wallet selection, per-Wallet result status, and two-step delete confirmation patterns
-- Fields stay intentionally light: Collection name, Chain, lifecycle Status, Accounts, Wallet participation, optional Mint schedule, Mint URL, and Notes
+- `/nfts` provides All, default lifecycle views, custom status views, search, and Chain filtering
+- Add/Edit NFT uses the shared modal, editable Chain/Status dropdowns, AppDatePicker, URL normalization, Account and Wallet selection, per-Wallet result status, and two-step delete confirmation patterns
+- Fields stay intentionally light: Collection name, optional X URL, Chain, lifecycle Status, Accounts, Wallet participation, optional Mint schedule, Mint URL, and Notes
+- Collection name can be derived from a pasted X profile URL such as `x.com/laptopnfts`; the resulting list name links to X while Mint URL remains a separate mint action
 - Assigned Accounts reuse stored avatars, initials fallback, hover motion, and the interactive `+N` overflow popover
 - Account-owned Wallets are filtered by exact or EVM-family Chain compatibility; ownerless Wallets remain available as Shared wallets
 - A sole compatible Account Wallet is preselected visibly, while Accounts without a selected Wallet remain tracked as `need wallet`
@@ -320,7 +325,7 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | `archive-preview.tsx` | ~350 lines | CRUD wired (restore, delete); React Query + commit-waiting mutations (`archive-query.ts`); inline two-step delete |
 | `daily-workspace.tsx` | ~350 lines | Task Log + Daily execution; React Query date-scoped cache (`daily-workspace-query.ts`) with optimistic Done/Skip and personal toggle; Motion `layout` on checklist rows |
 
-Unit tests: 22 files, 89 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, optimistic Quick Add and detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, Projects optimistic create, compact toast behavior, and Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
+Unit tests: 24 files, 99 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, NFT X profile parsing/name derivation, Watchlist X metadata parsing/autofill/fallback, custom NFT lifecycle statuses, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, optimistic Quick Add and detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, Projects optimistic create, compact toast behavior, and Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
 
 E2E diagnostics now include focused Accounts/Projects, Project Wallet assignment, NFT Wallet participation, Docs/Daily, Inbox, and a full application smoke suite. The latest focused Project Wallet browser smoke passed login, custom-chain Wallet creation, reload persistence, Project unlink behavior, Wallet survival, cleanup, and captured no console or page errors.
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { deriveCollectionNameFromXHandle, parseXProfileUrl } from "@/features/nfts/nft-links";
 import { nftCampaignInputSchema, nftCampaignUpdateSchema } from "@/features/nfts/nft-schema";
 
 const validCampaign = {
@@ -24,9 +25,31 @@ describe("NFT campaign validation", () => {
     expect(nftCampaignInputSchema.parse({ ...validCampaign, mintUrl: "mint.example.com" }).mintUrl).toBe("https://mint.example.com");
   });
 
+  it("keeps X profile links separate from mint URLs", () => {
+    const parsed = nftCampaignInputSchema.parse({ ...validCampaign, xUrl: "x.com/laptopnfts" });
+
+    expect(parsed.xUrl).toBe("https://x.com/laptopnfts");
+    expect(parsed.mintUrl).toBeUndefined();
+  });
+
+  it("derives a readable collection name from an X handle", () => {
+    const parsed = parseXProfileUrl("https://x.com/laptopnfts");
+
+    expect(parsed).toEqual({ handle: "laptopnfts", url: "https://x.com/laptopnfts" });
+    expect(deriveCollectionNameFromXHandle(parsed?.handle ?? "")).toBe("LaptopNfts");
+  });
+
+  it("accepts custom lifecycle statuses", () => {
+    expect(nftCampaignInputSchema.parse({ ...validCampaign, status: "role confirmed" }).status).toBe("role confirmed");
+  });
+
   it("rejects invalid mint times and non-HTTP URLs", () => {
     expect(() => nftCampaignInputSchema.parse({ ...validCampaign, mintTime: "26:00" })).toThrow();
     expect(() => nftCampaignInputSchema.parse({ ...validCampaign, mintUrl: "ftp://mint.example.com" })).toThrow();
+  });
+
+  it("rejects non-X profile URLs in the X URL field", () => {
+    expect(() => nftCampaignInputSchema.parse({ ...validCampaign, xUrl: "https://example.com/laptopnfts" })).toThrow();
   });
 
   it("allows campaigns without a mint schedule", () => {

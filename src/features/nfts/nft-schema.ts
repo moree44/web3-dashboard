@@ -1,14 +1,11 @@
 import { z } from "zod";
 
+import { DEFAULT_NFT_STATUSES, normalizeCustomOption } from "./nft-labels";
+import { parseXProfileUrl } from "./nft-links";
+
 import { isHttpUrl, normalizeHttpUrl } from "@/lib/url";
 
-export const NFT_STATUSES = [
-  "watching",
-  "whitelisted",
-  "upcoming",
-  "minted",
-  "missed",
-] as const;
+export const NFT_STATUSES = DEFAULT_NFT_STATUSES;
 
 export const NFT_WALLET_STATUSES = [
   "planned",
@@ -42,7 +39,7 @@ const optionalTime = z.union([
 
 const campaignName = z.string().trim().min(1, "Collection name is required").max(120);
 const campaignChain = z.string().trim().min(1, "Chain is required").max(80);
-const campaignStatus = z.enum(NFT_STATUSES);
+const campaignStatus = z.string().trim().min(1, "Status is required").max(60).transform(normalizeCustomOption);
 const campaignAccountIds = z.array(z.string().uuid()).max(50);
 const campaignWalletAssignments = z.array(z.object({
   walletId: z.string().uuid(),
@@ -61,6 +58,14 @@ const campaignWalletAssignments = z.array(z.object({
   });
 });
 const campaignNotes = z.string().trim().max(5000).nullable();
+const optionalXUrl = z.preprocess(
+  (value) => typeof value === "string" ? normalizeHttpUrl(value) : value,
+  z.union([
+    z.literal(""),
+    z.string().trim().url().refine(isHttpUrl, "Only http or https URLs are supported").refine((value) => Boolean(parseXProfileUrl(value)), "Enter an X or Twitter profile URL"),
+    z.null(),
+  ]).optional(),
+);
 
 export const nftCampaignInputSchema = z.object({
   name: campaignName,
@@ -71,6 +76,7 @@ export const nftCampaignInputSchema = z.object({
   mintDate: optionalDate,
   mintTime: optionalTime,
   mintUrl: optionalUrl,
+  xUrl: optionalXUrl,
   notes: campaignNotes.optional(),
 });
 
@@ -83,6 +89,7 @@ export const nftCampaignUpdateSchema = z.object({
   mintDate: optionalDate,
   mintTime: optionalTime,
   mintUrl: optionalUrl,
+  xUrl: optionalXUrl,
   notes: campaignNotes.optional(),
 });
 
@@ -93,6 +100,9 @@ function validationError(error: z.ZodError) {
   const issue = error.issues[0];
   if (issue?.path[0] === "mintUrl") {
     return new Error("Enter a valid mint URL, for example mint.example.com");
+  }
+  if (issue?.path[0] === "xUrl") {
+    return new Error("Enter a valid X profile URL, for example x.com/laptopnfts");
   }
   return new Error(issue?.message ?? "NFT campaign details are invalid");
 }

@@ -24,7 +24,7 @@ export function LoginForm() {
   return (
     <form className="space-y-4" method="POST" onSubmit={onSubmit} noValidate>
       <Field label="Username" error={errors.username?.message}>
-        <input {...register("username")} className={inputClass} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="moree" />
+        <input {...register("username")} className={inputClass} autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="username" />
       </Field>
       <Field label="Password" error={errors.password?.message}>
         <input {...register("password")} className={inputClass} type="password" autoComplete="current-password" placeholder="Enter your password" />

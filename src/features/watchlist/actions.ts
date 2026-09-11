@@ -21,6 +21,7 @@ import type {
   WatchlistPageData,
   WatchlistStatus,
 } from "@/features/watchlist/watchlist-types";
+import { fetchWatchlistXProfile } from "@/features/watchlist/x-profile-metadata";
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { projectWatchlistItems, projects } from "@/lib/db/schema";
@@ -126,9 +127,29 @@ export async function getWatchlistPageData(): Promise<WatchlistPageData> {
   };
 }
 
+export async function lookupWatchlistXProfile(xUrl: string) {
+  await requireWorkspace();
+  const parsed = parseWatchlistInput({ xUrl });
+  const metadata = await fetchWatchlistXProfile(parsed.xUrl);
+
+  return {
+    name: metadata?.name ?? parsed.name,
+    thesis: metadata?.thesis ?? "",
+  };
+}
+
 export async function createWatchlistItem(input: WatchlistInput): Promise<WatchlistItemRecord> {
   const workspaceId = await requireWorkspace();
-  const parsed = parseWatchlistInput(input);
+  const initial = parseWatchlistInput(input);
+  const shouldEnrich = !input.name?.trim() && !input.thesis?.trim();
+  const metadata = shouldEnrich
+    ? await fetchWatchlistXProfile(initial.xUrl)
+    : null;
+  const parsed = {
+    ...initial,
+    name: metadata?.name ?? initial.name,
+    thesis: metadata?.thesis ?? initial.thesis,
+  };
 
   try {
     const [created] = await db

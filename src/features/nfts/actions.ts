@@ -140,6 +140,7 @@ async function getCampaignsForWorkspace(workspaceId: string) {
       chain: nftCampaigns.chain,
       status: nftCampaigns.status,
       mintUrl: nftCampaigns.mintUrl,
+      xUrl: nftCampaigns.xUrl,
       notes: nftCampaigns.notes,
       createdAt: nftCampaigns.createdAt,
       updatedAt: nftCampaigns.updatedAt,
@@ -246,7 +247,7 @@ export async function getNftCampaignCount(): Promise<number> {
   return result?.count ?? 0;
 }
 
-function deadlineStatusForCampaign(status: NftCampaignInput["status"]) {
+function deadlineStatusForCampaign(status: string) {
   if (status === "minted") return "done" as const;
   if (status === "missed") return "cancelled" as const;
   return "upcoming" as const;
@@ -259,6 +260,9 @@ function normalizedValues(data: NftCampaignInput | NftCampaignUpdateInput) {
     ...(Object.prototype.hasOwnProperty.call(data, "status") ? { status: data.status } : {}),
     ...(Object.prototype.hasOwnProperty.call(data, "mintUrl")
       ? { mintUrl: data.mintUrl || null }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(data, "xUrl")
+      ? { xUrl: data.xUrl || null }
       : {}),
     ...(Object.prototype.hasOwnProperty.call(data, "notes")
       ? { notes: data.notes || null }
@@ -296,6 +300,7 @@ export async function createNftCampaign(
         chain: parsed.chain,
         status: parsed.status,
         mintUrl: parsed.mintUrl || null,
+        xUrl: parsed.xUrl || null,
         notes: parsed.notes || null,
         updatedAt: new Date(),
       })
