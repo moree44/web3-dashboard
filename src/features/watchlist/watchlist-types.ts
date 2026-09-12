@@ -9,6 +9,7 @@ export const WATCHLIST_PROJECT_TYPES = [
 ] as const;
 
 export type WatchlistStatus = "active" | "converted";
+export type WatchlistItemKind = "project" | "nft";
 
 export type WatchlistInput = {
   name?: string;
@@ -16,6 +17,7 @@ export type WatchlistInput = {
   thesis?: string;
   chain?: string;
   projectTypes?: string[];
+  itemKind?: WatchlistItemKind;
 };
 
 export type WatchlistConversionInput = {
@@ -32,25 +34,19 @@ export type WatchlistItemRecord = {
   thesis: string | null;
   chain: string | null;
   projectTypes: string[];
+  itemKind: WatchlistItemKind;
   status: WatchlistStatus;
   convertedProjectId: string | null;
+  convertedNftCampaignId: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
 
-export type ConvertedProjectRecord = {
-  id: string;
-  name: string;
-  twitterUrl: string | null;
-  description: string | null;
-  notes: string | null;
-  chains: string[];
-  projectTypes: string[] | null;
-};
 
 export type WatchlistConversionResult = {
   item: WatchlistItemRecord;
-  project: ConvertedProjectRecord;
+  targetType: WatchlistItemKind;
+  targetId: string;
 };
 
 export type WatchlistPageData = {

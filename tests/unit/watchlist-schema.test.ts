@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildProjectFromWatchlist } from "@/features/watchlist/watchlist-conversion";
+import {
+  buildNftFromWatchlist,
+  buildProjectFromWatchlist,
+} from "@/features/watchlist/watchlist-conversion";
 import {
   parseWatchlistConversion,
   parseWatchlistInput,
@@ -15,6 +18,7 @@ describe("Watchlist validation", () => {
       thesis: "",
       chain: "",
       projectTypes: [],
+      itemKind: "project",
     });
   });
 
@@ -47,6 +51,22 @@ describe("Watchlist validation", () => {
     );
   });
 
+  it("requires a Chain for NFT items", () => {
+    expect(() => parseWatchlistInput({
+      xUrl: "x.com/laptopnfts",
+      itemKind: "nft",
+    })).toThrow("Chain is required for NFT items");
+
+    expect(parseWatchlistInput({
+      xUrl: "x.com/laptopnfts",
+      chain: "Robinhood",
+      itemKind: "nft",
+    })).toMatchObject({
+      itemKind: "nft",
+      chain: "Robinhood",
+    });
+  });
+
   it("applies safe Project conversion defaults", () => {
     expect(parseWatchlistConversion({})).toEqual({
       huntType: "free_hunts",
@@ -77,6 +97,23 @@ describe("Watchlist conversion mapping", () => {
       projectTypes: ["L1"],
       dateStart: "2026-08-10",
       logoSource: "none",
+    });
+  });
+
+  it("moves discovery fields into an NFT campaign", () => {
+    expect(buildNftFromWatchlist({
+      name: "Laptop",
+      xUrl: "https://x.com/laptopnfts",
+      thesis: "Robinhood NFT collection",
+      chain: "Robinhood",
+      projectTypes: [],
+    })).toEqual({
+      name: "Laptop",
+      chain: "Robinhood",
+      status: "watching",
+      xUrl: "https://x.com/laptopnfts",
+      notes: "Robinhood NFT collection",
+      mintUrl: null,
     });
   });
 });

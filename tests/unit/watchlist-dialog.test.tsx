@@ -56,7 +56,7 @@ describe("WatchlistDialog", () => {
     fireEvent.change(screen.getByPlaceholderText("Derived from the X handle when empty"), {
       target: { value: "My project" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Why this project may be worth monitoring..."), {
+    fireEvent.change(screen.getByPlaceholderText("Why this account may be worth monitoring..."), {
       target: { value: "My thesis" },
     });
     fireEvent.paste(screen.getByPlaceholderText("x.com/project"), {
@@ -68,5 +68,37 @@ describe("WatchlistDialog", () => {
     await waitFor(() => expect(actionMocks.lookupWatchlistXProfile).toHaveBeenCalledTimes(1));
     expect(screen.getByDisplayValue("My project")).toBeInTheDocument();
     expect(screen.getByDisplayValue("My thesis")).toBeInTheDocument();
+  });
+
+  it("requires Chain and saves NFT items with their type", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <WatchlistDialog
+        open
+        onClose={vi.fn()}
+        onSave={onSave}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "NFT" }));
+    fireEvent.change(screen.getByPlaceholderText("x.com/project"), {
+      target: { value: "https://x.com/laptopnfts" },
+    });
+    expect(screen.getByRole("button", { name: "Add to Watchlist" })).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText("Ethereum, Solana, Cosmos..."), {
+      target: { value: "Robinhood" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add to Watchlist" }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({
+      name: "",
+      xUrl: "https://x.com/laptopnfts",
+      thesis: "",
+      chain: "Robinhood",
+      projectTypes: [],
+      itemKind: "nft",
+    }, undefined));
   });
 });

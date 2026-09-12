@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  convertWatchlistToNft,
   convertWatchlistToProject,
   createWatchlistItem,
   deleteWatchlistItem,
@@ -112,12 +113,17 @@ export function useWatchlistMutations({
   });
 
   const convertMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({
+      id,
+      itemKind,
+    }: Pick<WatchlistItemRecord, "id" | "itemKind">) => {
       if (developmentPreview) throw new Error("Preview mode does not persist Watchlist items");
-      return convertWatchlistToProject(id);
+      return itemKind === "nft"
+        ? convertWatchlistToNft(id)
+        : convertWatchlistToProject(id);
     },
     onError: (error: unknown) => {
-      onError(error instanceof Error ? error.message : "Unable to start Project");
+      onError(error instanceof Error ? error.message : "Unable to convert Watchlist item");
     },
     onSuccess: (result) => {
       const current = currentData();

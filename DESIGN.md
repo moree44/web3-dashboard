@@ -1,7 +1,7 @@
 # DESIGN.md — Web3 Hunting OS
 
-**Version:** 2.20
-**Status:** Current visual direction for Phase 1, including production smoothness, compact monochrome notifications, PWA app icon branding, Watchlist X metadata import, Project Wallet assignment, NFT X links, custom NFT chains/statuses, NFT wallet participation, and shared Deadline integration
+**Version:** 2.21
+**Status:** Current visual direction for Phase 1, including production smoothness, compact monochrome notifications, PWA app icon branding, unified Project/NFT Watchlist, Project Wallet assignment, NFT X links, custom NFT chains/statuses, NFT wallet participation, and shared Deadline integration
 **Product:** Web3 Hunting OS
 **Design Direction:** Premium dark compact productivity OS
 
@@ -908,7 +908,7 @@ Mobile should use compact project cards instead of squeezing table columns.
 
 ### Watchlist Page Direction
 
-Watchlist is a dedicated list-first workspace at `/watchlist`. It is for early project discovery, before the user decides to actively work on the project.
+Watchlist is a dedicated list-first workspace at `/watchlist`. It is a shared discovery inbox for Projects and NFT collections before active tracking begins.
 
 Primary controls:
 
@@ -918,27 +918,31 @@ Search watchlist
 Quick add from X URL
 ```
 
-The quick-add flow should keep X URL as the primary field. Project name is derived from the X handle and remains editable. Thesis, chain, and Project Type are optional details. Do not request or display a custom project logo in Watchlist.
+The quick-add flow keeps X URL as the primary field and uses a compact Project/NFT segmented control. Project remains the one-click default. NFT opens the detail form because Chain is required before conversion. Name is derived from the X handle and remains editable. Thesis and Chain remain light details; Project Type applies only to Project items. Do not request or display a custom logo in Watchlist.
 
 New Watchlist captures may perform one authenticated server-side metadata lookup for the public X profile. Use the public display name and bio as editable Name and Thesis defaults, never overwrite manual values, do not send workspace data or credentials, and keep handle-derived naming as the no-blocking fallback when the provider is unavailable.
 
 Desktop rows should show:
 
 ```txt
-Generic project icon · Name / X handle · Thesis · Chain · Project Type · Action
+Generic type icon · Name / X handle · Thesis · Chain · Type · Action
 ```
 
 Rules:
 
-* use one consistent monochrome project icon, not fetched project logos
+* use compact monochrome Project/NFT icons, not fetched logos
 * truncate thesis in the list and keep the full text available in edit/detail UI
 * show chain separately from Project Type
-* render Project Type as muted compact chips
-* keep `Start Project` as the primary row action
-* after conversion, retain the item in Converted history and link it to the created Project
+* render Project Type or NFT identity as muted compact chips
+* keep row actions left-aligned inside a bounded desktop table so they do not drift to the monitor edge
+* use a soft outline action: `Start project` for Project and `Track NFT` for NFT
+* after conversion, retain the item in Converted history and link it to the correct target
 * a converted Project uses its normal initials fallback until the user adds a logo later
+* use the table only when at least 920px of content width is available; narrower laptop, tablet, and PWA layouts use compact cards
 
 `Start Project` may ask only for Project workflow defaults that do not exist on the Watchlist item, such as hunt type, priority, status, and start date. It must carry over name, X URL, thesis, chain, and Project Type without re-entry.
+
+`Track NFT` creates a Watching NFT campaign atomically with Name, X URL, Chain, and Thesis mapped to Notes. Converted target relations use restrictive foreign keys so history cannot silently become orphaned or disappear.
 
 ### 19A. NFTs Page Direction
 

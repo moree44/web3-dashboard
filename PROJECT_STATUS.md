@@ -8,7 +8,7 @@ Web3 Hunting OS is in **Phase 1 Core, CRUD wired + production smoothness pass**.
 
 The app has a working Next.js 15 desktop preview shell with routed UI for Dashboard, Deadlines, Inbox, Docs, Projects, Watchlist, NFTs, Daily, Tasks, Accounts, Archive, Settings, Login, and Signup. Visual direction is locked around a premium dark compact productivity OS, following `DESIGN.md` and the accepted `/projects` baseline. The shell now uses a dedicated Web3 Hunting OS app icon and has a lightweight PWA foundation for installable app surfaces.
 
-**Data foundation is in place:** Drizzle ORM schema (22 tables), 18 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0016_add_project_watchlist.sql have been applied to the live database. Migration 0017_add_docs_folders.sql has been applied to the live database. Migration 0018_nft_x_url_and_custom_status.sql has been applied through the Supabase SQL Editor for NFT X links and custom lifecycle statuses. The current live 22-table schema has RLS enabled on every application table, including the Docs folder catalog. **CRUD server actions now exist for Projects, Project Watchlist, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
+**Data foundation is in place:** Drizzle ORM schema (22 tables), 19 migration files, workspace helpers, auto-workspace creation on signup, Supabase Auth adapter, and Supabase Storage buckets for project logos and account avatars. Migrations through 0016_add_project_watchlist.sql have been applied to the live database. Migration 0017_add_docs_folders.sql has been applied to the live database. Migration 0018_nft_x_url_and_custom_status.sql has been applied through the Supabase SQL Editor for NFT X links and custom lifecycle statuses. Migration 0019_watchlist_item_kinds.sql has been applied through the Supabase SQL Editor, with the new Project/NFT columns verified and existing Watchlist rows retained as Project items. The current live 22-table schema has RLS enabled on every application table, including the Docs folder catalog. **CRUD server actions now exist for Projects, Project Watchlist, NFTs, Accounts, Wallets, Wallet Groups, Archive, Deadlines, Tasks, Inbox, and Docs. Daily execution actions are also persisted, with create, update, and delete flows wired where noted below.** **Project logo upload is complete** with file upload and clipboard paste (Ctrl+V) in both Add and Edit forms. **Account avatar upload/URL is complete** with the same storage pattern, and Projects, NFTs, and Tasks render assigned account avatars from those stored account records.
 
 Gmail remains Phase 2 because it requires OAuth and an email connector. Settings basic profile/workspace CRUD and Personal Items persistence are now live. Core Dashboard Quick Capture, overview metrics, and Hunting Pulse categories now read live workspace data. Project Wallet assignment is complete in Add/Edit Project, including existing Wallet selection and transactional custom-chain Wallet creation. UI foundation cleanup standardizes feature dropdowns and date pickers through shared components instead of browser-native menus. Active HTTP URL inputs share one normalization and validation path, so bare domains are accepted consistently and persisted with an HTTPS scheme. The latest production pass tightened serverless database pooling, disabled sidebar viewport prefetch storms, added compact route skeleton delay, moved feature mutation failures into compact bottom-right monochrome toasts, and made Tasks/Projects create flows optimistic with rollback.
 
@@ -113,7 +113,7 @@ Server actions follow the same workspace-scoped pattern across implemented CRUD 
 | --- | --- | --- | --- |
 | Auth | `src/features/auth/actions.ts` | — | signup, login |
 | Projects | `src/features/projects/actions.ts` | `getProjects`, `getArchivedProjects`, `getProjectAccountOptions`, `getProjectWalletOptions` | `createProject`, `updateProject`, `archiveProject`, `restoreProject`, `deleteProject`, `uploadProjectLogo` |
-| Project Watchlist | `src/features/watchlist/actions.ts` | `getWatchlistItems`, `getWatchlistPageData` | `createWatchlistItem`, `updateWatchlistItem`, `deleteWatchlistItem`, `convertWatchlistToProject` |
+| Project Watchlist | `src/features/watchlist/actions.ts` | `getWatchlistItems`, `getWatchlistPageData` | `createWatchlistItem`, `updateWatchlistItem`, `deleteWatchlistItem`, `convertWatchlistToProject`, `convertWatchlistToNft` |
 | NFTs | `src/features/nfts/actions.ts` | `getNftPageData`, `getNftCampaignCount` | `createNftCampaign`, `updateNftCampaign`, `deleteNftCampaign` |
 | Accounts | `src/features/accounts/actions.ts` | `getAccounts` (with stats), `getWallets`, `getWalletGroups` | `createAccount`, `updateAccount`, `deleteAccount`, `uploadAccountAvatar`, `setAccountAvatarUrl`, `createWallet`, `updateWallet`, `deleteWallet`, `createWalletGroup`, `updateWalletGroup`, `deleteWalletGroup` |
 | Tasks | `src/features/tasks/actions.ts` | `getTaskWorkspaceData` | `createTask`, `updateTask`, `updateTaskStatus`, `deleteTask` |
@@ -154,19 +154,23 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 
 ### Project Watchlist - dedicated discovery workspace
 
-- Dedicated route at `/watchlist`, separate from Projects and separate from Trading Token Watchlist
+- Dedicated route at `/watchlist`, separate from Projects/NFTs and separate from Trading Token Watchlist
+- Unified Project/NFT item type selector; Project stays the one-click Quick Add default while NFT opens details to require Chain
 - Quick add accepts an X profile URL and performs a one-time authenticated server lookup through Microlink for editable display-name and bio-derived Thesis defaults
 - Metadata lookup sends only the public X URL, preserves manual values, has bounded response/timeout handling, and falls back to the X handle without blocking creation
-- Optional thesis, Chain, preset or custom multi Project Type, search, and Active/Converted views
-- Uses one generic Project icon and does not request a logo
-- Desktop table and compact mobile cards share the same persisted data
+- Optional thesis, Chain, preset or custom multi Project Type for Project items, search, and Active/Converted views
+- Uses compact monochrome Project/NFT icons and does not request a logo
+- Desktop table is bounded to keep actions away from wide-monitor edges; narrower laptop, tablet, and PWA layouts use compact cards from the same persisted data
 - Active items support edit and two-step delete; converted items remain read-only history
 - `Start Project` transaction carries name, X URL, thesis, Chain, and Project Type into a new Project without re-entry
+- `Track NFT` transaction carries name, X URL, thesis as Notes, and required Chain into a Watching NFT campaign without re-entry
 - Project detail displays and can edit the converted Chain and X URL; thesis remains visible in the short note
-- Conversion retains the Watchlist item with `converted_project_id`, is idempotent after completion, and does not create a project logo
+- Conversion retains the Watchlist item with a target-specific relation, is idempotent after completion, and does not create a logo
+- Converted target foreign keys use `ON DELETE RESTRICT` so history cannot silently disappear or become orphaned
 - React Query cache updates create/edit/delete/conversion results without a full page reload
 - Dashboard Quick Capture writes the Watchlist intent directly to this entity
 - Migration `0016_add_project_watchlist.sql` adds `projects.chains`, the Watchlist table, indexes, constraints, grants, and workspace RLS; it has been applied live
+- Migration `0019_watchlist_item_kinds.sql` adds `item_kind`, the NFT conversion relation, strict conversion-state checks, and indexes; it has been applied through the Supabase SQL Editor and its columns were verified live
 
 ### Accounts (Identities) — CRUD wired + avatar upload
 
@@ -231,6 +235,8 @@ All mutations call `revalidatePath()` to refresh Next.js cache.
 - Overdue is computed using the Asia/Jakarta calendar date and is not stored as mutable status
 - Create/edit UI reuses shared `AppSelect` and `AppDatePicker` surfaces
 - Delete uses an inline two-step confirmation inside the modal rather than a browser-native prompt
+- A protected daily Vercel Cron cleanup removes only `upcoming` standalone or NFT-linked Deadlines after one full overdue day in Asia/Jakarta
+- Project-linked, Task-linked, Done, and Cancelled Deadlines are excluded from automatic cleanup
 
 ### Dashboard Preview
 
@@ -325,9 +331,21 @@ Folder architecture is sound (`app` / `features` / `components` / `lib`), but se
 | `archive-preview.tsx` | ~350 lines | CRUD wired (restore, delete); React Query + commit-waiting mutations (`archive-query.ts`); inline two-step delete |
 | `daily-workspace.tsx` | ~350 lines | Task Log + Daily execution; React Query date-scoped cache (`daily-workspace-query.ts`) with optimistic Done/Skip and personal toggle; Motion `layout` on checklist rows |
 
-Unit tests: 24 files, 99 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, NFT X profile parsing/name derivation, Watchlist X metadata parsing/autofill/fallback, custom NFT lifecycle statuses, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, optimistic Quick Add and detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, Projects optimistic create, compact toast behavior, and Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
+Unit tests: 26 files, 108 tests total, including shared HTTP URL normalization, Project and NFT partial-update safety, NFT X profile parsing/name derivation, Watchlist X metadata parsing/autofill/fallback, Project/NFT item validation, view filtering, conversion mapping, Deadline auto-delete boundaries and cron authorization, custom NFT lifecycle statuses, Project Wallet assignment validation, custom-chain Wallet creation input, Daily Once/Daily/Weekly/Monthly scheduling, NFT Wallet Chain compatibility, Deadline validation, Task filtering/fallback, optimistic Quick Add and detailed Add Task with linked Deadline, completion duration, edit drawer, nested dropdown dismissal, advanced filters, Recheck Review coverage, Daily per-account generation coverage, Projects optimistic create, compact toast behavior, and Projects/Accounts preview React Query coverage (`projects-preview.test.tsx`, `accounts-preview.test.tsx`).
 
 E2E diagnostics now include focused Accounts/Projects, Project Wallet assignment, NFT Wallet participation, Docs/Daily, Inbox, and a full application smoke suite. The latest focused Project Wallet browser smoke passed login, custom-chain Wallet creation, reload persistence, Project unlink behavior, Wallet survival, cleanup, and captured no console or page errors.
+The 2026-09-11 unified Watchlist batch includes:
+
+- **Project and NFT discovery:** Watchlist items now carry an explicit Project/NFT type; Project keeps one-click capture and NFT requires Chain before save.
+- **Atomic target conversion:** Start project creates a Project and Track NFT creates a Watching NFT campaign, with target-specific converted relations and duplicate guards.
+- **Responsive density:** the desktop table is capped at 1320px, actions are left-aligned and softer, rows/icons are smaller, and viewports below xl use compact cards for laptop, tablet, and PWA layouts.
+- **Low-noise optional content:** empty Thesis values no longer render fallback copy in list rows or cards.
+- **Quick capture precision:** the Project/NFT selector now sits directly below the X URL field, the duplicate inline Add details action is removed, and the header retains the single detailed-create entry point.
+- **Type filtering:** Active and Converted views can each be filtered to All, Projects, or NFTs without another database query.
+- **Migration status:** 0019_watchlist_item_kinds.sql has been applied to the live Supabase database; the new columns and retained Project rows were verified through SQL Editor queries.
+- **Deadline lifecycle:** a protected daily cron removes eligible standalone and NFT mint-schedule Deadlines after one full overdue day while retaining Project-linked, Task-linked, Done, and Cancelled records.
+- **Validation:** the unified Watchlist, quick-capture/filter, and Deadline cleanup work passed pnpm test with 26 files and 108 tests, pnpm typecheck, pnpm lint, pnpm build, route authorization smoke, and git diff --check. Logged-out Playwright smoke for the responsive Watchlist foundation passed at 1920x1080, 1366x768, and 390x844 before the follow-up control placement change.
+
 
 ## Latest Change Batch
 

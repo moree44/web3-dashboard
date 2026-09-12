@@ -6,14 +6,16 @@ import { z } from "zod";
 
 import { recordActivity } from "@/features/activity/activity-log";
 import { getJakartaDateValue } from "@/features/tasks/task-duration";
-import { buildProjectFromWatchlist } from "@/features/watchlist/watchlist-conversion";
+import {
+  buildNftFromWatchlist,
+  buildProjectFromWatchlist,
+} from "@/features/watchlist/watchlist-conversion";
 import {
   parseWatchlistConversion,
   parseWatchlistInput,
   parseWatchlistUpdate,
 } from "@/features/watchlist/watchlist-schema";
 import type {
-  ConvertedProjectRecord,
   WatchlistConversionInput,
   WatchlistConversionResult,
   WatchlistInput,
@@ -24,7 +26,7 @@ import type {
 import { fetchWatchlistXProfile } from "@/features/watchlist/x-profile-metadata";
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
-import { projectWatchlistItems, projects } from "@/lib/db/schema";
+import { nftCampaigns, projectWatchlistItems, projects } from "@/lib/db/schema";
 import { ensureDefaultWorkspace } from "@/lib/db/workspace";
 
 async function requireWorkspace() {
@@ -50,24 +52,15 @@ function toRecord(row: typeof projectWatchlistItems.$inferSelect): WatchlistItem
     thesis: row.thesis,
     chain: row.chain,
     projectTypes: row.projectTypes,
+    itemKind: row.itemKind,
     status: row.status,
     convertedProjectId: row.convertedProjectId,
+    convertedNftCampaignId: row.convertedNftCampaignId,
     createdAt: row.createdAt?.toISOString() ?? null,
     updatedAt: row.updatedAt?.toISOString() ?? null,
   };
 }
 
-function toProjectRecord(
-  project: Pick<
-    typeof projects.$inferSelect,
-    "id" | "name" | "twitterUrl" | "description" | "notes" | "chains" | "projectTypes"
-  >,
-): ConvertedProjectRecord {
-  return {
-    ...project,
-    chains: project.chains,
-  };
-}
 
 function hasPostgresCode(error: unknown, code: string): boolean {
   let current: unknown = error;
@@ -161,6 +154,7 @@ export async function createWatchlistItem(input: WatchlistInput): Promise<Watchl
         thesis: cleanOptional(parsed.thesis),
         chain: cleanOptional(parsed.chain),
         projectTypes: parsed.projectTypes,
+        itemKind: parsed.itemKind,
         status: "active",
         updatedAt: new Date(),
       })
@@ -199,6 +193,7 @@ export async function updateWatchlistItem(
         thesis: cleanOptional(parsed.thesis),
         chain: cleanOptional(parsed.chain),
         projectTypes: parsed.projectTypes,
+        itemKind: parsed.itemKind,
         updatedAt: new Date(),
       })
       .where(and(
@@ -266,6 +261,7 @@ export async function convertWatchlistToProject(
         ))
         .limit(1);
       if (!item) throw new Error("Watchlist item not found");
+      if (item.itemKind !== "project") throw new Error("This Watchlist item is an NFT");
 
       if (item.status === "converted") {
         if (!item.convertedProjectId) {
@@ -288,7 +284,7 @@ export async function convertWatchlistToProject(
           ))
           .limit(1);
         if (!existingProject) throw new Error("The converted Project no longer exists");
-        return { item, project: existingProject, created: false };
+        return { item, targetId: existingProject.id, targetName: existingProject.name, created: false };
       }
 
       const [duplicateProject] = await tx
@@ -338,24 +334,119 @@ export async function convertWatchlistToProject(
         .returning();
       if (!updatedItem) throw new Error("Watchlist item has already been converted");
 
-      return { item: updatedItem, project, created: true };
+      return { item: updatedItem, targetId: project.id, targetName: project.name, created: true };
     });
 
     const converted = {
       item: toRecord(result.item),
-      project: toProjectRecord(result.project),
+      targetType: "project" as const,
+      targetId: result.targetId,
     };
     revalidateWatchlistViews(["/", "/watchlist", "/projects", "/tasks"]);
     if (result.created) {
-      await recordActivity(workspaceId, "watchlist.converted", { projectId: converted.project.id }, {
+      await recordActivity(workspaceId, "watchlist.converted", { projectId: converted.targetId }, {
         watchlistItemId: converted.item.id,
-        name: converted.project.name,
+        name: result.targetName,
+        targetType: converted.targetType,
       });
     }
     return converted;
   } catch (error) {
     if (hasPostgresCode(error, "23505")) {
       throw new Error("An active project with this name already exists");
+    }
+    throw error;
+  }
+}
+
+export async function convertWatchlistToNft(
+  id: string,
+): Promise<WatchlistConversionResult> {
+  const workspaceId = await requireWorkspace();
+  const watchlistId = z.string().uuid().parse(id);
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [item] = await tx
+        .select()
+        .from(projectWatchlistItems)
+        .where(and(
+          eq(projectWatchlistItems.id, watchlistId),
+          eq(projectWatchlistItems.workspaceId, workspaceId),
+        ))
+        .limit(1);
+      if (!item) throw new Error("Watchlist item not found");
+      if (item.itemKind !== "nft") throw new Error("This Watchlist item is a Project");
+
+      if (item.status === "converted") {
+        if (!item.convertedNftCampaignId) {
+          throw new Error("The converted NFT campaign no longer exists");
+        }
+        const [existingNft] = await tx
+          .select({ id: nftCampaigns.id, name: nftCampaigns.name })
+          .from(nftCampaigns)
+          .where(and(
+            eq(nftCampaigns.id, item.convertedNftCampaignId),
+            eq(nftCampaigns.workspaceId, workspaceId),
+          ))
+          .limit(1);
+        if (!existingNft) throw new Error("The converted NFT campaign no longer exists");
+        return { item, targetId: existingNft.id, targetName: existingNft.name, created: false };
+      }
+
+      const [duplicateNft] = await tx
+        .select({ id: nftCampaigns.id })
+        .from(nftCampaigns)
+        .where(and(
+          eq(nftCampaigns.workspaceId, workspaceId),
+          sql`lower(trim(${nftCampaigns.name})) = lower(trim(${item.name}))`,
+        ))
+        .limit(1);
+      if (duplicateNft) throw new Error("An NFT campaign with this name already exists");
+
+      const nftValues = buildNftFromWatchlist(item);
+      const [nft] = await tx
+        .insert(nftCampaigns)
+        .values({ ...nftValues, workspaceId, updatedAt: new Date() })
+        .returning({ id: nftCampaigns.id, name: nftCampaigns.name });
+      if (!nft) throw new Error("NFT campaign could not be created");
+
+      const [updatedItem] = await tx
+        .update(projectWatchlistItems)
+        .set({
+          status: "converted",
+          convertedNftCampaignId: nft.id,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(projectWatchlistItems.id, item.id),
+          eq(projectWatchlistItems.workspaceId, workspaceId),
+          eq(projectWatchlistItems.status, "active"),
+        ))
+        .returning();
+      if (!updatedItem) throw new Error("Watchlist item has already been converted");
+
+      return { item: updatedItem, targetId: nft.id, targetName: nft.name, created: true };
+    });
+
+    const converted = {
+      item: toRecord(result.item),
+      targetType: "nft" as const,
+      targetId: result.targetId,
+    };
+    revalidateWatchlistViews(["/", "/watchlist", "/nfts", "/projects"]);
+    if (result.created) {
+      await recordActivity(workspaceId, "watchlist.converted", {}, {
+        watchlistItemId: converted.item.id,
+        nftCampaignId: converted.targetId,
+        name: result.targetName,
+        targetType: converted.targetType,
+      });
+    }
+    return converted;
+  } catch (error) {
+    if (hasPostgresCode(error, "23505")) {
+      throw new Error("An NFT campaign with this name already exists");
     }
     throw error;
   }

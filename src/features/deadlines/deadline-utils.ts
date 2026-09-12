@@ -3,6 +3,13 @@ export type DeadlineDateSource = {
   dueTime?: string | null;
 };
 
+export type AutoDeleteDeadlineCandidate = {
+  dueDate: string;
+  status: "upcoming" | "done" | "cancelled";
+  linkedProjectId?: string | null;
+  linkedTaskId?: string | null;
+};
+
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export function getJakartaDateValue(date = new Date()) {
@@ -23,6 +30,20 @@ export function getJakartaDateValue(date = new Date()) {
 
 export function getDeadlineDayDifference(dueDate: string, today = getJakartaDateValue()) {
   return Math.round((parseDateValue(dueDate).getTime() - parseDateValue(today).getTime()) / DAY_IN_MS);
+}
+
+export function getDeadlineAutoDeleteCutoffDate(today = getJakartaDateValue()) {
+  return shiftDateValue(today, -2);
+}
+
+export function isDeadlineEligibleForAutoDelete(
+  deadline: AutoDeleteDeadlineCandidate,
+  today = getJakartaDateValue(),
+) {
+  return deadline.status === "upcoming"
+    && !deadline.linkedProjectId
+    && !deadline.linkedTaskId
+    && deadline.dueDate <= getDeadlineAutoDeleteCutoffDate(today);
 }
 
 export function formatDeadlineDueLabel(dueDate: string, today = getJakartaDateValue()) {

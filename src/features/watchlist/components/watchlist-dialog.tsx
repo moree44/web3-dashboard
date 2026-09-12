@@ -6,7 +6,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CornerToast, type CornerToastNotice } from "@/components/shared/corner-toast";
 import { Button } from "@/components/ui/button";
 import { lookupWatchlistXProfile } from "@/features/watchlist/actions";
-import { WATCHLIST_PROJECT_TYPES, type WatchlistInput, type WatchlistItemRecord } from "@/features/watchlist/watchlist-types";
+import {
+  WATCHLIST_PROJECT_TYPES,
+  type WatchlistInput,
+  type WatchlistItemKind,
+  type WatchlistItemRecord,
+} from "@/features/watchlist/watchlist-types";
 import { cn } from "@/lib/utils";
 import { normalizeHttpUrl } from "@/lib/url";
 import { usePresence } from "@/lib/use-presence";
@@ -15,6 +20,7 @@ export function WatchlistDialog({
   open,
   item,
   initialXUrl = "",
+  initialItemKind = "project",
   onClose,
   onSave,
   onDelete,
@@ -22,12 +28,14 @@ export function WatchlistDialog({
   open: boolean;
   item?: WatchlistItemRecord | null;
   initialXUrl?: string;
+  initialItemKind?: WatchlistItemKind;
   onClose: () => void;
   onSave: (input: WatchlistInput, id?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [xUrl, setXUrl] = useState("");
+  const [itemKind, setItemKind] = useState<WatchlistItemKind>("project");
   const [thesis, setThesis] = useState("");
   const [chain, setChain] = useState("");
   const [projectTypes, setProjectTypes] = useState<string[]>([]);
@@ -73,6 +81,7 @@ export function WatchlistDialog({
     lastLookupUrlRef.current = "";
     setName(item?.name ?? "");
     setXUrl(item?.xUrl ?? initialXUrl);
+    setItemKind(item?.itemKind ?? initialItemKind);
     setThesis(item?.thesis ?? "");
     setChain(item?.chain ?? "");
     setProjectTypes(item?.projectTypes ?? []);
@@ -80,7 +89,7 @@ export function WatchlistDialog({
     setProfileLoading(false);
     setDeleteArmed(false);
     clearNotice();
-  }, [clearNotice, initialXUrl, item, open]);
+  }, [clearNotice, initialItemKind, initialXUrl, item, open]);
 
   useEffect(() => {
     if (!open || item || !initialXUrl.trim()) return;
@@ -99,7 +108,13 @@ export function WatchlistDialog({
   const { mounted, closing } = usePresence(open, 160);
   if (!mounted) return null;
 
-  const canSave = Boolean(xUrl.trim() && (!item || name.trim()) && !profileLoading && !busy);
+  const canSave = Boolean(
+    xUrl.trim()
+    && (!item || name.trim())
+    && (itemKind === "project" || chain.trim())
+    && !profileLoading
+    && !busy,
+  );
 
   function toggleProjectType(value: string) {
     setProjectTypes((current) => current.includes(value)
@@ -124,7 +139,8 @@ export function WatchlistDialog({
         xUrl: normalizeHttpUrl(xUrl),
         thesis: thesis.trim(),
         chain: chain.trim(),
-        projectTypes,
+        projectTypes: itemKind === "project" ? projectTypes : [],
+        itemKind,
       }, item?.id);
       onClose();
     } catch (caught) {
@@ -179,6 +195,29 @@ export function WatchlistDialog({
         </div>
 
         <div className="space-y-4 px-5 pb-5">
+          <fieldset>
+            <legend className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+              Item type
+            </legend>
+            <div className="mt-1.5 inline-flex rounded-lg border border-white/[0.055] bg-input p-0.5 soft-inset">
+              {(["project", "nft"] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  aria-pressed={itemKind === kind}
+                  onClick={() => setItemKind(kind)}
+                  className={cn(
+                    "h-7 rounded-md px-3 text-[11px] font-medium transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97]",
+                    itemKind === kind
+                      ? "bg-white/[0.08] text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {kind === "project" ? "Project" : "NFT"}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <label className="block">
             <span className="flex items-center justify-between gap-2 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
               X profile URL
@@ -212,7 +251,7 @@ export function WatchlistDialog({
 
           <label className="block">
             <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-              Project name{item ? "" : ", optional"}
+              {itemKind === "nft" ? "Collection name" : "Project name"}{item ? "" : ", optional"}
             </span>
             <input
               value={name}
@@ -231,12 +270,12 @@ export function WatchlistDialog({
               maxLength={2000}
               rows={4}
               className="mt-1.5 w-full resize-none rounded-lg border border-white/[0.055] bg-input px-3 py-2.5 text-xs leading-5 outline-none soft-inset placeholder:text-muted-foreground focus:border-ring"
-              placeholder="Why this project may be worth monitoring..."
+              placeholder="Why this account may be worth monitoring..."
             />
           </label>
 
           <label className="block">
-            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Chain, optional</span>
+            <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Chain{itemKind === "nft" ? "" : ", optional"}</span>
             <input
               value={chain}
               onChange={(event) => setChain(event.target.value)}
@@ -246,7 +285,8 @@ export function WatchlistDialog({
             />
           </label>
 
-          <fieldset>
+          {itemKind === "project" ? (
+            <fieldset>
             <legend className="text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">Project Type, optional</legend>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {WATCHLIST_PROJECT_TYPES.map((type) => {
@@ -286,7 +326,8 @@ export function WatchlistDialog({
                 <Plus className="size-3.5" /> Add
               </Button>
             </div>
-          </fieldset>
+            </fieldset>
+          ) : null}
           <div className="flex items-center justify-between gap-3 pt-1">
             <div>
               {item ? (

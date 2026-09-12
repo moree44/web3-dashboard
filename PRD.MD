@@ -1,6 +1,6 @@
 # PRD — Web3 Hunting OS
 
-**Version:** 3.4
+**Version:** 3.5
 **Status:** Implementation-ready draft. Supersedes v3.3. Synced against Project Wallet assignment and custom-chain wallet creation implemented on 2026-07-31.
 **Primary Use:** Personal Web3 hunting workbench
 **Product Type:** Private Web3 activity tracker, inbox, notes system, task manager, account/wallet tracker, project dashboard, and personal trading ledger
@@ -792,13 +792,13 @@ updated_at
 
 ---
 
-## 13A. Project Watchlist Model
+## 13A. Discovery Watchlist Model
 
-Project Watchlist adalah tempat menangkap project yang baru ditemukan sebelum project tersebut benar-benar mulai digarap. Ini adalah entitas dan route tersendiri di `/watchlist`, bukan filter dari tabel Projects dan bukan Token Watchlist di Trading.
+Watchlist adalah tempat menangkap project atau koleksi NFT yang baru ditemukan sebelum benar-benar mulai digarap. Ini adalah entitas dan route tersendiri di `/watchlist`, bukan filter dari tabel Projects/NFTs dan bukan Token Watchlist di Trading.
 
-Input harus cepat dan tidak meminta logo project. Nama boleh diturunkan dari handle X lalu diedit jika perlu.
+Input harus cepat dan tidak meminta logo. Nama boleh diturunkan dari handle X lalu diedit jika perlu. User memilih tipe `project` atau `nft`; NFT membutuhkan Chain sebelum disimpan agar dapat dikonversi langsung ke campaign yang valid.
 
-### Project Watchlist Fields
+### Watchlist Fields
 
 ```txt
 id
@@ -808,15 +808,17 @@ x_url
 thesis
 chain
 project_types[]
+item_kind          project | nft
 status              active | converted
 converted_project_id
+converted_nft_campaign_id
 created_at
 updated_at
 ```
 
-`chain` dan `project_types[]` menyimpan dua konsep berbeda. Chain menjawab jaringan tempat project berjalan, sedangkan Project Type menjawab kategori atau teknologi project seperti L1, L2, AI, DePIN, ZK, Security, atau Data.
+`chain` dan `project_types[]` menyimpan dua konsep berbeda. Chain menjawab jaringan tempat item berjalan, sedangkan Project Type hanya mengklasifikasikan item Project seperti L1, L2, AI, DePIN, ZK, Security, atau Data.
 
-Action `Start Project` harus membuat Project dari item Watchlist tanpa meminta user mengisi ulang data. Mapping awal:
+Action `Start Project` membuat Project; action `Track NFT` membuat NFT campaign berstatus Watching. Keduanya harus membawa data discovery tanpa meminta user mengisi ulang data.
 
 ```txt
 name            -> name
@@ -826,7 +828,7 @@ chain           -> chains[]
 project_types[] -> project_types[]
 ```
 
-Project hasil konversi tidak memiliki logo secara default dan menggunakan initials fallback. Setelah berhasil, item Watchlist tetap disimpan sebagai history dengan status `converted` dan relasi `converted_project_id`. Konversi harus atomic dan tidak boleh membuat Project kedua jika action yang sama dijalankan ulang.
+Project hasil konversi tidak memiliki logo secara default dan menggunakan initials fallback. Setelah berhasil, item Watchlist tetap disimpan sebagai history dengan status `converted` dan relasi ke satu target sesuai tipe. Konversi harus atomic, idempotent, dan tidak boleh membuat target kedua jika action yang sama dijalankan ulang.
 
 ---
 
@@ -1348,6 +1350,8 @@ cancelled
 * Creating a detailed Task may optionally create a linked Deadline in the same transaction.
 * Setting a Mint date on an NFT Campaign creates or updates its linked Deadline. Clearing the date removes that linked mint Deadline.
 * Marking an NFT Campaign Minted completes its linked Deadline; Missed cancels it.
+* An automated daily cleanup may permanently remove an `upcoming` Deadline after one full overdue calendar day in Asia/Jakarta only when it is standalone or linked solely to an NFT Campaign.
+* Automatic cleanup must never remove a Deadline linked to a Project or Task. Completed and cancelled Deadline history is retained.
 
 ### Deadline UI
 

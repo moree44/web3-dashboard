@@ -1,4 +1,4 @@
-import type { projectWatchlistItems, projects } from "@/lib/db/schema";
+import type { nftCampaigns, projectWatchlistItems, projects } from "@/lib/db/schema";
 
 type WatchlistRow = Pick<
   typeof projectWatchlistItems.$inferSelect,
@@ -36,5 +36,21 @@ export function buildProjectFromWatchlist(
     dateStart: conversion.dateStart || fallbackDate,
     logoSource: "none",
     isArchived: false,
+  };
+}
+
+export function buildNftFromWatchlist(
+  item: WatchlistRow,
+): Omit<typeof nftCampaigns.$inferInsert, "workspaceId"> {
+  const chain = item.chain?.trim();
+  if (!chain) throw new Error("Add a Chain before tracking this NFT");
+
+  return {
+    name: item.name,
+    chain,
+    status: "watching",
+    xUrl: item.xUrl,
+    notes: item.thesis?.trim() || null,
+    mintUrl: null,
   };
 }

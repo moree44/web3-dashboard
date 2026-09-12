@@ -52,6 +52,7 @@ const xProfileUrl = z.preprocess(
 
 const optionalText = (max: number) => z.string().trim().max(max).optional().default("");
 const tags = z.array(z.string().trim().min(1).max(80)).max(10).default([]);
+const itemKind = z.enum(["project", "nft"]).default("project");
 
 export const watchlistInputSchema = z.object({
   name: optionalText(120),
@@ -59,6 +60,11 @@ export const watchlistInputSchema = z.object({
   thesis: optionalText(2000),
   chain: optionalText(80),
   projectTypes: tags,
+  itemKind,
+}).superRefine((input, context) => {
+  if (input.itemKind === "nft" && !input.chain) {
+    context.addIssue({ code: "custom", path: ["chain"], message: "Chain is required for NFT items" });
+  }
 }).transform((input) => ({
   ...input,
   name: input.name || deriveWatchlistName(input.xUrl),
@@ -70,6 +76,11 @@ export const watchlistUpdateSchema = z.object({
   thesis: optionalText(2000),
   chain: optionalText(80),
   projectTypes: tags,
+  itemKind,
+}).superRefine((input, context) => {
+  if (input.itemKind === "nft" && !input.chain) {
+    context.addIssue({ code: "custom", path: ["chain"], message: "Chain is required for NFT items" });
+  }
 });
 
 export const watchlistConversionSchema = z.object({

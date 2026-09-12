@@ -25,8 +25,10 @@ const activeItem: WatchlistItemRecord = {
   thesis: "Interwoven rollups",
   chain: "Cosmos",
   projectTypes: ["L1"],
+  itemKind: "project",
   status: "active",
   convertedProjectId: null,
+  convertedNftCampaignId: null,
   createdAt: "2026-08-10T00:00:00.000Z",
   updatedAt: "2026-08-10T00:00:00.000Z",
 };
@@ -62,15 +64,8 @@ describe("Watchlist cache updates", () => {
     };
     const result = applyWatchlistConversion(data, {
       item: convertedItem,
-      project: {
-        id: convertedItem.convertedProjectId!,
-        name: "Initia",
-        twitterUrl: activeItem.xUrl,
-        description: activeItem.thesis,
-        notes: activeItem.thesis,
-        chains: ["Cosmos"],
-        projectTypes: ["L1"],
-      },
+      targetType: "project",
+      targetId: convertedItem.convertedProjectId!,
     });
 
     expect(result.activeItems).toEqual([]);

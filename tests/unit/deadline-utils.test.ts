@@ -5,8 +5,10 @@ import {
   compareDeadlineDates,
   formatDeadlineDueLabel,
   formatDeadlineTime,
+  getDeadlineAutoDeleteCutoffDate,
   getDeadlineDayDifference,
   getJakartaDateValue,
+  isDeadlineEligibleForAutoDelete,
   shiftDateValue,
 } from "@/features/deadlines/deadline-utils";
 
@@ -41,6 +43,39 @@ describe("deadline date utilities", () => {
   it("shifts dates safely across month boundaries", () => {
     expect(shiftDateValue("2026-07-31", 1)).toBe("2026-08-01");
     expect(shiftDateValue("2026-08-01", -1)).toBe("2026-07-31");
+  });
+
+  it("allows one full overdue day before automatic deletion", () => {
+    expect(getDeadlineAutoDeleteCutoffDate("2026-09-14")).toBe("2026-09-12");
+    expect(isDeadlineEligibleForAutoDelete({
+      dueDate: "2026-09-12",
+      status: "upcoming",
+    }, "2026-09-14")).toBe(true);
+    expect(isDeadlineEligibleForAutoDelete({
+      dueDate: "2026-09-13",
+      status: "upcoming",
+    }, "2026-09-14")).toBe(false);
+  });
+
+  it("keeps completed, cancelled, Project-linked, and Task-linked deadlines", () => {
+    const base = { dueDate: "2026-09-12" };
+
+    expect(isDeadlineEligibleForAutoDelete({ ...base, status: "done" }, "2026-09-14")).toBe(false);
+    expect(isDeadlineEligibleForAutoDelete({ ...base, status: "cancelled" }, "2026-09-14")).toBe(false);
+    expect(isDeadlineEligibleForAutoDelete({
+      ...base,
+      status: "upcoming",
+      linkedProjectId: "project-id",
+    }, "2026-09-14")).toBe(false);
+    expect(isDeadlineEligibleForAutoDelete({
+      ...base,
+      status: "upcoming",
+      linkedTaskId: "task-id",
+    }, "2026-09-14")).toBe(false);
+    expect(isDeadlineEligibleForAutoDelete({
+      ...base,
+      status: "upcoming",
+    }, "2026-09-14")).toBe(true);
   });
 });
 

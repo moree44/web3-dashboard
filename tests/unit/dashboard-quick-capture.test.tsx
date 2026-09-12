@@ -27,8 +27,10 @@ describe("DashboardQuickCapture", () => {
       thesis: null,
       chain: null,
       projectTypes: [],
+      itemKind: "project",
       status: "active",
       convertedProjectId: null,
+      convertedNftCampaignId: null,
       createdAt: null,
       updatedAt: null,
     });

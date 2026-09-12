@@ -181,12 +181,19 @@ export const projectWatchlistItems = pgTable("project_watchlist_items", {
   thesis: text("thesis"),
   chain: text("chain"),
   projectTypes: text("project_types").array().notNull().default(sql`'{}'::text[]`),
+  itemKind: text("item_kind", { enum: ["project", "nft"] })
+    .notNull()
+    .default("project"),
   status: text("status", { enum: ["active", "converted"] })
     .notNull()
     .default("active"),
   convertedProjectId: uuid("converted_project_id").references(() => projects.id, {
-    onDelete: "set null",
+    onDelete: "restrict",
   }),
+  convertedNftCampaignId: uuid("converted_nft_campaign_id").references(
+    () => nftCampaigns.id,
+    { onDelete: "restrict" },
+  ),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 }, (table) => [
@@ -201,6 +208,9 @@ export const projectWatchlistItems = pgTable("project_watchlist_items", {
   uniqueIndex("project_watchlist_converted_project_unique")
     .on(table.convertedProjectId)
     .where(sql`${table.convertedProjectId} IS NOT NULL`),
+  uniqueIndex("project_watchlist_converted_nft_unique")
+    .on(table.convertedNftCampaignId)
+    .where(sql`${table.convertedNftCampaignId} IS NOT NULL`),
 ]);
 
 // ─── Project Accounts ─────────────────────────────────────────────────────────
